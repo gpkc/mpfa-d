@@ -8,10 +8,11 @@ class MpfaD3D:
         self.dirichlet_nodes = set(mesh_data.mb.get_entities_by_type_and_tag(
             0, types.MBVERTEX, mesh_data.dirichlet_tag, np.array((None,))))
 
-        # self.neumann_nodes = set(mesh_data.mb.get_entities_by_type_and_tag(
-        #     0, types.MBVERTEX, mesh_data.neumann_tag, np.array((None,))))
-        #
-        # self.neumann_nodes = self.neumann_nodes - self.dirichlet_nodes
+        self.neumann_nodes = set(mesh_data.mb.get_entities_by_type_and_tag(
+            0, types.MBVERTEX, mesh_data.neumann_tag, np.array((None,))))
+        self.neumann_nodes = self.neumann_nodes - self.dirichlet_nodes
+
+        
 
     def run(self):
 

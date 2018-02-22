@@ -34,8 +34,8 @@ class PressureSolverTest(unittest.TestCase):
     def test_if_method_has_all_dirichlet_nodes(self):
         self.assertEqual(len(self.mpfad_2.dirichlet_nodes), 10)
 
-    # def test_if_method_has_all_neumann_nodes(self):
-    #     self.assertEqual(len(self.mpfad_2.mpfad.neumann_nodes), 10)
+    def test_if_method_has_all_neumann_nodes(self):
+        self.assertEqual(len(self.mpfad_2.neumann_nodes), 12)
 
     # def test_linear_problem_with_orthogonal_mesh(self):
     #     mpfad = MpfaD3D(self.mesh_1)
