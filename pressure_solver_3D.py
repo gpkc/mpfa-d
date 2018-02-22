@@ -5,11 +5,19 @@ class MpfaD3D:
 
     def __init__(self, mesh_data):
 
-        self.dirichlet_nodes = set(mesh_data.mb.get_entities_by_type_and_tag(
-            0, types.MBVERTEX, mesh_data.dirichlet_tag, np.array((None,))))
+        self.mb = mesh_data.mb
+        self.mtu = mesh_data.mtu
 
-        self.neumann_nodes = set(mesh_data.mb.get_entities_by_type_and_tag(
-            0, types.MBVERTEX, mesh_data.neumann_tag, np.array((None,))))
+        self.dirichlet_tag = mesh_data.dirichlet_tag
+        self.neumann_tag = mesh_data.neumann_tag
+        self.perm_tag = mesh_data.perm_tag
+        self.pressure_tag = mesh_data.pressure_tag
+
+        self.dirichlet_nodes = set(self.mb.get_entities_by_type_and_tag(
+            0, types.MBVERTEX, self.dirichlet_tag, np.array((None,))))
+
+        self.neumann_nodes = set(self.mb.get_entities_by_type_and_tag(
+            0, types.MBVERTEX, self.neumann_tag, np.array((None,))))
         self.neumann_nodes = self.neumann_nodes - self.dirichlet_nodes
 
         self.intern_nodes = set(mesh_data.all_nodes) - (self.dirichlet_nodes | self.neumann_nodes)
@@ -17,78 +25,60 @@ class MpfaD3D:
         self.dirichlet_faces = mesh_data.dirichlet_faces
         self.neumann_faces = mesh_data.neumann_faces
 
-        all_faces = mesh_data.mb.get_entities_by_dimension(0, 2)
+        self.all_faces = self.mb.get_entities_by_dimension(0, 2)
         # print('ALL FACES', all_faces, len(all_faces))
-        self.intern_faces = set(all_faces) - (self.dirichlet_faces | self.neumann_faces)
+        self.intern_faces = set(self.all_faces) - (self.dirichlet_faces | self.neumann_faces)
 
     def run(self):
 
-        mb = mesh_data.mb
-        mtu = mesh_data.mtu
+        for a_node in self.intern_nodes | self.neumann_nodes:
+            a_node_coords = self.mb.get_coords([a_node])[0]
+            self.mb.tag_set_data(self.dirichlet_tag, a_node, 1.0 - a_node_coords)
 
-        perm_tag = mesh_data.perm_tag
-        neumann_tag = mesh_data.neumann_tag
-        dirichlet_tag = mesh_data.dirichlet_tag
-        pressure_tag = mesh_data.pressure_tag
-
-        dirichlet_faces = mesh_data.dirich_faces
-        neumann_faces = mesh_data.neu_faces
-        all_faces = set(np.asarray(mb.get_entities_by_dimension(mesh_data.root_set,
-                                                                2), dtype='uint64')
-                        )
-        intern_faces = all_faces - (dirichlet_faces | neumann_faces)
-
-        dirichlet_nodes = mesh_data.dirich_nodes
-        neumann_nodes = mesh_data.neu_nodes - dirichlet_nodes
-        all_nodes = set(mb.get_entities_by_dimension(mesh_data.root_set, 0))
-        intern_nodes = all_nodes - dirichlet_nodes - neumann_nodes
-
-        for a_node in intern_nodes | neumann_nodes:
-            a_node_coords = mb.get_coords([a_node])[0]
-            mb.tag_set_data(dirichlet_tag, a_node, 1.0 - a_node_coords)
-
-        gid_tag = mb.tag_get_handle(
+        gid_tag = self.mb.tag_get_handle(
                         "GID_VOLUME", 1, types.MB_TYPE_DOUBLE,
                         types.MB_TAG_SPARSE, True)
 
         gid = 0.0
-        volumes = mb.get_entities_by_dimension(mesh_data.root_set, 3)
+        volumes = self.mb.get_entities_by_dimension(0, 3)
         for volume in volumes:
-            mb.tag_set_data(gid_tag, volume, gid)
+            self.mb.tag_set_data(gid_tag, volume, gid)
             gid += 1
 
         A = np.zeros([len(volumes), len(volumes)])
         b = np.zeros([1, len(volumes)])
 
 
-        for face in all_faces:
-            if face in dirichlet_faces:
-                volume = mtu.get_bridge_adjacencies(face, 2, 3)
-                volume_id = int(mb.tag_get_data(gid_tag, volume))
+        for face in self.all_faces:
+            if face in self.dirichlet_faces:
+                volume = self.mtu.get_bridge_adjacencies(face, 2, 3)
+                volume_id = int(self.mb.tag_get_data(gid_tag, volume))
 
-                I, J, K = mtu.get_bridge_adjacencies(face, 0, 0)
-                g_I = mb.tag_get_data(dirichlet_tag, I)
-                g_J = mb.tag_get_data(dirichlet_tag, J)
-                g_K = mb.tag_get_data(dirichlet_tag, K)
-                JI = mb.get_coords([I]) - mb.get_coords([J])
-                JK = mb.get_coords([K]) - mb.get_coords([J])
+                I, J, K = self.mtu.get_bridge_adjacencies(face, 0, 0)
+                g_I = self.mb.tag_get_data(self.dirichlet_tag, I)
+                g_J = self.mb.tag_get_data(self.dirichlet_tag, J)
+                g_K = self.mb.tag_get_data(self.dirichlet_tag, K)
+                JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
+                JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
                 N_IJK = np.cross(JK, JI) / 2
                 area = np.sqrt(np.dot(N_IJK, N_IJK))
 
-                face_centroid = mtu.get_average_position([face])
-                volume_centroid = mtu.get_average_position(volume)
+                face_centroid = self.mtu.get_average_position([face])
+                volume_centroid = self.mtu.get_average_position(volume)
 
                 test_vector = face_centroid - volume_centroid
                 check_left_or_right = np.dot(test_vector, N_IJK)
 
                 if check_left_or_right > 0:
-                    JR = volume_centroid - mb.get_coords([J])
+                    JR = volume_centroid - self.mb.get_coords([J])
                     h_R = np.absolute(np.dot(N_IJK, JR) / np.sqrt(np.dot(N_IJK,
                                       N_IJK)))
                     tan_JI = np.cross(JI, N_IJK)
                     tan_JK = np.cross(N_IJK, JK)
 
-                    K_R = mb.tag_get_data(perm_tag, volume).reshape([3, 3])
+
+
+                    K_R = self.mb.tag_get_data(self.perm_tag, volume).reshape([3, 3])
                     K_R_n = np.dot(np.dot(np.transpose(N_IJK), K_R), N_IJK) / area
 
                     K_R_JI = np.dot(np.dot(np.transpose(N_IJK), K_R),
@@ -107,17 +97,17 @@ class MpfaD3D:
                 elif check_left_or_right < 0:
                     I, K = K, I
 
-                    JI = mb.get_coords([I]) - mb.get_coords([J])
-                    JK = mb.get_coords([K]) - mb.get_coords([J])
+                    JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
+                    JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
                     N_IJK = np.cross(JK, JI) / 2
                     tan_JI = np.cross(JI, N_IJK)
                     tan_JK = np.cross(N_IJK, JK)
-                    LJ = mb.get_coords([J]) - volume_centroid
+                    LJ = self.mb.get_coords([J]) - volume_centroid
 
                     h_L = np.absolute(np.dot(N_IJK, LJ) / np.sqrt(np.dot(N_IJK,
                                       N_IJK)))
 
-                    K_L = mb.tag_get_data(perm_tag, volume).reshape([3, 3])
+                    K_L = self.mb.tag_get_data(self.perm_tag, volume).reshape([3, 3])
                     K_L_n = np.dot(np.dot(np.transpose(N_IJK), K_L), N_IJK) / area
                     K_L_JI = np.dot(np.dot(np.transpose(N_IJK), K_L),
                                     tan_JI) / area
@@ -141,42 +131,42 @@ class MpfaD3D:
                 A[volume_id][volume_id] += -2 * K_n_eff
                 b[0][volume_id] += RHS
 
-            if face in intern_faces:
-                face_centroid = mtu.get_average_position([face])
-                v1, v2 = mtu.get_bridge_adjacencies(face, 2, 3)
-                v1_centroid = mtu.get_average_position([v1])
-                v2_centroid = mtu.get_average_position([v2])
+            if face in self.intern_faces:
+                face_centroid = self.mtu.get_average_position([face])
+                v1, v2 = self.mtu.get_bridge_adjacencies(face, 2, 3)
+                v1_centroid = self.mtu.get_average_position([v1])
+                v2_centroid = self.mtu.get_average_position([v2])
                 test_LR = v1_centroid - v2_centroid
-                I, J, K = mtu.get_bridge_adjacencies(face, 0, 0)
-                p_I = mb.tag_get_data(dirichlet_tag, I)
-                p_J = mb.tag_get_data(dirichlet_tag, J)
-                p_K = mb.tag_get_data(dirichlet_tag, K)
-                JI = mb.get_coords([I]) - mb.get_coords([J])
-                JK = mb.get_coords([K]) - mb.get_coords([J])
+                I, J, K = self.mtu.get_bridge_adjacencies(face, 0, 0)
+                p_I = self.mb.tag_get_data(self.dirichlet_tag, I)
+                p_J = self.mb.tag_get_data(self.dirichlet_tag, J)
+                p_K = self.mb.tag_get_data(self.dirichlet_tag, K)
+                JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
+                JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
                 N_IJK = np.cross(JK, JI) / 2
                 area = np.sqrt(np.dot(N_IJK, N_IJK))
                 check_left_or_right = np.dot(test_LR, N_IJK)
                 if check_left_or_right > 0:
                     right_volume = v1
-                    right_volume_centroid = mtu.get_average_position([
+                    right_volume_centroid = self.mtu.get_average_position([
                                                                      right_volume])
 
                     left_volume = v2
-                    left_volume_centroid = mtu.get_average_position([left_volume])
+                    left_volume_centroid = self.mtu.get_average_position([left_volume])
 
                 else:
                     right_volume = v2
-                    right_volume_centroid = mtu.get_average_position([
+                    right_volume_centroid = self.mtu.get_average_position([
                                                                      right_volume])
 
                     left_volume = v1
-                    left_volume_centroid = mtu.get_average_position([left_volume])
+                    left_volume_centroid = self.mtu.get_average_position([left_volume])
 
                 LR = right_volume_centroid - left_volume_centroid
                 tan_JI = np.cross(JI, N_IJK)
                 tan_JK = np.cross(N_IJK, JK)
 
-                K_R = mb.tag_get_data(perm_tag, right_volume).reshape([3, 3])
+                K_R = self.mb.tag_get_data(self.perm_tag, right_volume).reshape([3, 3])
                 h_R = face_centroid - right_volume_centroid
                 h_R = np.absolute(np.dot(N_IJK, h_R) / np.sqrt(np.dot(N_IJK,
                                                                       N_IJK))
@@ -185,7 +175,7 @@ class MpfaD3D:
                 K_R_JI = np.dot(np.dot(np.transpose(N_IJK), K_R), tan_JI) / area
                 K_R_JK = np.dot(np.dot(np.transpose(N_IJK), K_R), tan_JK) / area
 
-                K_L = mb.tag_get_data(perm_tag, left_volume).reshape([3, 3])
+                K_L = self.mb.tag_get_data(self.perm_tag, left_volume).reshape([3, 3])
                 h_L = face_centroid - left_volume_centroid
                 h_L = np.absolute(np.dot(N_IJK, h_L) / np.sqrt(np.dot(N_IJK,
                                                                       N_IJK))
@@ -205,8 +195,8 @@ class MpfaD3D:
                 K_n_eff = K_R_n * K_L_n / (K_R_n * h_L + K_L_n * h_R)
                 RHS = K_n_eff * (D_JI * (p_I - p_J) + D_JK * (p_K - p_J))
 
-                gid_right = int(mb.tag_get_data(gid_tag, right_volume))
-                gid_left = int(mb.tag_get_data(gid_tag, left_volume))
+                gid_right = int(self.mb.tag_get_data(gid_tag, right_volume))
+                gid_left = int(self.mb.tag_get_data(gid_tag, left_volume))
 
                 A[gid_right][gid_right] += -2 * K_n_eff
                 A[gid_right][gid_left] += 2 * K_n_eff
@@ -220,8 +210,8 @@ class MpfaD3D:
 
         p = np.linalg.solve(A, b[0])
         print("PRESSAO: ", p)
-        mb.tag_set_data(pressure_tag, volumes, p)
-        mb.write_file("pressure_solution.vtk")
+        self.mb.tag_set_data(self.pressure_tag, volumes, p)
+        self.mb.write_file("pressure_solution.vtk")
 
     # err = []
     # for a_p, volume in zip(p, volumes):
