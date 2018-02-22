@@ -12,7 +12,14 @@ class MpfaD3D:
             0, types.MBVERTEX, mesh_data.neumann_tag, np.array((None,))))
         self.neumann_nodes = self.neumann_nodes - self.dirichlet_nodes
 
-        
+        self.intern_nodes = set(mesh_data.all_nodes) - (self.dirichlet_nodes | self.neumann_nodes)
+
+        self.dirichlet_faces = mesh_data.dirichlet_faces
+        self.neumann_faces = mesh_data.neumann_faces
+
+        all_faces = mesh_data.mb.get_entities_by_dimension(0, 2)
+        # print('ALL FACES', all_faces, len(all_faces))
+        self.intern_faces = set(all_faces) - (self.dirichlet_faces | self.neumann_faces)
 
     def run(self):
 

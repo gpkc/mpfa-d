@@ -9,8 +9,9 @@ from pymoab import topo_util
 class MeshManager:
 
 
-    def __init__(self, mesh_file, dimension=3):
+    def __init__(self, mesh_file, dim=3):
 
+        self.dimension = dim
         self.mb = core.Core()
         self.root_set = self.mb.get_root_set()
         self.mtu = topo_util.MeshTopoUtil(self.mb)
@@ -58,21 +59,17 @@ class MeshManager:
         # self.full_edges_tag = self.mb.tag_get_handle(
         #     "full_edges", 1, types.MB_TYPE_HANDLE, types.MB_TAG_SPARSE, True)
 
-        self.all_volumes = self.mb.get_entities_by_dimension(self.root_set, dimension)
+        self.all_volumes = self.mb.get_entities_by_dimension(self.root_set, self.dimension)
 
         self.all_nodes = self.mb.get_entities_by_dimension(self.root_set, 0)
 
         self.mtu.construct_aentities(self.all_nodes)
 
-        self.dirich_nodes = set()
-        self.neu_nodes = set()
-
-        self.dirich_faces = set()
-        self.neu_faces = set()
+        self.dirichlet_faces = set()
+        self.neumann_faces = set()
 
         # self.all_pressure_well_vols = np.asarray([], dtype='uint64')
         # self.all_flow_rate_well_vols = np.asarray([], dtype='uint64')
-
 
     def create_vertices(self, coords):
         new_vertices = self.mb.create_vertices(coords)
@@ -94,19 +91,27 @@ class MeshManager:
                 physical_group = self.mb.tag_get_data(self.physical_tag, a_set, flat=True)
 
                 if physical_group == physical:
-                    group_elements = self.mb.get_entities_by_handle(a_set, True)
+                    group_elements = self.mb.get_entities_by_dimension(a_set, self.dimension - 1)
+
+                    if information_name == 'Dirichlet':
+                        # print('DIR GROUP', len(group_elements), group_elements)
+                        self.dirichlet_faces = self.dirichlet_faces | set(group_elements)
+
+                    if information_name == 'Neumann':
+                        # print('NEU GROUP', len(group_elements), group_elements)
+                        self.neumann_faces = self.neumann_faces | set(group_elements)
 
                     for element in group_elements:
-                        # value = np.asarray(value)
                         self.mb.tag_set_data(information_tag, element, value)
 
                         if set_connect:
                             connectivities = self.mtu.get_bridge_adjacencies(element, 0, 0)
                             self.mb.tag_set_data(
                                 information_tag, connectivities, np.repeat(value, len(connectivities)))
+
         # self.mb.write_file('algo_ahora.vtk')
 
-    def set_media_property(self, property_name, physicals_values, set_nodes = False):
+    def set_media_property(self, property_name, physicals_values, set_nodes=False):
         self.set_information(property_name, physicals_values, set_nodes)
 
     def set_boundary_condition(self, boundary_condition, physicals_values, set_nodes=False):
