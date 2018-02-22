@@ -117,7 +117,65 @@ class MeshManager:
     def set_boundary_condition(self, boundary_condition, physicals_values, set_nodes=False):
         self.set_information(boundary_condition, physicals_values, set_nodes)
 
+    # @staticmethod
+    # def norma(vector):
+    #     vector = np.array(vector)
+    #     dot_product = np.dot(vector, vector)
+    #     mag = sqrt(dot_product)
+    #     return mag
+    #
+    #
+    # def ang_vectors(self, u, v):
+    #     u = np.array(u)
+    #     v = np.array(v)
+    #     dot_product = np.dot(u,v)
+    #     norms = self.norma(u)*self.norma(v)
+    #     try:
+    #         arc = dot_product/norms
+    #         if np.fabs(arc) > 1:
+    #             raise ValueError('Arco maior que 1 !!!')
+    #     except ValueError:
+    #         arc = np.around(arc)
+    #     ang = np.arccos(arc)
+    #     #print ang, arc, dot_product, norms, u, v
+    #     return ang
 
+
+    def get_centroid(self, entity):
+
+        verts = self.mb.get_adjacencies(entity, 0)
+        coords = np.array([self.mb.get_coords([vert]) for vert in verts])
+
+        qtd_pts = len(verts)
+        #print qtd_pts, 'qtd_pts'
+        coords = np.reshape(coords, (qtd_pts, 3))
+        pseudo_cent = sum(coords)/qtd_pts
+
+        # vectors = np.array([coord - pseudo_cent for coord in coords])
+        # vectors = vectors.flatten()
+        # vectors = np.reshape(vectors, (len(verts), 3))
+        # directions = np.zeros(len(vectors))
+        # for j in range(len(vectors)):
+        #     direction = self.ang_vectors(vectors[j], [1,0,0])
+        #     if vectors[j, 1] <= 0:
+        #         directions[j] = directions[j] + 2.0*pi - direction
+        #     else:
+        #         directions[j] = directions[j] + direction
+        # indices = np.argsort(directions)
+        # vect_std = vectors[indices]
+        # total_area = 0
+        # wgtd_cent = 0
+        # for i in range(len(vect_std)):
+        #     norma1 = self.norma(vect_std[i])
+        #     norma2 = self.norma(vect_std[i-1])
+        #     ang_vect = self.ang_vectors(vect_std[i], vect_std[i-1])
+        #     area_tri = (0.5)*norma1*norma2*np.sin(ang_vect)
+        #     cent_tri = pseudo_cent + (1/3.0)*(vect_std[i] + vect_std[i-1])
+        #     wgtd_cent = wgtd_cent + area_tri*cent_tri
+        #     total_area = total_area + area_tri
+        #
+        # centroide = wgtd_cent/total_area
+        return pseudo_cent
 
     #
     # @staticmethod
@@ -266,65 +324,7 @@ class MeshManager:
     #
     #
     #
-    # @staticmethod
-    # def norma(vector):
-    #     vector = np.array(vector)
-    #     dot_product = np.dot(vector, vector)
-    #     mag = sqrt(dot_product)
-    #     return mag
-    #
-    #
-    # def ang_vectors(self, u, v):
-    #     u = np.array(u)
-    #     v = np.array(v)
-    #     dot_product = np.dot(u,v)
-    #     norms = self.norma(u)*self.norma(v)
-    #     try:
-    #         arc = dot_product/norms
-    #         if np.fabs(arc) > 1:
-    #             raise ValueError('Arco maior que 1 !!!')
-    #     except ValueError:
-    #         arc = np.around(arc)
-    #     ang = np.arccos(arc)
-    #     #print ang, arc, dot_product, norms, u, v
-    #     return ang
-    #
-    #
-    # def get_centroid(self, entity):
-    #
-    #     verts = self.mb.get_adjacencies(entity, 0)
-    #     coords = np.array([self.mb.get_coords([vert]) for vert in verts])
-    #
-    #     qtd_pts = len(verts)
-    #     #print qtd_pts, 'qtd_pts'
-    #     coords = np.reshape(coords, (qtd_pts, 3))
-    #     pseudo_cent = sum(coords)/qtd_pts
-    #
-    #     # vectors = np.array([coord - pseudo_cent for coord in coords])
-    #     # vectors = vectors.flatten()
-    #     # vectors = np.reshape(vectors, (len(verts), 3))
-    #     # directions = np.zeros(len(vectors))
-    #     # for j in range(len(vectors)):
-    #     #     direction = self.ang_vectors(vectors[j], [1,0,0])
-    #     #     if vectors[j, 1] <= 0:
-    #     #         directions[j] = directions[j] + 2.0*pi - direction
-    #     #     else:
-    #     #         directions[j] = directions[j] + direction
-    #     # indices = np.argsort(directions)
-    #     # vect_std = vectors[indices]
-    #     # total_area = 0
-    #     # wgtd_cent = 0
-    #     # for i in range(len(vect_std)):
-    #     #     norma1 = self.norma(vect_std[i])
-    #     #     norma2 = self.norma(vect_std[i-1])
-    #     #     ang_vect = self.ang_vectors(vect_std[i], vect_std[i-1])
-    #     #     area_tri = (0.5)*norma1*norma2*np.sin(ang_vect)
-    #     #     cent_tri = pseudo_cent + (1/3.0)*(vect_std[i] + vect_std[i-1])
-    #     #     wgtd_cent = wgtd_cent + area_tri*cent_tri
-    #     #     total_area = total_area + area_tri
-    #     #
-    #     # centroide = wgtd_cent/total_area
-    #     return pseudo_cent
+
     #
     # def all_hanging_nodes_full_edges(self):
     #
