@@ -86,8 +86,8 @@ class MeshManager:
         return new_volume
 
 
-    def set_information(self, information_tag, physicals_values, set_connect=False):
-        information_tag = self.mb.tag_get_handle(information_tag)
+    def set_information(self, information_name, physicals_values, set_connect=False):
+        information_tag = self.mb.tag_get_handle(information_name)
         for physical, value in physicals_values.items():
 
             for a_set in self.physical_sets:
