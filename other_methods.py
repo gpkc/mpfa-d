@@ -10,7 +10,7 @@ def A1(params):
 def B4(params):
     pass
 
-def C2(params): 
+def C2(params):
     pass
 
 def D4(params):
