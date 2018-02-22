@@ -50,6 +50,6 @@ Physical Point(101) = {2, 3, 7, 6};
 
 Physical Surface(201) = {18, 14, 22, 16};
 Physical Surface(102) = {24};
-Physical Surface(101) = {20};
+Physical Surface(101) = {20}; 
 
 Physical Volume(1) = {26};
