@@ -83,15 +83,16 @@ class MeshManager:
         return new_volume
 
 
-    def set_information(self, information_name, physicals_values, set_connect=False):
+    def set_information(self, information_name, physicals_values,
+                              dim_target, set_connect=False):
+
         information_tag = self.mb.tag_get_handle(information_name)
         for physical, value in physicals_values.items():
-
             for a_set in self.physical_sets:
                 physical_group = self.mb.tag_get_data(self.physical_tag, a_set, flat=True)
 
                 if physical_group == physical:
-                    group_elements = self.mb.get_entities_by_dimension(a_set, self.dimension - 1)
+                    group_elements = self.mb.get_entities_by_dimension(a_set, dim_target)
 
                     if information_name == 'Dirichlet':
                         # print('DIR GROUP', len(group_elements), group_elements)
@@ -111,11 +112,17 @@ class MeshManager:
 
         # self.mb.write_file('algo_ahora.vtk')
 
-    def set_media_property(self, property_name, physicals_values, set_nodes=False):
-        self.set_information(property_name, physicals_values, set_nodes)
+    def set_media_property(self, property_name, physicals_values,
+                                 dim_target=3, set_nodes=False):
 
-    def set_boundary_condition(self, boundary_condition, physicals_values, set_nodes=False):
-        self.set_information(boundary_condition, physicals_values, set_nodes)
+        self.set_information(property_name, physicals_values,
+                             dim_target, set_connect=set_nodes)
+
+    def set_boundary_condition(self, boundary_condition, physicals_values,
+                                     dim_target=3, set_nodes=False):
+
+        self.set_information(boundary_condition, physicals_values,
+                             dim_target, set_connect=set_nodes)
 
     # @staticmethod
     # def norma(vector):
