@@ -5,13 +5,20 @@ class MpfaD3D:
 
     def __init__(self, mesh_data):
 
+        self.mesh_data = mesh_data
         self.mb = mesh_data.mb
         self.mtu = mesh_data.mtu
 
         self.dirichlet_tag = mesh_data.dirichlet_tag
         self.neumann_tag = mesh_data.neumann_tag
         self.perm_tag = mesh_data.perm_tag
-        self.pressure_tag = mesh_data.pressure_tag
+
+        self.pressure_tag = self.mb.tag_get_handle(
+            "Pressure", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+
+        self.global_id_tag = self.mb.tag_get_handle(
+                        "GLOBAL_ID_VOLUME", 1, types.MB_TYPE_DOUBLE,
+                        types.MB_TAG_SPARSE, True)
 
         self.dirichlet_nodes = set(self.mb.get_entities_by_type_and_tag(
             0, types.MBVERTEX, self.dirichlet_tag, np.array((None,))))
@@ -37,32 +44,35 @@ class MpfaD3D:
                 N_IJK = - N_IJK
         return N_IJK
 
+    def set_global_id(self):
+        vol_ids = {}
+        range_of_ids = range(len(self.mesh_data.all_volumes))
+        for id_, volume in zip(range_of_ids, self.mesh_data.all_volumes):
+            vol_ids[volume] = id_
+        return vol_ids
+
     def run(self):
+
+        v_ids = self.set_global_id()
 
         for a_node in self.intern_nodes | self.neumann_nodes:
             a_node_coords = self.mb.get_coords([a_node])[0]
             self.mb.tag_set_data(self.dirichlet_tag, a_node, 1.0 - a_node_coords)
 
-        gid_tag = self.mb.tag_get_handle(
-                        "GID_VOLUME", 1, types.MB_TYPE_DOUBLE,
-                        types.MB_TAG_SPARSE, True)
-
-        gid = 0.0
-        volumes = self.mb.get_entities_by_dimension(0, 3)
-        for volume in volumes:
-            self.mb.tag_set_data(gid_tag, volume, gid)
-            gid += 1
-
+        volumes = self.mesh_data.all_volumes
         A = np.zeros([len(volumes), len(volumes)])
         b = np.zeros([1, len(volumes)])
 
-
         for face in self.all_faces:
+
+            # if face in self.neumann_faces:
+            #     volume = self.mtu.get_bridge_adjacencies(face, 2, 3)
+            #     vol_global_id = self.mb.tag_get_data(g)
+
             if face in self.dirichlet_faces:
-                volume = self.mtu.get_bridge_adjacencies(face, 2, 3)
+                volume = np.asarray(self.mtu.get_bridge_adjacencies(face, 2, 3), dtype='uint64')
                 volume_centroid = self.mtu.get_average_position(volume)
 
-                volume_id = int(self.mb.tag_get_data(gid_tag, volume))
                 I, J, K = self.mtu.get_bridge_adjacencies(face, 0, 0)
                 g_I = self.mb.tag_get_data(self.dirichlet_tag, I)
                 g_J = self.mb.tag_get_data(self.dirichlet_tag, J)
@@ -97,6 +107,7 @@ class MpfaD3D:
                 RHS = -(D_JI * (g_J - g_I) + D_JK * (g_J - g_K) + 2 *
                         K_R_n / h_R * g_J)
 
+                volume_id = v_ids[volume[0]]
                 A[volume_id][volume_id] += -2 * K_n_eff
                 b[0][volume_id] += RHS
 
@@ -155,8 +166,8 @@ class MpfaD3D:
                 K_n_eff = K_R_n * K_L_n / (K_R_n * h_L + K_L_n * h_R)
                 RHS = K_n_eff * (D_JI * (p_I - p_J) + D_JK * (p_K - p_J))
 
-                gid_right = int(self.mb.tag_get_data(gid_tag, right_volume))
-                gid_left = int(self.mb.tag_get_data(gid_tag, left_volume))
+                gid_right = v_ids[right_volume]
+                gid_left = v_ids[left_volume]
 
                 A[gid_right][gid_right] += -2 * K_n_eff
                 A[gid_right][gid_left] += 2 * K_n_eff
