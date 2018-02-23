@@ -29,17 +29,12 @@ class MpfaD3D:
         # print('ALL FACES', all_faces, len(all_faces))
         self.intern_faces = set(self.all_faces) - (self.dirichlet_faces | self.neumann_faces)
 
-    def area_vector(self, face, centroid):
-        I, J, K = self.mtu.get_bridge_adjacencies(face, 0, 0)
-        JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
-        JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
-        N_IJK = np.cross(JK, JI) / 2
-        face_centroid = self.mtu.get_average_position([face])
-        test_vector = face_centroid - centroid
-        check_left_or_right = np.dot(test_vector, N_IJK)
-
-        if check_left_or_right < 0:
-            N_IJK = - N_IJK
+    def area_vector(self, JK, JI, test_vector=np.zeros(3)):
+        N_IJK = np.cross(JK, JI) / 2.0
+        if test_vector.all() != (np.zeros(3)).all():
+            check_left_or_right = np.dot(test_vector, N_IJK)
+            if check_left_or_right < 0:
+                N_IJK = - N_IJK
         return N_IJK
 
     def run(self):
@@ -74,7 +69,10 @@ class MpfaD3D:
                 g_K = self.mb.tag_get_data(self.dirichlet_tag, K)
                 JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
                 JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
-                N_IJK = self.area_vector(face, volume_centroid)
+                face_centroid = self.mtu.get_average_position([face])
+
+                test_vector = face_centroid - volume_centroid
+                N_IJK = self.area_vector(JK, JI, test_vector)
                 area = np.sqrt(np.dot(N_IJK, N_IJK))
 
                 JR = volume_centroid - self.mb.get_coords([J])
@@ -99,44 +97,30 @@ class MpfaD3D:
                 RHS = -(D_JI * (g_J - g_I) + D_JK * (g_J - g_K) + 2 *
                         K_R_n / h_R * g_J)
 
-                # else:
-                #     print('****************************************************')
-                #     print('********* check left or right volume error *********')
-                #     print('****************************************************')
-                #     exit()
                 A[volume_id][volume_id] += -2 * K_n_eff
                 b[0][volume_id] += RHS
 
             if face in self.intern_faces:
                 face_centroid = self.mtu.get_average_position([face])
-                v1, v2 = self.mtu.get_bridge_adjacencies(face, 2, 3)
-                v1_centroid = self.mtu.get_average_position([v1])
-                v2_centroid = self.mtu.get_average_position([v2])
-                test_LR = v1_centroid - v2_centroid
+                left_volume, right_volume = self.mtu.get_bridge_adjacencies(face, 2, 3)
+                left_volume_centroid = self.mtu.get_average_position([left_volume])
+                right_volume_centroid = self.mtu.get_average_position([right_volume])
+                # test_LR = left_volume_centroid - right_volume_centroid
+
                 I, J, K = self.mtu.get_bridge_adjacencies(face, 0, 0)
                 p_I = self.mb.tag_get_data(self.dirichlet_tag, I)
                 p_J = self.mb.tag_get_data(self.dirichlet_tag, J)
                 p_K = self.mb.tag_get_data(self.dirichlet_tag, K)
                 JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
                 JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
-                N_IJK = np.cross(JK, JI) / 2
+
+                N_IJK = self.area_vector(JK, JI)
+                # N_IJK = np.cross(JK, JI) / 2
                 area = np.sqrt(np.dot(N_IJK, N_IJK))
-                check_left_or_right = np.dot(test_LR, N_IJK)
-                if check_left_or_right > 0:
-                    right_volume = v1
-                    right_volume_centroid = self.mtu.get_average_position([
-                                                                     right_volume])
-
-                    left_volume = v2
-                    left_volume_centroid = self.mtu.get_average_position([left_volume])
-
-                else:
-                    right_volume = v2
-                    right_volume_centroid = self.mtu.get_average_position([
-                                                                     right_volume])
-
-                    left_volume = v1
-                    left_volume_centroid = self.mtu.get_average_position([left_volume])
+                # check_left_or_right = np.dot(test_LR, N_IJK)
+                # if check_left_or_right < 0:
+                #     right_volume, left_volume = left_volume, right_volume
+                #     right_volume_centroid, left_volume_centroid = left_volume_centroid, right_volume_centroid
 
                 LR = right_volume_centroid - left_volume_centroid
                 tan_JI = np.cross(JI, N_IJK)
