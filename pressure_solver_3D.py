@@ -173,14 +173,19 @@ class MpfaD3D:
         self.mb.tag_set_data(self.pressure_tag, volumes, p)
         self.mb.write_file("pressure_solution.vtk")
 
-    # err = []
-    # for a_p, volume in zip(p, volumes):
-    #     x_coord = mtu.get_average_position([volume])[0]
-    #     err.append(a_p - (1 - x_coord))
-    #
-    # print(('maximum error: {0}').format(max(err)))
-    #
-    # ms = mb.create_meshset()
-    # mb.add_entities(ms, volumes)
-    #
-    # mb.write_file("pressure_solution.vtk")
+class InterpolMethod:
+
+    def by_least_squares(self):
+        pass
+
+    def by_volumes(self):
+        pass
+
+    def by_inverse_distance(self):
+        pass
+
+    def by_volumes(self):
+        pass
+
+    def by_lpew2(self):
+        pass
