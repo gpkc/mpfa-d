@@ -68,7 +68,7 @@ class PressureSolverTest(unittest.TestCase):
         self.mesh_1.mb.write_file('perm_testing.vtk')
         self.mpfad_1.run()
         for a_volume in self.mesh_1.all_volumes:
-            local_pressure = self.mesh_1.mb.tag_get_data(self.mesh_1.pressure_tag, a_volume)
+            local_pressure = self.mesh_1.mb.tag_get_data(self.mpfad_1.pressure_tag, a_volume)
             coord_x = self.mesh_1.get_centroid(a_volume)[0]
             self.assertAlmostEqual(local_pressure[0][0], 1 - coord_x, delta=1e-10)
 
