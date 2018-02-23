@@ -29,6 +29,19 @@ class MpfaD3D:
         # print('ALL FACES', all_faces, len(all_faces))
         self.intern_faces = set(self.all_faces) - (self.dirichlet_faces | self.neumann_faces)
 
+    def area_vector(self, face, centroid):
+        I, J, K = self.mtu.get_bridge_adjacencies(face, 0, 0)
+        JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
+        JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
+        N_IJK = np.cross(JK, JI) / 2
+        face_centroid = self.mtu.get_average_position([face])
+        test_vector = face_centroid - centroid
+        check_left_or_right = np.dot(test_vector, N_IJK)
+
+        if check_left_or_right < 0:
+            N_IJK = - N_IJK
+        return N_IJK
+
     def run(self):
 
         for a_node in self.intern_nodes | self.neumann_nodes:
@@ -52,82 +65,45 @@ class MpfaD3D:
         for face in self.all_faces:
             if face in self.dirichlet_faces:
                 volume = self.mtu.get_bridge_adjacencies(face, 2, 3)
-                volume_id = int(self.mb.tag_get_data(gid_tag, volume))
+                volume_centroid = self.mtu.get_average_position(volume)
 
+                volume_id = int(self.mb.tag_get_data(gid_tag, volume))
                 I, J, K = self.mtu.get_bridge_adjacencies(face, 0, 0)
                 g_I = self.mb.tag_get_data(self.dirichlet_tag, I)
                 g_J = self.mb.tag_get_data(self.dirichlet_tag, J)
                 g_K = self.mb.tag_get_data(self.dirichlet_tag, K)
                 JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
                 JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
-                N_IJK = np.cross(JK, JI) / 2
+                N_IJK = self.area_vector(face, volume_centroid)
                 area = np.sqrt(np.dot(N_IJK, N_IJK))
 
-                face_centroid = self.mtu.get_average_position([face])
-                volume_centroid = self.mtu.get_average_position(volume)
+                JR = volume_centroid - self.mb.get_coords([J])
+                h_R = np.absolute(np.dot(N_IJK, JR) / np.sqrt(np.dot(N_IJK,
+                                  N_IJK)))
+                tan_JI = np.cross(JI, N_IJK)
+                tan_JK = np.cross(N_IJK, JK)
 
-                test_vector = face_centroid - volume_centroid
-                check_left_or_right = np.dot(test_vector, N_IJK)
+                K_R = self.mb.tag_get_data(self.perm_tag, volume).reshape([3, 3])
+                K_R_n = np.dot(np.dot(np.transpose(N_IJK), K_R), N_IJK) / area
 
-                if check_left_or_right > 0:
-                    JR = volume_centroid - self.mb.get_coords([J])
-                    h_R = np.absolute(np.dot(N_IJK, JR) / np.sqrt(np.dot(N_IJK,
-                                      N_IJK)))
-                    tan_JI = np.cross(JI, N_IJK)
-                    tan_JK = np.cross(N_IJK, JK)
+                K_R_JI = np.dot(np.dot(np.transpose(N_IJK), K_R),
+                                tan_JI) / area
+                K_R_JK = np.dot(np.dot(np.transpose(N_IJK), K_R),
+                                tan_JK) / area
+                D_JI = ((np.dot(np.cross(JK, N_IJK), JR) / np.dot(N_IJK,
+                        N_IJK)) * K_R_n / h_R - K_R_JK / area)
+                D_JK = ((np.dot(np.cross(N_IJK, JI), JR) / np.dot(N_IJK,
+                        N_IJK)) * K_R_n / h_R - K_R_JI / area)
 
+                K_n_eff = K_R_n / h_R
+                RHS = -(D_JI * (g_J - g_I) + D_JK * (g_J - g_K) + 2 *
+                        K_R_n / h_R * g_J)
 
-
-                    K_R = self.mb.tag_get_data(self.perm_tag, volume).reshape([3, 3])
-                    K_R_n = np.dot(np.dot(np.transpose(N_IJK), K_R), N_IJK) / area
-
-                    K_R_JI = np.dot(np.dot(np.transpose(N_IJK), K_R),
-                                    tan_JI) / area
-                    K_R_JK = np.dot(np.dot(np.transpose(N_IJK), K_R),
-                                    tan_JK) / area
-                    D_JI = ((np.dot(np.cross(JK, N_IJK), JR) / np.dot(N_IJK,
-                            N_IJK)) * K_R_n / h_R - K_R_JK / area)
-                    D_JK = ((np.dot(np.cross(N_IJK, JI), JR) / np.dot(N_IJK,
-                            N_IJK)) * K_R_n / h_R - K_R_JI / area)
-
-                    K_n_eff = K_R_n / h_R
-                    RHS = -(D_JI * (g_J - g_I) + D_JK * (g_J - g_K) + 2 *
-                            K_R_n / h_R * g_J)
-
-                elif check_left_or_right < 0:
-                    I, K = K, I
-
-                    JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
-                    JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
-                    N_IJK = np.cross(JK, JI) / 2
-                    tan_JI = np.cross(JI, N_IJK)
-                    tan_JK = np.cross(N_IJK, JK)
-                    LJ = self.mb.get_coords([J]) - volume_centroid
-
-                    h_L = np.absolute(np.dot(N_IJK, LJ) / np.sqrt(np.dot(N_IJK,
-                                      N_IJK)))
-
-                    K_L = self.mb.tag_get_data(self.perm_tag, volume).reshape([3, 3])
-                    K_L_n = np.dot(np.dot(np.transpose(N_IJK), K_L), N_IJK) / area
-                    K_L_JI = np.dot(np.dot(np.transpose(N_IJK), K_L),
-                                    tan_JI) / area
-                    K_L_JK = np.dot(np.dot(np.transpose(N_IJK), K_L),
-                                    tan_JK) / area
-
-                    D_JI = ((np.dot(np.cross(JK, N_IJK), LJ) / np.dot(N_IJK,
-                            N_IJK)) * K_L_n / h_L - K_L_JK / area)
-                    D_JK = ((np.dot(np.cross(N_IJK, JI), LJ) / np.dot(N_IJK,
-                            N_IJK)) * K_L_n / h_L - K_L_JI / area)
-
-                    K_n_eff = K_L_n / h_L
-                    RHS = (D_JI * (g_J - g_I) + D_JK * (g_J - g_K) -
-                           2 * K_L_n / h_L * g_J)
-
-                else:
-                    print('****************************************************')
-                    print('********* check left or right volume error *********')
-                    print('****************************************************')
-                    exit()
+                # else:
+                #     print('****************************************************')
+                #     print('********* check left or right volume error *********')
+                #     print('****************************************************')
+                #     exit()
                 A[volume_id][volume_id] += -2 * K_n_eff
                 b[0][volume_id] += RHS
 
