@@ -23,9 +23,6 @@ class MeshManager:
             0, types.MBENTITYSET, np.array(
             (self.physical_tag,)), np.array((None,)))
 
-        self.pressure_tag = self.mb.tag_get_handle(
-            "Pressure", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-
         self.dirichlet_tag = self.mb.tag_get_handle(
             "Dirichlet", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
 
