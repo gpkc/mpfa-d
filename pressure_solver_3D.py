@@ -51,6 +51,31 @@ class MpfaD3D:
             vol_ids[volume] = id_
         return vol_ids
 
+    def _flux_term(self, vector_1st, permeab, vector_2nd, face_area):
+        aux_1 = np.dot(vector_1st, permeab)
+        aux_2 = np.dot(aux_1, vector_2nd)
+        flux_term = aux_2 / face_area
+        return flux_term
+
+    def _intern_cross_term(self, tan_vector, cent_vector, face_area,
+                           tan_term_1st, tan_term_2nd,
+                           norm_term_1st, norm_term_2nd,
+                           cent_dist_1st, cent_dist_2nd):
+        mesh_anisio_term = np.dot(tan_vector, cent_vector) / (face_area**2.0)
+        phys_anisio_term = ((tan_term_1st / norm_term_1st) * cent_dist_1st) + \
+                           ((tan_term_2nd / norm_term_2nd) * cent_dist_2nd)
+
+        cross_flux_term = mesh_anisio_term - phys_anisio_term / face_area
+        return cross_flux_term
+
+    def _boundary_cross_term(self, tan_vector, norm_vector, face_area,
+                             tan_flux_term, norm_flux_term, cent_dist):
+        mesh_anisio_term = np.dot(tan_vector, norm_vector)/(face_area**2)
+        phys_anisio_term = tan_flux_term / face_area
+        cross_term = mesh_anisio_term * (norm_flux_term / cent_dist) - \
+            phys_anisio_term
+        return cross_term
+
     def run(self):
 
         v_ids = self.set_global_id()
@@ -85,7 +110,7 @@ class MpfaD3D:
 
                 test_vector = face_centroid - volume_centroid
                 N_IJK = self.area_vector(JK, JI, test_vector)
-                area = np.sqrt(np.dot(N_IJK, N_IJK))
+                face_area = np.sqrt(np.dot(N_IJK, N_IJK))
 
                 JR = volume_centroid - self.mb.get_coords([J])
                 h_R = np.absolute(np.dot(N_IJK, JR) / np.sqrt(np.dot(N_IJK,
@@ -94,18 +119,18 @@ class MpfaD3D:
                 tan_JK = np.cross(N_IJK, JK)
 
                 K_R = self.mb.tag_get_data(self.perm_tag, volume).reshape([3, 3])
-                K_R_n = np.dot(np.dot(np.transpose(N_IJK), K_R), N_IJK) / area
 
-                K_R_JI = np.dot(np.dot(np.transpose(N_IJK), K_R),
-                                tan_JI) / area
-                K_R_JK = np.dot(np.dot(np.transpose(N_IJK), K_R),
-                                tan_JK) / area
-                D_JI = ((np.dot(np.cross(JK, N_IJK), JR) / np.dot(N_IJK,
-                        N_IJK)) * K_R_n / h_R - K_R_JK / area)
-                D_JK = ((np.dot(np.cross(N_IJK, JI), JR) / np.dot(N_IJK,
-                        N_IJK)) * K_R_n / h_R - K_R_JI / area)
+                K_R_n = self._flux_term(N_IJK, K_R, N_IJK, face_area)
+                K_R_JI = self._flux_term(N_IJK, K_R, tan_JI, face_area)
+                K_R_JK = self._flux_term(N_IJK, K_R, tan_JK, face_area)
+
+                D_JI = self._boundary_cross_term(tan_JK, JR, face_area,
+                                                 K_R_JK, K_R_n, h_R)
+                D_JK = self._boundary_cross_term(tan_JI, JR, face_area,
+                                                 K_R_JI, K_R_n, h_R)
 
                 K_n_eff = K_R_n / h_R
+
                 RHS = -(D_JI * (g_J - g_I) + D_JK * (g_J - g_K) + 2 *
                         K_R_n / h_R * g_J)
 
@@ -129,41 +154,43 @@ class MpfaD3D:
 
                 N_IJK = self.area_vector(JK, JI)
                 # N_IJK = np.cross(JK, JI) / 2
-                area = np.sqrt(np.dot(N_IJK, N_IJK))
+                face_area = np.sqrt(np.dot(N_IJK, N_IJK))
                 # check_left_or_right = np.dot(test_LR, N_IJK)
                 # if check_left_or_right < 0:
                 #     right_volume, left_volume = left_volume, right_volume
                 #     right_volume_centroid, left_volume_centroid = left_volume_centroid, right_volume_centroid
 
-                LR = right_volume_centroid - left_volume_centroid
+                dist_LR = right_volume_centroid - left_volume_centroid
                 tan_JI = np.cross(JI, N_IJK)
                 tan_JK = np.cross(N_IJK, JK)
 
                 K_R = self.mb.tag_get_data(self.perm_tag, right_volume).reshape([3, 3])
                 h_R = face_centroid - right_volume_centroid
                 h_R = np.absolute(np.dot(N_IJK, h_R) / np.sqrt(np.dot(N_IJK,
-                                                                      N_IJK))
-                                  )
-                K_R_n = np.dot(np.dot(np.transpose(N_IJK), K_R), N_IJK) / area
-                K_R_JI = np.dot(np.dot(np.transpose(N_IJK), K_R), tan_JI) / area
-                K_R_JK = np.dot(np.dot(np.transpose(N_IJK), K_R), tan_JK) / area
+                                                                      N_IJK)))
+
+                K_R_n = self._flux_term(N_IJK, K_R, N_IJK, face_area)
+                K_R_JI = self._flux_term(N_IJK, K_R, tan_JI, face_area)
+                K_R_JK = self._flux_term(N_IJK, K_R, tan_JK, face_area)
 
                 K_L = self.mb.tag_get_data(self.perm_tag, left_volume).reshape([3, 3])
                 h_L = face_centroid - left_volume_centroid
                 h_L = np.absolute(np.dot(N_IJK, h_L) / np.sqrt(np.dot(N_IJK,
-                                                                      N_IJK))
-                                  )
-                K_L_n = np.dot(np.dot(np.transpose(N_IJK), K_L), N_IJK) / area
-                K_L_JI = np.dot(np.dot(np.transpose(N_IJK), K_L), tan_JI) / area
-                K_L_JK = np.dot(np.dot(np.transpose(N_IJK), K_L), tan_JK) / area
-                D_JI = ((np.dot(np.cross(JK, N_IJK), LR) / (np.dot(N_IJK, N_IJK)))
-                        - 1 / np.sqrt(np.dot(N_IJK, N_IJK)) * (K_R_JK / K_R_n * h_R
-                        + K_L_JK / K_L_n * h_L)
-                        )
-                D_JK = ((np.dot(np.cross(N_IJK, JI), LR) / (np.dot(N_IJK, N_IJK)))
-                        - 1 / np.sqrt(np.dot(N_IJK, N_IJK)) * (K_R_JI / K_R_n * h_R
-                        + K_L_JI / K_L_n * h_L)
-                        )
+                                                                      N_IJK)))
+
+                K_L_n = self._flux_term(N_IJK, K_L, N_IJK, face_area)
+                K_L_JI = self._flux_term(N_IJK, K_L, tan_JI, face_area)
+                K_L_JK = self._flux_term(N_IJK, K_L, tan_JK, face_area)
+
+                D_JI = self._intern_cross_term(-tan_JK, dist_LR, face_area,
+                                               K_R_JK, K_L_JK,
+                                               K_R_n, K_L_n,
+                                               h_R, h_L)
+
+                D_JK = self._intern_cross_term(-tan_JI, dist_LR, face_area,
+                                               K_R_JI, K_L_JI,
+                                               K_R_n, K_L_n,
+                                               h_R, h_L)
 
                 K_n_eff = K_R_n * K_L_n / (K_R_n * h_L + K_L_n * h_R)
                 RHS = K_n_eff * (D_JI * (p_I - p_J) + D_JK * (p_K - p_J))
@@ -184,7 +211,8 @@ class MpfaD3D:
         p = np.linalg.solve(A, b[0])
         print("PRESSAO: ", p)
         self.mb.tag_set_data(self.pressure_tag, volumes, p)
-        self.mb.write_file("pressure_solution.vtk")
+        # self.mb.write_file("pressure_solution.vtk")
+
 
 class InterpolMethod:
 
@@ -195,9 +223,6 @@ class InterpolMethod:
         pass
 
     def by_inverse_distance(self):
-        pass
-
-    def by_volumes(self):
         pass
 
     def by_lpew2(self):
