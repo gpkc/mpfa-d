@@ -1,6 +1,7 @@
 import numpy as np
 from pymoab import types
 
+
 class MpfaD3D:
 
     def __init__(self, mesh_data):
@@ -27,7 +28,8 @@ class MpfaD3D:
             0, types.MBVERTEX, self.neumann_tag, np.array((None,))))
         self.neumann_nodes = self.neumann_nodes - self.dirichlet_nodes
 
-        self.intern_nodes = set(mesh_data.all_nodes) - (self.dirichlet_nodes | self.neumann_nodes)
+        boundary_nodes = (self.dirichlet_nodes | self.neumann_nodes)
+        self.intern_nodes = set(mesh_data.all_nodes) - boundary_nodes
 
         self.dirichlet_faces = mesh_data.dirichlet_faces
         self.neumann_faces = mesh_data.neumann_faces
@@ -61,19 +63,19 @@ class MpfaD3D:
                            tan_term_1st, tan_term_2nd,
                            norm_term_1st, norm_term_2nd,
                            cent_dist_1st, cent_dist_2nd):
-        mesh_anisio_term = np.dot(tan_vector, cent_vector) / (face_area**2.0)
-        phys_anisio_term = ((tan_term_1st / norm_term_1st) * cent_dist_1st) + \
+        mesh_aniso_term = np.dot(tan_vector, cent_vector) / (face_area**2.0)
+        phys_aniso_term = ((tan_term_1st / norm_term_1st) * cent_dist_1st) + \
                            ((tan_term_2nd / norm_term_2nd) * cent_dist_2nd)
 
-        cross_flux_term = mesh_anisio_term - phys_anisio_term / face_area
+        cross_flux_term = mesh_aniso_term - phys_aniso_term / face_area
         return cross_flux_term
 
     def _boundary_cross_term(self, tan_vector, norm_vector, face_area,
                              tan_flux_term, norm_flux_term, cent_dist):
-        mesh_anisio_term = np.dot(tan_vector, norm_vector)/(face_area**2)
-        phys_anisio_term = tan_flux_term / face_area
-        cross_term = mesh_anisio_term * (norm_flux_term / cent_dist) - \
-            phys_anisio_term
+        mesh_aniso_term = np.dot(tan_vector, norm_vector)/(face_area**2)
+        phys_aniso_term = tan_flux_term / face_area
+        cross_term = mesh_aniso_term * (norm_flux_term / cent_dist) - \
+            phys_aniso_term
         return cross_term
 
     def run(self):
