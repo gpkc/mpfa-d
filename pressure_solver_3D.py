@@ -65,9 +65,11 @@ class MpfaD3D:
 
         for face in self.all_faces:
 
-            # if face in self.neumann_faces:
-            #     volume = self.mtu.get_bridge_adjacencies(face, 2, 3)
-            #     vol_global_id = self.mb.tag_get_data(g)
+            if face in self.neumann_faces:
+                face_flow = self.mb.tag_get_data(self.neumann_tag, face)
+                volume = self.mtu.get_bridge_adjacencies(face, 2, 3)
+                volume = np.asarray(volume, dtype='uint64')
+                b[0][v_ids[volume[0]]] += -face_flow
 
             if face in self.dirichlet_faces:
                 volume = np.asarray(self.mtu.get_bridge_adjacencies(face, 2, 3), dtype='uint64')
