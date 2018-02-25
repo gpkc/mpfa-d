@@ -57,18 +57,26 @@ class PressureSolverTest(unittest.TestCase):
     def test_if_method_has_all_intern_faces(self):
         self.assertEqual(len(self.mpfad_2.intern_faces), 76)
 
-    def test_linear_problem_with_no_interpolation(self):
-        self.mpfad_1.run()
+    # def test_linear_problem_with_no_interpolation(self):
+    #     self.mpfad_1.run()
+    #     for a_volume in self.mesh_1.all_volumes:
+    #         local_pressure = self.mesh_1.mb.tag_get_data(
+    #                          self.mpfad_1.pressure_tag, a_volume)
+    #         coord_x = self.mesh_1.get_centroid(a_volume)[0]
+    #         self.assertAlmostEqual(
+    #             local_pressure[0][0], 1 - coord_x, delta=1e-10)
+
+    def test_inverse_distance_yields_same_weight_for_equal_tetrahedra(self):
+        intern_node = self.mesh_1.all_nodes[-1]
+        vols_weights = self.inverse_dist_inter.by_inverse_distance(intern_node)
+        for vol, weight in vols_weights.items():
+            self.assertAlmostEqual(weight, 1.0/12.0, delta=1e-10)
+
+    def test_linear_problem_with_inverse_distance_interpolation(self):
+        self.mpfad_1.run(InterpolMethod(self.mesh_1).by_inverse_distance)
         for a_volume in self.mesh_1.all_volumes:
             local_pressure = self.mesh_1.mb.tag_get_data(
                              self.mpfad_1.pressure_tag, a_volume)
             coord_x = self.mesh_1.get_centroid(a_volume)[0]
             self.assertAlmostEqual(
                 local_pressure[0][0], 1 - coord_x, delta=1e-10)
-
-    def test_inverse_distance_yields_same_weight_for_equal_tetrahedra(self):
-        intern_node = self.mesh_1.all_nodes[-1]
-        print('NODE COORD', self.mesh_1.mb.get_coords([intern_node]))
-        vols_weights = self.inverse_dist_inter.by_inverse_distance(intern_node)
-        for vol, weight in vols_weights.items():
-            self.assertAlmostEqual(weight, 1.0/12.0, delta=1e-10)
