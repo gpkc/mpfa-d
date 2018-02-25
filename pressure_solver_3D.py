@@ -104,7 +104,7 @@ class MpfaD3D:
                 self.A[id_1st][v_id] += - value
                 self.A[id_2nd][v_id] += value
 
-    def run(self, interpolation_method):
+    def run_solver(self, interpolation_method):
 
         nodes_weights = self.get_intern_nodes_weights(interpolation_method)
 
