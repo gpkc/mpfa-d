@@ -33,7 +33,7 @@ class InterpMethodTest(unittest.TestCase):
             self.assertAlmostEqual(weight, 1.0/12.0, delta=1e-10)
 
     def test_linear_problem_with_inverse_distance_interpolation_mesh_1(self):
-        self.mpfad_1.run(InterpolMethod(self.mesh_1).by_inverse_distance)
+        self.mpfad_1.run_solver(InterpolMethod(self.mesh_1).by_inverse_distance)
         for a_volume in self.mesh_1.all_volumes:
             local_pressure = self.mesh_1.mb.tag_get_data(
                              self.mpfad_1.pressure_tag, a_volume)
