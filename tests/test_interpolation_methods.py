@@ -25,7 +25,7 @@ class InterpMethodTest(unittest.TestCase):
         self.mesh_1.set_boundary_condition('Neumann', {201: 0.0},
                                            dim_target=2, set_nodes=True)
         self.mpfad_1 = MpfaD3D(self.mesh_1)
-        self.imd_1.InterpolMethod(self.mesh_1)
+        self.imd_1 = InterpolMethod(self.mesh_1)
 
     def test_inverse_distance_yields_same_weight_for_equal_tetrahedra(self):
         intern_node = self.mesh_1.all_nodes[-1]
