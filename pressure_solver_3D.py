@@ -266,14 +266,12 @@ class InterpolMethod:
             R_x += x_k
             R_y += y_k
             R_z += z_k
-
             I_xx += x_k * x_k
             I_yy += y_k * y_k
             I_zz += z_k * z_k
-
-            I_xy = x_k * y_k
-            I_xz = x_k * z_k
-            I_yz = y_k * z_k
+            I_xy += x_k * y_k
+            I_xz += x_k * z_k
+            I_yz += y_k * z_k
 
         G = I_xx * (I_yy*I_zz - I_yz*I_yz) + \
             I_xy * (I_yz*I_xz - I_xy*I_zz) + \
