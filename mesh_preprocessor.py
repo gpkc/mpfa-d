@@ -56,11 +56,12 @@ class MeshManager:
         # self.full_edges_tag = self.mb.tag_get_handle(
         #     "full_edges", 1, types.MB_TYPE_HANDLE, types.MB_TAG_SPARSE, True)
 
-        self.all_volumes = self.mb.get_entities_by_dimension(self.root_set, self.dimension)
+        self.all_volumes = self.mb.get_entities_by_dimension(0, self.dimension)
 
-        self.all_nodes = self.mb.get_entities_by_dimension(self.root_set, 0)
+        self.all_nodes = self.mb.get_entities_by_dimension(0, 0)
 
         self.mtu.construct_aentities(self.all_nodes)
+        self.all_faces = self.mb.get_entities_by_dimension(0, self.dimension-1)
 
         self.dirichlet_faces = set()
         self.neumann_faces = set()
@@ -181,7 +182,7 @@ class MeshManager:
         # centroide = wgtd_cent/total_area
         return pseudo_cent
 
-    
+
     @staticmethod
     def point_distance(coords_1, coords_2):
         dist_vector = coords_1 - coords_2

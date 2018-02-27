@@ -34,7 +34,7 @@ class MpfaD3D:
         self.dirichlet_faces = mesh_data.dirichlet_faces
         self.neumann_faces = mesh_data.neumann_faces
 
-        self.all_faces = self.mb.get_entities_by_dimension(0, 2)
+        self.all_faces = mesh_data.all_faces
         boundary_faces = (self.dirichlet_faces | self.neumann_faces)
         # print('ALL FACES', all_faces, len(all_faces))
         self.intern_faces = set(self.all_faces) - boundary_faces
@@ -375,7 +375,6 @@ class InterpolMethod:
 
         return nodes_weights
 
-
     def by_volumes(self):
         pass
 
@@ -390,8 +389,9 @@ class InterpolMethod:
             weights = np.append(weights, inv_dist)
             weight_sum += inv_dist
         weights = weights / weight_sum
-        v_weights = {vol: weight for vol, weight in zip(vols_around, weights)}
-        return v_weights
+        node_weights = {
+            vol: weight for vol, weight in zip(vols_around, weights)}
+        return node_weights
 
     def by_lpew2(self, node):
         if node in self.dirichlet_nodes:
