@@ -249,6 +249,83 @@ class InterpolMethod:
         self.mb = mesh_data.mb
         self.mtu = mesh_data.mtu
 
+        self.dirichlet_tag = mesh_data.dirichlet_tag
+        self.neumann_tag = mesh_data.neumann_tag
+        self.perm_tag = mesh_data.perm_tag
+
+        self.dirichlet_nodes = set(self.mb.get_entities_by_type_and_tag(
+            0, types.MBVERTEX, self.dirichlet_tag, np.array((None,))))
+
+        self.neumann_nodes = set(self.mb.get_entities_by_type_and_tag(
+            0, types.MBVERTEX, self.neumann_tag, np.array((None,))))
+        self.neumann_nodes = self.neumann_nodes - self.dirichlet_nodes
+
+        boundary_nodes = (self.dirichlet_nodes | self.neumann_nodes)
+        self.intern_nodes = set(mesh_data.all_nodes) - boundary_nodes
+
+        self.dirichlet_faces = mesh_data.dirichlet_faces
+        self.neumann_faces = mesh_data.neumann_faces
+
+        self.all_faces = self.mb.get_entities_by_dimension(0, 2)
+        boundary_faces = (self.dirichlet_faces | self.neumann_faces)
+        # print('ALL FACES', all_faces, len(all_faces))
+        self.intern_faces = set(self.all_faces) - boundary_faces
+
+    def _get_volumes_sharing_face_and_node(self, node, volume):
+        faces_in_volume = set(self.mtu.get_bridge_adjacencies(
+                                          volume, 3, 2))
+        faces_sharing_vertice = set(self.mtu.get_bridge_adjacencies(
+                                                node, 0, 2))
+        faces_sharing_vertice = faces_in_volume.intersection(
+                                            faces_sharing_vertice)
+        adj_vols = []
+        for face in faces_sharing_vertice:
+            volumes_sharing_face = set(self.mtu.get_bridge_adjacencies(
+                                                face, 2, 3))
+            side_volume = volumes_sharing_face - {volume}
+            adj_vols.append(side_volume)
+        return adj_vols
+
+    def _get_opposite_node_to_adj_volume(self, volume, adj_volume):
+        verts_in_volume = set(self.mtu.get_bridge_adjacencies(
+                                            volume, 3, 0))
+        verts_in_adj_volume = set(self.mtu.get_bridge_adjacencies(
+                                            adj_volume[0], 3, 0))
+        opposite_vert = list(verts_in_volume -
+                             verts_in_volume.intersection(verts_in_adj_volume))
+        return opposite_vert
+
+    def _get_auxiliar_adjacent_volume(self, node, volume, opposite_vert,
+                                      adj_volume):
+        volumes_around_node = self.mtu.get_bridge_adjacencies(node, 0, 3)
+        volumes_around_opposite_vert = set(self.mtu.get_bridge_adjacencies(
+                                           opposite_vert[0], 0, 3))
+        volumes_around_adj_volume = set(self.mtu.get_bridge_adjacencies(
+                                        adj_volume[0], 2, 3))
+        auxiliar_adjacent_volume = (volumes_around_opposite_vert.intersection(
+                                    volumes_around_node).intersection(
+                                    volumes_around_adj_volume) - {volume})
+        return auxiliar_adjacent_volume
+
+    def _get_vert_shared_by_volumes(self, node, adj_volume, aux_volume_1,
+                                    aux_volume_2):
+        verts_in_adj_volume = set(self.mtu.get_bridge_adjacencies(
+                                            adj_volume[0], 3, 0))
+        verts_in_aux_volume_1 = set(self.mtu.get_bridge_adjacencies(
+                                            aux_volume_1[0], 3, 0))
+        verts_in_aux_volume_2 = set(self.mtu.get_bridge_adjacencies(
+                                            aux_volume_2[0], 3, 0))
+        aux_vert = verts_in_adj_volume.intersection(
+                   verts_in_aux_volume_1).intersection(
+                   verts_in_aux_volume_2) - {node}
+        return aux_vert
+
+    def weight(self, volume):
+        volume_weight = (A1(volume) * B4(volume) + C2(volume) * D4(volume) +
+                         E3(volume) * F4(volume) + G4(volume) * H4(volume) -
+                         B2(volume) - F2(volume) - H2(volume))
+        return volume_weight
+
     def by_least_squares(self):
         pass
 
@@ -269,5 +346,36 @@ class InterpolMethod:
         v_weights = {vol: weight for vol, weight in zip(vols_around, weights)}
         return v_weights
 
-    def by_lpew2(self):
-        pass
+    def by_lpew2(self, node):
+        if node in self.dirichlet_nodes:
+            print('a dirichlet node')
+        if node in self.neumann_nodes:
+            print('a neumann node')
+        elif node in self.intern_nodes:
+            vols_around = self.mtu.get_bridge_adjacencies(node, 0, 3)
+            weights = np.array([])
+            weight_sum = 0.0
+            for a_vol in vols_around:
+                adj_vols = self._get_volumes_sharing_face_and_node(node, a_vol)
+                M = a_vol
+                W = list(adj_vols.pop())
+                R = list(adj_vols.pop())
+                L = list(adj_vols.pop())
+
+                i = self._get_opposite_node_to_adj_volume(M, W)
+                j = self._get_opposite_node_to_adj_volume(M, R)
+                k = self._get_opposite_node_to_adj_volume(M, L)
+
+                N = list(self._get_auxiliar_adjacent_volume(node, M, i, L))
+                P = list(self._get_auxiliar_adjacent_volume(node, M, i, R))
+                O = list(self._get_auxiliar_adjacent_volume(node, M, k, R))
+                S = list(self._get_auxiliar_adjacent_volume(node, M, k, W))
+                H = list(self._get_auxiliar_adjacent_volume(node, M, j, L))
+                V = list(self._get_auxiliar_adjacent_volume(node, M, j, W))
+
+                w = self._get_vert_shared_by_volumes(node, L, H, N)
+                l = self._get_vert_shared_by_volumes(node, R, P, O)
+                r = self._get_vert_shared_by_volumes(node, W, S, V)
+                print(w, l, r)
+
+                # weights = np.append(weights, weight(a_vol))
