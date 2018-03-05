@@ -51,6 +51,9 @@ class MpfaD3D:
                 N_IJK = - N_IJK
         return N_IJK
 
+    def get_height(self):
+        pass
+
     def set_global_id(self):
         vol_ids = {}
         range_of_ids = range(len(self.mesh_data.all_volumes))
@@ -64,6 +67,7 @@ class MpfaD3D:
         flux_term = aux_2 / face_area
         return flux_term
 
+    # chamar essa função de cross_diffusion_term
     def _intern_cross_term(self, tan_vector, cent_vector, face_area,
                            tan_term_1st, tan_term_2nd,
                            norm_term_1st, norm_term_2nd,
@@ -190,6 +194,7 @@ class MpfaD3D:
                 tan_JK = np.cross(N_IJK, JK)
 
                 K_R = self.mb.tag_get_data(self.perm_tag, right_volume).reshape([3, 3])
+
                 h_R = face_centroid - right_vol_cent
                 h_R = np.absolute(np.dot(N_IJK, h_R) / np.sqrt(np.dot(N_IJK,
                                                                       N_IJK)))
@@ -269,7 +274,7 @@ class InterpolMethod:
         boundary_faces = (self.dirichlet_faces | self.neumann_faces)
         # print('ALL FACES', all_faces, len(all_faces))
         self.intern_faces = set(self.all_faces) - boundary_faces
-        
+
     def by_inverse_distance(self, node):
         coords_node = self.mb.get_coords([node])
         vols_around = self.mtu.get_bridge_adjacencies(node, 0, 3)
@@ -393,7 +398,7 @@ class InterpolMethod:
                          B2(volume) - F2(volume) - H2(volume))
         return volume_weight
 
-    def by_lpew2(self, node):
+    def by_lpew3(self, node):
         if node in self.dirichlet_nodes:
             print('a dirichlet node')
         if node in self.neumann_nodes:
