@@ -51,7 +51,7 @@ class MpfaD3D:
                 N_IJK = - N_IJK
         return N_IJK
 
-    def get_height(self):
+    def get_height(self):  # calcula h de tetraedro
         pass
 
     def set_global_id(self):
@@ -74,7 +74,7 @@ class MpfaD3D:
                            cent_dist_1st, cent_dist_2nd):
         mesh_aniso_term = np.dot(tan_vector, cent_vector) / (face_area**2.0)
         phys_aniso_term = ((tan_term_1st / norm_term_1st) * cent_dist_1st) + \
-                           ((tan_term_2nd / norm_term_2nd) * cent_dist_2nd)
+                          ((tan_term_2nd / norm_term_2nd) * cent_dist_2nd)
 
         cross_flux_term = mesh_aniso_term - phys_aniso_term / face_area
         return cross_flux_term
@@ -116,7 +116,8 @@ class MpfaD3D:
 
         for a_node in self.neumann_nodes:  # | self.intern_nodes:
             a_node_coords = self.mb.get_coords([a_node])[0]
-            self.mb.tag_set_data(self.dirichlet_tag, a_node, 1.0 - a_node_coords)
+            self.mb.tag_set_data(self.dirichlet_tag, a_node, 1.0 -
+                                 a_node_coords)
 
         for face in self.all_faces:
 
@@ -149,7 +150,8 @@ class MpfaD3D:
                 tan_JI = np.cross(JI, N_IJK)
                 tan_JK = np.cross(N_IJK, JK)
 
-                K_R = self.mb.tag_get_data(self.perm_tag, volume).reshape([3, 3])
+                K_R = self.mb.tag_get_data(self.perm_tag,
+                                           volume).reshape([3, 3])
 
                 K_R_n = self._flux_term(N_IJK, K_R, N_IJK, face_area)
                 K_R_JI = self._flux_term(N_IJK, K_R, tan_JI, face_area)
@@ -193,7 +195,8 @@ class MpfaD3D:
                 tan_JI = np.cross(JI, N_IJK)
                 tan_JK = np.cross(N_IJK, JK)
 
-                K_R = self.mb.tag_get_data(self.perm_tag, right_volume).reshape([3, 3])
+                K_R = self.mb.tag_get_data(self.perm_tag,
+                                           right_volume).reshape([3, 3])
 
                 h_R = face_centroid - right_vol_cent
                 h_R = np.absolute(np.dot(N_IJK, h_R) / np.sqrt(np.dot(N_IJK,
@@ -203,7 +206,8 @@ class MpfaD3D:
                 K_R_JI = self._flux_term(N_IJK, K_R, tan_JI, face_area)
                 K_R_JK = self._flux_term(N_IJK, K_R, tan_JK, face_area)
 
-                K_L = self.mb.tag_get_data(self.perm_tag, left_volume).reshape([3, 3])
+                K_L = self.mb.tag_get_data(self.perm_tag,
+                                           left_volume).reshape([3, 3])
                 h_L = face_centroid - left_vol_cent
                 h_L = np.absolute(np.dot(N_IJK, h_L) / np.sqrt(np.dot(N_IJK,
                                                                       N_IJK)))
@@ -428,6 +432,5 @@ class InterpolMethod:
                 w = self._get_vert_shared_by_volumes(node, L, H, N)
                 l = self._get_vert_shared_by_volumes(node, R, P, O)
                 r = self._get_vert_shared_by_volumes(node, W, S, V)
-                print(w, l, r)
 
                 # weights = np.append(weights, weight(a_vol))
