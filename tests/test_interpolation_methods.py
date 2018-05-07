@@ -31,19 +31,20 @@ class InterpMethodTest(unittest.TestCase):
         intern_node = self.mesh_1.all_nodes[-1]
         vols_ws_by_inv_distance = self.imd_1.by_inverse_distance(intern_node)
         for vol, weight in vols_ws_by_inv_distance.items():
-            self.assertAlmostEqual(weight, 1.0/12.0, delta=1e-10)
+            self.assertAlmostEqual(weight, 1.0/12.0, delta=1e-15)
 
     def test_least_squares_yields_same_weight_for_equal_tetrahedra(self):
         intern_node = self.mesh_1.all_nodes[-1]
         vols_ws_by_least_squares = self.imd_1.by_least_squares(intern_node)
         for vol, weight in vols_ws_by_least_squares.items():
-            self.assertAlmostEqual(weight, 1.0/12.0, delta=1e-10)
+            self.assertAlmostEqual(weight, 1.0/12.0, delta=1e-15)
 
-    def test_lpew3_yields_same_weight_for_equal_tetrahedra(self):
+    @unittest.skip("not ready for testing")
+    def test_lpew2_yields_same_weight_for_equal_tetrahedra(self):
         intern_node = self.mesh_1.all_nodes[-1]
-        vols_ws_by_lpew3 = self.imd_1.by_lpew3(intern_node)
-        for vol, weight in vols_ws_by_lpew3.items():
-            self.assertAlmostEqual(weight, 1.0/12.0, delta=1e-10)
+        vols_ws_by_lpew2 = self.imd_1.by_lpew2(intern_node)
+        for vol, weight in vols_ws_by_lpew2.items():
+            self.assertAlmostEqual(weight, 1.0/12.0, delta=1e-15)
 
     def test_linear_problem_with_inverse_distance_interpolation_mesh_1(self):
         self.mpfad_1.run_solver(self.imd_1.by_inverse_distance)
@@ -52,7 +53,7 @@ class InterpMethodTest(unittest.TestCase):
                              self.mpfad_1.pressure_tag, a_volume)
             coord_x = self.mesh_1.get_centroid(a_volume)[0]
             self.assertAlmostEqual(
-                local_pressure[0][0], 1 - coord_x, delta=1e-10)
+                local_pressure[0][0], 1 - coord_x, delta=1e-15)
 
     def test_linear_problem_with_least_squares_interpolation_mesh_1(self):
         self.mpfad_1.run_solver(self.imd_1.by_least_squares)
@@ -61,10 +62,10 @@ class InterpMethodTest(unittest.TestCase):
                              self.mpfad_1.pressure_tag, a_volume)
             coord_x = self.mesh_1.get_centroid(a_volume)[0]
             self.assertAlmostEqual(
-                local_pressure[0][0], 1 - coord_x, delta=1e-10)
+                local_pressure[0][0], 1 - coord_x, delta=1e-15)
 
-    def test_if_N_ijk_points_outward_CV(self):
-        # create vector N_ijk from interpolation method information
-        # create vertex pointing from vertice to volume centroide
-        # dot product from these vectors should be greater than zero
-        pass
+    def test_if_only_node_volume_adjacents_in_list(self):
+        intern_nodes = self.mesh_1.all_nodes[-1]
+        vols_ws_by_lpew2 = self.imd_1.by_lpew2(intern_nodes)
+        for a_node in self.mesh_1.all_nodes:
+            adj_vols = self.mpfad_1.mtu.get_bridge_adjacencies(a_node, 0, 3)
