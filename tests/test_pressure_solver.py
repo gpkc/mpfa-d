@@ -5,7 +5,10 @@ from mesh_preprocessor import MeshManager
 
 
 class PressureSolverTest(unittest.TestCase):
-
+"""
+These tests are more MeshManager class related. We should rename
+this test suite.
+"""
     def setUp(self):
 
         K_1 = np.array([1.0, 0.0, 0.0,

@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 from pressure_solver_3D import MpfaD3D
-from pressure_solver_3D import InterpolMethod
+from interpolation_methods import InterpolMethod
 from mesh_preprocessor import MeshManager
 
 
