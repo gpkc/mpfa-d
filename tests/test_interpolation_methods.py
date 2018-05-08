@@ -63,9 +63,3 @@ class InterpMethodTest(unittest.TestCase):
             coord_x = self.mesh_1.get_centroid(a_volume)[0]
             self.assertAlmostEqual(
                 local_pressure[0][0], 1 - coord_x, delta=1e-15)
-
-    def test_if_only_node_volume_adjacents_in_list(self):
-        intern_nodes = self.mesh_1.all_nodes[-1]
-        vols_ws_by_lpew2 = self.imd_1.by_lpew2(intern_nodes)
-        for a_node in self.mesh_1.all_nodes:
-            adj_vols = self.mpfad_1.mtu.get_bridge_adjacencies(a_node, 0, 3)

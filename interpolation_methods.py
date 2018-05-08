@@ -2,6 +2,7 @@ import numpy as np
 from itertools import cycle
 from pymoab import types
 
+
 class InterpolMethod:
 
     def __init__(self, mesh_data):
@@ -110,10 +111,13 @@ class InterpolMethod:
             adj_vols.append(side_volume)
         return adj_vols
 
-    def eta(self, volume, opposite_vertice, node):
+    def eta(self, volume, opposite_vertice, node, j_aux):
         pass
 
-    def xi(self, volume, opposite_vertice, face):
+    def xi(self, volume, opposite_vertice, r_aux):
+        pass
+
+    def _get_opposite_area_vector(self, opposite_vert):
         pass
 
     def by_lpew2(self, node):
@@ -133,19 +137,17 @@ class InterpolMethod:
                 adj_vols = [list(adj_vols[i])[0] for i in range(len(adj_vols))]
                 aux_verts = list(set(self.mtu.get_bridge_adjacencies(a_vol,
                                      3, 0)).difference(set([node])))
-                adj_faces = list(self.mtu.get_bridge_adjacencies(a_vol,
-                                 3, 2))
-                for index, aux in zip([1, 3, 5], aux_verts):
-                    T[index] = aux  # convert later in get average position
-                Aux_verts = cycle(aux_verts)
-                for i, aux_vert in zip(range(len(T)), Aux_verts):
+                _aux_verts = cycle(aux_verts)
+                for i, aux_vert in zip(range(3), _aux_verts):
                     aux1 = list(T.keys())[list(T.values()).index(aux_vert)]
                     aux2 = list(T.keys())[list(T.values()).index(
-                                next(Aux_verts))]
+                                next(_aux_verts))]
                     if aux1 + aux2 != 6:
                         index = (aux1 + aux2) / 2
                         T[index] = self.mtu.get_average_position([node,
                                                                   aux1, aux2])
+                        # might be more interesting getitng the real aentity
+                        # (face, edge, node,...)
                     else:
                         T[6] = self.mtu.get_average_position([node,
                                                              aux1, aux2])
