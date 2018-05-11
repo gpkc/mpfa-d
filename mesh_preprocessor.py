@@ -156,6 +156,14 @@ class MeshManager:
         coords = np.reshape(coords, (qtd_pts, 3))
         pseudo_cent = sum(coords)/qtd_pts
 
+    def get_tetra_volume(self, tet_nodes):
+        vect_1 = tet_nodes[1] - tet_nodes[0]
+        vect_2 = tet_nodes[2] - tet_nodes[0]
+        vect_3 = tet_nodes[3] - tet_nodes[0]
+        vol_eval = np.linalg.det(vect_1, vect_2, vect_3)/6.0
+        return vol_eval
+
+
         # vectors = np.array([coord - pseudo_cent for coord in coords])
         # vectors = vectors.flatten()
         # vectors = np.reshape(vectors, (len(verts), 3))
