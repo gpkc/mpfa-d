@@ -19,7 +19,7 @@ class PressureSolverTest(unittest.TestCase):
         K_2 = np.array([2.0, 0.0, 0.0,
                         0.0, 2.0, 0.0,
                         0.0, 0.0, 2.0])
-
+        self.mesh_1 = MeshManager('mesh_test_1.msh')
         self.mesh_2 = MeshManager('geometry_two_regions_test.msh', dim=3)
         self.all_volumes_2 = self.mesh_2.mb.get_entities_by_dimension(0, 3)
         self.mesh_2.set_media_property('Permeability', {1: K_1, 2: K_2},
@@ -47,3 +47,11 @@ class PressureSolverTest(unittest.TestCase):
 
     def test_if_method_has_all_intern_faces(self):
         self.assertEqual(len(self.mpfad_2.intern_faces), 76)
+
+    def test_get_tetra_volume(self):
+        a_tetra = self.mesh_1.all_volumes[0]
+        tetra_nodes = self.mesh_1.mb.get_adjacencies(a_tetra, 0)
+        tetra_nodes_coords = self.mesh_1.mb.get_coords(tetra_nodes)
+        tetra_nodes_coords = np.reshape(tetra_nodes_coords, (4, 3))
+        vol_eval = self.mesh_1.get_tetra_volume(tetra_nodes_coords)
+        self.assertAlmostEqual(vol_eval, 1/12.0, delta=1e-15)
