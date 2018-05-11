@@ -1,9 +1,10 @@
 import numpy as np
 from itertools import cycle
 from pymoab import types
+from perssure_solver_3D import MpfaD3D
 
 
-class InterpolMethod:
+class InterpolMethod(MpfaD3D):
 
     def __init__(self, mesh_data):
         self.mesh_data = mesh_data
@@ -153,3 +154,29 @@ class InterpolMethod:
                                                              aux1, aux2])
                 for index, aux in zip([1, 3, 5], aux_verts):
                     T[index] = self.mtu.get_average_position([aux, node])
+
+
+
+    def _lambda_lpew3(self, node, aux_node, face):
+        adj_vols = self.mtu.get_bridge_adjacencies(face, 2, 3)
+        adj_nodes = self.mtu.get_bridge_adjacencies(face, 2, 0)
+        ref_node = set(adj_vols) - set([node, aux_node])
+        for a_vol in adj_vols:
+            vol_cent = self.mesh_data.get_centroid(a_vol)
+            vol_nodes = self.mesh_data.mb.get_adjacencies(a_vol, 0)
+            vol_nodes_crds = self.mesh_data.mb.get_coords(vol_nodes)
+            vol_nodes_crds = np.reshape(vol_nodes_crds, (4, 3))
+            tetra_vol = self.mesh_data.mb._adjacencies(vol_nodes_crds)
+
+    pass
+
+
+
+
+    def by_lpew3(self, node):
+        adj_vols = self.mtu.get_bridge_adjacencies(node, 0, 3)
+        for a_vol in adj_vols:
+            aux_verts = set(self.mb.get_adjacencies(a_vol, 0))
+            aux_verts.remove(node)
+
+        pass
