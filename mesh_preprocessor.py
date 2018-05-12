@@ -183,9 +183,15 @@ class MeshManager:
         return pseudo_cent
 
     def get_tetra_volume(self, tet_nodes):
-        vect_1 = tet_nodes[1] - tet_nodes[0]
-        vect_2 = tet_nodes[2] - tet_nodes[0]
-        vect_3 = tet_nodes[3] - tet_nodes[0]
+
+        coords_0 = self.mb.get_coords(tet_nodes[0])
+        coords_1 = self.mb.get_coords(tet_nodes[1])
+        coords_2 = self.mb.get_coords(tet_nodes[2])
+        coords_3 = self.mb.get_coords(tet_nodes[3])
+
+        vect_1 = coords_1 - coords_0
+        vect_2 = coords_2 - coords_0
+        vect_3 = coords_3 - coords_0
         all_vects = np.array([vect_1, vect_2, vect_3])
         vol_eval = np.linalg.det(all_vects)/6.0
         vol_eval = abs(vol_eval)
