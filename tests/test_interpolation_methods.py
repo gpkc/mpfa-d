@@ -63,9 +63,18 @@ class InterpMethodTest(unittest.TestCase):
             coord_x = self.mesh_1.get_centroid(a_volume)[0]
             self.assertAlmostEqual(
                 local_pressure[0][0], 1 - coord_x, delta=1e-15)
-    @unittest.skip("not ready for testing")
+
     def test_lpew3_yields_same_weight_for_equal_tetrahedra(self):
         intern_node = self.mesh_1.all_nodes[-1]
         vols_ws_by_least_squares = self.imd_1.by_lpew3(intern_node)
         for vol, weight in vols_ws_by_least_squares.items():
             self.assertAlmostEqual(weight, 1.0/12.0, delta=1e-15)
+
+    def test_linear_problem_with_lpew3_interpolation_mesh_1(self):
+        self.mpfad_1.run_solver(self.imd_1.by_lpew3)
+        for a_volume in self.mesh_1.all_volumes:
+            local_pressure = self.mesh_1.mb.tag_get_data(
+                             self.mpfad_1.pressure_tag, a_volume)
+            coord_x = self.mesh_1.get_centroid(a_volume)[0]
+            self.assertAlmostEqual(
+                local_pressure[0][0], 1 - coord_x, delta=1e-15)
