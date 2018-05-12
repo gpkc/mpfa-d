@@ -266,14 +266,39 @@ class InterpolMethod(MpfaD3D):
             lambda_mult = lambda_mult * lbd
         sigma = self._sigma_lpew3(node, vol)
         neta = self._neta_lpew3(node, vol, face)
-
         phi = lambda_mult * neta / sigma
         return phi
+
+    def _psi_sum_lpew3(self, node, vol, face):
+        face_nodes = self.mtu.get_bridge_adjacencies(face, 2, 0)
+        vol_nodes = self.mb.get_adjacencies(vol, 0)
+        aux_node = set(vol_nodes) - set(face_nodes)
+        aux_node = list(aux_node)
+
+        adj_faces = set(self.mtu.get_bridge_adjacencies(node, 0, 2))
+        vol_faces = set(self.mtu.get_bridge_adjacencies(vol, 3, 2))
+        in_faces = adj_faces & vol_faces
+        faces = in_faces - face
+        faces = list(faces)
+        phi_sum = 0.0
+        for i in range(len(faces)):
+            a_face_nodes = self.mtu.get_bridge_adjacencies(faces[i], 2, 0)
+            other_node = set(face_nodes) - set(a_face_nodes)
+            other_node = list(other_node)
+            lbd_1 = self._lambda_lpew3(node, aux_node, faces[i])
+            lbd_2 = self._lambda_lpew3(node, other_node, faces[i-1])
+            neta = self._neta_lpew3(node, vol, faces[i])
+            phi = lbd_1 * lbd_2 * neta
+            phi_sum = phi_sum + phi
+        sigma = self._sigma_lpew3(node, vol)
+        phi_sum = phi_sum / sigma
+        return phi_sum
+
 
     def by_lpew3(self, node):
         adj_vols = self.mtu.get_bridge_adjacencies(node, 0, 3)
         adj_faces = self.mtu.get_bridge_adjacencies(node, 0, 2)
         for a_vol in adj_vols:
-            
+
 
         pass
