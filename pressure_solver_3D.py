@@ -62,7 +62,7 @@ class MpfaD3D:
             vol_ids[volume] = id_
         return vol_ids
 
-    def _flux_term(self, vector_1st, permeab, vector_2nd, face_area):
+    def _flux_term(self, vector_1st, permeab, vector_2nd, face_area=1.0):
         aux_1 = np.dot(vector_1st, permeab)
         aux_2 = np.dot(aux_1, vector_2nd)
         flux_term = aux_2 / face_area
