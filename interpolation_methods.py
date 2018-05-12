@@ -163,7 +163,6 @@ class InterpolMethod(MpfaD3D):
         if np.dot(area, ref_vect) < 0.0:
             area_vector = - area_vector
             return [area_vector, -1]
-
         return [area_vector, 1]
 
     def _lambda_lpew3(self, node, aux_node, face):
@@ -243,7 +242,6 @@ class InterpolMethod(MpfaD3D):
             clock_test = self._area_vector(aux_vect, vol_cent)[1]
             if clock_test < 0:
                 aux_nodes[0], aux_nodes[1] = aux_nodes[1], aux_nodes[0]
-
             count = self._lambda_lpew3(node, aux_nodes[0], a_face)
             counterwise = counterwise * count
             clock = self._lambda_lpew3(node, aux_nodes[1], a_face)
@@ -251,10 +249,31 @@ class InterpolMethod(MpfaD3D):
         sigma = clockwise + counterwise
         return sigma
 
+    def _phi_lpew3(self, node, vol, face):
+        face_nodes = self.mtu.get_bridge_adjacencies(face, 2, 0)
+        vol_nodes = self.mb.get_adjacencies(vol, 0)
+        aux_node = set(vol_nodes) - set(face_nodes)
+        aux_node = list(aux_node)
+
+        adj_faces = set(self.mtu.get_bridge_adjacencies(node, 0, 2))
+        vol_faces = set(self.mtu.get_bridge_adjacencies(vol_1, 3, 2))
+        in_faces = adj_faces & vol_faces
+        faces = in_faces - face
+        faces = list(faces)
+        lambda_mult = 1.0
+        for a_face in faces:
+            lbd = self._lambda_lpew3(node, aux_node, a_face)
+            lambda_mult = lambda_mult * lbd
+        sigma = self._sigma_lpew3(node, vol)
+        neta = self._neta_lpew3(node, vol, face)
+
+        phi = lambda_mult * neta / sigma
+        return phi
+
     def by_lpew3(self, node):
         adj_vols = self.mtu.get_bridge_adjacencies(node, 0, 3)
         adj_faces = self.mtu.get_bridge_adjacencies(node, 0, 2)
         for a_vol in adj_vols:
-            vol_faces =
+            
 
         pass
