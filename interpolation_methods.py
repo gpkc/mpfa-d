@@ -294,11 +294,32 @@ class InterpolMethod(MpfaD3D):
         phi_sum = phi_sum / sigma
         return phi_sum
 
+    def _partial_weight_lpew3(self, node, vol):
+        vol_faces = self.mtu.get_bridge_adjacencies(vol, 3, 2)
+        zepta = 0.0
+        delta = 0.0
+        for a_face in vol_faces:
+            csi = self._csi_lpew3(a_face, vol)
+
+            neigh = set(self.mtu.get_bridge_adjacencies(a_face, 2, 3))
+            neigh.remove(vol)
+            neigh = list(neigh)
+
+            psi_sum_neigh = self._psi_sum_lpew3(node, neigh, a_face)
+            psi_sum_vol = self._psi_sum_lpew3(node, vol, a_face)
+            zepta = zepta + (psi_sum_vol + psi_sum_neigh) * csi
+
+            phi_vol = self._phi_lpew3(node, vol, a_face)
+            phi_neigh = self._phi_lpew3(node, neigh, a_face)
+            delta = delta + (phi_vol + phi_neigh) * csi
+        p_weight = zepta - delta
+        return p_weight
 
     def by_lpew3(self, node):
         adj_vols = self.mtu.get_bridge_adjacencies(node, 0, 3)
-        adj_faces = self.mtu.get_bridge_adjacencies(node, 0, 2)
         for a_vol in adj_vols:
+
+
 
 
         pass
