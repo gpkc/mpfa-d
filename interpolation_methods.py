@@ -155,21 +155,52 @@ class InterpolMethod(MpfaD3D):
                 for index, aux in zip([1, 3, 5], aux_verts):
                     T[index] = self.mtu.get_average_position([aux, node])
 
+    def _area_vector(self, nodes, ref_node):
+        node_1 = self.mb.get_coords(nodes[0])
+        node_2 = self.mb.get_coords(nodes[1])
+        node_3 = self.mb.get_coords(nodes[2])
+        ref_node_crds = self.mb.get_coords(ref_node)
+        ref_vect = node_1 - ref_node_crds
+        AB = node_2 - node_1
+        AC = node_3 - node_1
+        area_vector = np.cross(AB, AC)/2.0
+        if np.dot(area, ref_vect) < 0.0:
+            area_vector = - area_vector
 
+        return area_vector
 
     def _lambda_lpew3(self, node, aux_node, face):
         adj_vols = self.mtu.get_bridge_adjacencies(face, 2, 3)
-        adj_nodes = self.mtu.get_bridge_adjacencies(face, 2, 0)
-        ref_node = set(adj_vols) - set([node, aux_node])
+        face_nodes = self.mtu.get_bridge_adjacencies(face, 2, 0)
+        ref_node = list(set(adj_vols) - set([node, aux_node]))
+        lambda_l = 0.0
         for a_vol in adj_vols:
+            vol_perm = self.mb.tag_get_data(self.perm_tag, a_vol)
             vol_cent = self.mesh_data.get_centroid(a_vol)
-            vol_nodes = self.mesh_data.mb.get_adjacencies(a_vol, 0)
-            vol_nodes_crds = self.mesh_data.mb.get_coords(vol_nodes)
-            vol_nodes_crds = np.reshape(vol_nodes_crds, (4, 3))
-            tetra_vol = self.mesh_data.mb._adjacencies(vol_nodes_crds)
+            vol_nodes = self.mb.get_adjacencies(a_vol, 0)
+            sub_vol = np.append(adj_vols, vol_cent)
+            tetra_vol = self.mesh_data.get_tetra_volume(sub_vol)
+            ref_node_i = list(set(vol_nodes) - set(face_nodes))
+            N_int = self._area_vector([node, aux_node, vol_cent], ref_node)
+            N_i = self._area_vector(face_nodes, ref_node_i)
+            lambda_l = lambda_l + self._flux_term(N_i, vol_perm, N_int)/(3*tetra_vol)
+        return lambda_l
 
-    pass
+    def _neta_lpew3(self, node, vol, face):
+        vol_perm = self.mb.tag_get_data(self.perm_tag, vol)
+        vol_nodes = self.mb.get_adjancencies(vol)
+        face_nodes = self.mtu.get_bridge_adjacencies(face, 2, 0)
+        ref_node = list(set(vol_nodes) - set(face_nodes))
 
+        vol_nodes.remove(node)
+        face_nodes_i = vol_nodes
+
+        N_out = self._area_vector(face_nodes_i, node)
+        N_i = self._area_vector(face_nodes, ref_node)
+        tetra_vol = self.mesh_data.get_tetra_volume(vol_nodes)
+        neta = self._flux_term(N_out, vol_perm, N_i)/(3*tetra_vol)
+
+        return neta
 
 
 
