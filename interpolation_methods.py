@@ -199,7 +199,6 @@ class InterpolMethod(MpfaD3D):
         face_nodes_crds = np.reshape(face_nodes_crds, (3, 3))
         ref_node = list(set(vol_nodes) - set(face_nodes))
         ref_node = self.mb.get_coords(ref_node)
-
         vol_nodes_crds = self.mb.get_coords(list(vol_nodes))
         vol_nodes_crds = np.reshape(vol_nodes_crds, (4, 3))
         tetra_vol = self.mesh_data.get_tetra_volume(vol_nodes_crds)
@@ -208,11 +207,9 @@ class InterpolMethod(MpfaD3D):
         face_nodes_i = self.mb.get_coords(list(vol_nodes))
         face_nodes_i = np.reshape(face_nodes_i, (3, 3))
         node = self.mb.get_coords([node])
-
         N_out = self._area_vector(face_nodes_i, node)[0]
         N_i = self._area_vector(face_nodes_crds, ref_node)[0]
         neta = self._flux_term(N_out, vol_perm, N_i)/(3.0*tetra_vol)
-
         return neta
 
     def _csi_lpew3(self, face, vol):
@@ -259,7 +256,6 @@ class InterpolMethod(MpfaD3D):
         vol_nodes = self.mb.get_adjacencies(vol, 0)
         aux_node = set(vol_nodes) - set(face_nodes)
         aux_node = list(aux_node)
-
         adj_faces = set(self.mtu.get_bridge_adjacencies(node, 0, 2))
         vol_faces = set(self.mtu.get_bridge_adjacencies(vol, 3, 2))
         in_faces = adj_faces & vol_faces
@@ -312,7 +308,6 @@ class InterpolMethod(MpfaD3D):
             psi_sum_neigh = self._psi_sum_lpew3(node, a_neigh, a_face[0])
             psi_sum_vol = self._psi_sum_lpew3(node, vol, a_face[0])
             zepta += (psi_sum_vol + psi_sum_neigh) * csi
-
             phi_vol = self._phi_lpew3(node, vol, a_face[0])
             phi_neigh = self._phi_lpew3(node, a_neigh, a_face[0])
             delta += (phi_vol + phi_neigh) * csi
