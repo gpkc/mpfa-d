@@ -18,7 +18,6 @@ class InterpMethodTest(unittest.TestCase):
                         0.0, 0.0, 2.0])
 
         self.mesh_1 = MeshManager('mesh_test_1.msh', dim=3)
-        self.all_volumes_1 = self.mesh_1.mb.get_entities_by_dimension(0, 3)
         self.mesh_1.set_media_property('Permeability', {1: K_1}, dim_target=3)
         self.mesh_1.set_boundary_condition('Dirichlet', {102: 1.0, 101: 0.0},
                                            dim_target=2, set_nodes=True)
@@ -26,6 +25,15 @@ class InterpMethodTest(unittest.TestCase):
                                            dim_target=2, set_nodes=True)
         self.mpfad_1 = MpfaD3D(self.mesh_1)
         self.imd_1 = InterpolMethod(self.mesh_1)
+
+        self.mesh_2 = MeshManager('mesh_test_2.msh', dim=3)
+        self.mesh_2.set_media_property('Permeability', {1: K_1}, dim_target=3)
+        self.mesh_2.set_boundary_condition('Dirichlet', {102: 1.0, 101: 0.0},
+                                           dim_target=2, set_nodes=True)
+        self.mesh_2.set_boundary_condition('Neumann', {201: 0.0},
+                                           dim_target=2, set_nodes=True)
+        self.mpfad_2 = MpfaD3D(self.mesh_2)
+        self.imd_2 = InterpolMethod(self.mesh_2)
 
     def test_inverse_distance_yields_same_weight_for_equal_tetrahedra(self):
         intern_node = self.mesh_1.all_nodes[-1]
@@ -70,11 +78,11 @@ class InterpMethodTest(unittest.TestCase):
         for vol, weight in vols_ws_by_least_squares.items():
             self.assertAlmostEqual(weight, 1.0/12.0, delta=1e-15)
 
-    def test_linear_problem_with_lpew3_interpolation_mesh_1(self):
-        self.mpfad_1.run_solver(self.imd_1.by_lpew3)
-        for a_volume in self.mesh_1.all_volumes:
-            local_pressure = self.mesh_1.mb.tag_get_data(
-                             self.mpfad_1.pressure_tag, a_volume)
-            coord_x = self.mesh_1.get_centroid(a_volume)[0]
+    def test_linear_problem_with_lpew3_interpolation_mesh_2(self):
+        self.mpfad_2.run_solver(self.imd_2.by_lpew3)
+        for a_volume in self.mesh_2.all_volumes:
+            local_pressure = self.mesh_2.mb.tag_get_data(
+                             self.mpfad_2.pressure_tag, a_volume)
+            coord_x = self.mesh_2.get_centroid(a_volume)[0]
             self.assertAlmostEqual(
                 local_pressure[0][0], 1 - coord_x, delta=1e-15)
