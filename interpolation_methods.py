@@ -185,7 +185,7 @@ class InterpolMethod(MpfaD3D):
             ref_node_i = self.mb.get_coords([ref_node_i])
             N_int = self._area_vector([node, aux_node, vol_cent], ref_node)[0]
             N_i = self._area_vector(face_nodes, ref_node_i)[0]
-            lambda_l = lambda_l + self._flux_term(N_i, vol_perm, N_int)/(3.0*tetra_vol)
+            lambda_l += self._flux_term(N_i, vol_perm, N_int)/(3.0*tetra_vol)
         return lambda_l
 
     def _neta_lpew3(self, node, vol, face):
@@ -289,7 +289,7 @@ class InterpolMethod(MpfaD3D):
             lbd_2 = self._lambda_lpew3(node, other_node, faces[i-1])
             neta = self._neta_lpew3(node, vol, faces[i])
             phi = lbd_1 * lbd_2 * neta
-            phi_sum = phi_sum + phi
+            phi_sum += + phi
         sigma = self._sigma_lpew3(node, vol)
         phi_sum = phi_sum / sigma
         return phi_sum
@@ -300,26 +300,29 @@ class InterpolMethod(MpfaD3D):
         delta = 0.0
         for a_face in vol_faces:
             csi = self._csi_lpew3(a_face, vol)
-
             neigh = set(self.mtu.get_bridge_adjacencies(a_face, 2, 3))
             neigh.remove(vol)
             neigh = list(neigh)
 
             psi_sum_neigh = self._psi_sum_lpew3(node, neigh, a_face)
             psi_sum_vol = self._psi_sum_lpew3(node, vol, a_face)
-            zepta = zepta + (psi_sum_vol + psi_sum_neigh) * csi
+            zepta += (psi_sum_vol + psi_sum_neigh) * csi
 
             phi_vol = self._phi_lpew3(node, vol, a_face)
             phi_neigh = self._phi_lpew3(node, neigh, a_face)
-            delta = delta + (phi_vol + phi_neigh) * csi
+            delta += (phi_vol + phi_neigh) * csi
         p_weight = zepta - delta
         return p_weight
 
     def by_lpew3(self, node):
-        adj_vols = self.mtu.get_bridge_adjacencies(node, 0, 3)
-        for a_vol in adj_vols:
-
-
-
-
-        pass
+        vols_around = self.mtu.get_bridge_adjacencies(node, 0, 3)
+        weights = np.array([])
+        weight_sum = 0.0
+        for a_vol in vols_around:
+            p_weight = self._partial_weight_lpew3(node, a_vol)
+            weights = np.append(weights, p_weight)
+            weight_sum += p_weight
+        weights = weights / weight_sum
+        node_weights = {
+            vol: weight for vol, weight in zip(vols_around, weights)}
+        return node_weights
