@@ -47,7 +47,7 @@ class InterpMethodTest(unittest.TestCase):
         for vol, weight in vols_ws_by_least_squares.items():
             self.assertAlmostEqual(weight, 1.0/12.0, delta=1e-15)
 
-    @unittest.skip("not ready for testing")
+    # @unittest.skip("not ready for testing")
     def test_lpew2_yields_same_weight_for_equal_tetrahedra(self):
         intern_node = self.mesh_1.all_nodes[-1]
         vols_ws_by_lpew2 = self.imd_1.by_lpew2(intern_node)

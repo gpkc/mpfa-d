@@ -112,14 +112,50 @@ class InterpolMethod(MpfaD3D):
             adj_vols.append(side_volume)
         return adj_vols
 
-    def eta(self, volume, opposite_vertice, node, j_aux):
-        pass
+    def eta(self, volume, opposite_vertice, aux_node):
 
-    def xi(self, volume, opposite_vertice, r_aux):
+
+    def xi(self, volume, opposite_vertice, face):
         pass
 
     def _get_opposite_area_vector(self, opposite_vert):
         pass
+
+    def _arrange_auxiliary_faces_and_verts(self, node, volume):
+        T = {}
+        adj_vols = self._get_volumes_sharing_face_and_node(node, volume)
+        adj_vols = [list(adj_vols[i])[0] for i in range(len(adj_vols))]
+        aux_verts = list(set(self.mtu.get_bridge_adjacencies(volume,
+                                 3, 0)).difference(set([node])))
+        aux_faces = list(set(self.mtu.get_bridge_adjacencies(volume,
+                                 3, 2)))
+        for face in aux_faces:
+            nodes_in_aux_face = list(set(self.mtu.get_bridge_adjacencies(
+                                         face, 2, 0)).difference(set([node])
+                                                                 )
+                                         )
+            if len(nodes_in_aux_face) == 3:
+                    aux_faces.remove(face)
+        aux_verts = cycle(aux_verts)
+        for index, aux_vert in zip([1, 3, 5], aux_verts):
+            T[index] = aux_vert
+
+        for aux_face in aux_faces:
+            aux_verts = list(set(self.mtu.get_bridge_adjacencies(
+                                         aux_face, 2, 0)).difference(set(
+                                                                     [node]
+                                                                     )))
+            aux1 = list(T.keys())[list(T.values()).index(aux_verts[0])]
+            aux2 = list(T.keys())[list(T.values()).index(aux_verts[1])]
+            if aux1 + aux2 != 6:
+                index = (aux1 + aux2) / 2
+                T[int(index)] = face
+            else:
+                T[6] = face
+        return T
+
+        def _get_continuity_face(self):
+            pass
 
     def by_lpew2(self, node):
         if node in self.dirichlet_nodes:
@@ -130,30 +166,11 @@ class InterpolMethod(MpfaD3D):
             vols_around = self.mtu.get_bridge_adjacencies(node, 0, 3)
             weights = np.array([])
             weight_sum = 0.0
-            T = {}
             for a_vol in vols_around:
-                k_hat = a_vol
-                k_hat_centroid = self.mesh_data.get_centroid(k_hat)
-                adj_vols = self._get_volumes_sharing_face_and_node(node, a_vol)
-                adj_vols = [list(adj_vols[i])[0] for i in range(len(adj_vols))]
-                aux_verts = list(set(self.mtu.get_bridge_adjacencies(a_vol,
-                                     3, 0)).difference(set([node])))
-                _aux_verts = cycle(aux_verts)
-                for i, aux_vert in zip(range(3), _aux_verts):
-                    aux1 = list(T.keys())[list(T.values()).index(aux_vert)]
-                    aux2 = list(T.keys())[list(T.values()).index(
-                                next(_aux_verts))]
-                    if aux1 + aux2 != 6:
-                        index = (aux1 + aux2) / 2
-                        T[index] = self.mtu.get_average_position([node,
-                                                                  aux1, aux2])
-                        # might be more interesting getitng the real aentity
-                        # (face, edge, node,...)
-                    else:
-                        T[6] = self.mtu.get_average_position([node,
-                                                             aux1, aux2])
-                for index, aux in zip([1, 3, 5], aux_verts):
-                    T[index] = self.mtu.get_average_position([aux, node])
+                auxiliary_variables = self._arrange_auxiliary_faces_and_verts(
+                                      node, a_vol)
+
+
 
     def _area_vector(self, nodes, ref_node):
         ref_vect = nodes[0] - ref_node
