@@ -1,6 +1,7 @@
 import numpy as np
 from itertools import cycle
 from pymoab import types
+from pymoab import rng
 from pressure_solver_3D import MpfaD3D
 
 
@@ -112,11 +113,42 @@ class InterpolMethod(MpfaD3D):
             adj_vols.append(side_volume)
         return adj_vols
 
-    def eta(self, volume, opposite_vertice, aux_node):
+    def _neta_lpew2(self, node, vol, face, reff_node):
+        vol_perm = self.mb.tag_get_data(self.perm_tag, vol)
+        vol_perm = np.reshape(vol_perm, (3, 3))
+        vol_centroid = self.mesh_data.get_centroid(vol)
+        face_nodes = self.mtu.get_bridge_adjacencies(face, 2, 0)
+        face_node_coords = self.mb.get_coords(face_nodes)
+        face_node_coords.reshape([3,3])
+        vol_coords = np.append(face_node_coords, vol_centroid)
+        tetra_volume = self.mesh_data.get_tetra_volume(vol_coords.reshape([4,3]))
+        opposite_face_nodes = set(face_nodes).difference(set([reff_node]))
+        opposite_face_nodes_coords = self.mb.get_coords(opposite_face_nodes)
+        opposite_face_nodes_coords = np.append(opposite_face_nodes_coords,
+                                               vol_centroid).reshape([3,3])
+        area_vector_reff_node = self._area_vector(opposite_face_nodes_coords,
+                                                  self.mb.get_coords([reff_node
+                                                                      ]))[0]
+        area_vector_centroid = self._area_vector(face_node_coords.reshape(
+                                                 [3, 3]), vol_centroid)[0]
+        neta = self._flux_term(area_vector_reff_node,
+                               vol_perm, area_vector_centroid
+                               )/(3.0 * tetra_volume)
+        return neta
 
 
-    def xi(self, volume, opposite_vertice, face):
+    def xi_lpew2(self, volume, opposite_vertice, face):
         pass
+        # return xi
+
+    def _phi_lpew2(self, neta_k_r, neta_k_r_plus_1,
+                   neta_k_j_r, neta_k_j_r_plus_1):
+        if self.neumann:
+            phi = neta_k_r / neta_k_r_plus_1
+        else:
+            phi = (neta_k_j_r - neta_k_r) / (neta_k_j_r_plus_1 - neta_k_r_plus_1)
+
+        return phi
 
     def _get_opposite_area_vector(self, opposite_vert):
         pass
@@ -125,7 +157,7 @@ class InterpolMethod(MpfaD3D):
         T = {}
         adj_vols = self._get_volumes_sharing_face_and_node(node, volume)
         adj_vols = [list(adj_vols[i])[0] for i in range(len(adj_vols))]
-        aux_verts = list(set(self.mtu.get_bridge_adjacencies(volume,
+        aux_verts_bkp = list(set(self.mtu.get_bridge_adjacencies(volume,
                                  3, 0)).difference(set([node])))
         aux_faces = list(set(self.mtu.get_bridge_adjacencies(volume,
                                  3, 2)))
@@ -136,47 +168,88 @@ class InterpolMethod(MpfaD3D):
                                          )
             if len(nodes_in_aux_face) == 3:
                     aux_faces.remove(face)
-        aux_verts = cycle(aux_verts)
+        aux_verts = cycle(aux_verts_bkp)
         for index, aux_vert in zip([1, 3, 5], aux_verts):
             T[index] = aux_vert
-
         for aux_face in aux_faces:
             aux_verts = list(set(self.mtu.get_bridge_adjacencies(
                                          aux_face, 2, 0)).difference(set(
                                                                      [node]
                                                                      )))
+            adj_vol = set(self.mtu.get_bridge_adjacencies(aux_face, 2, 3)).difference(set([volume]))
             aux1 = list(T.keys())[list(T.values()).index(aux_verts[0])]
             aux2 = list(T.keys())[list(T.values()).index(aux_verts[1])]
             if aux1 + aux2 != 6:
                 index = (aux1 + aux2) / 2
-                T[int(index)] = face
+                T[int(index)] = (aux_face,
+                                 self.mtu.get_average_position([aux_face]), adj_vol)
             else:
-                T[6] = face
-        return T
+                T[6] = (aux_face, self.mtu.get_average_position([aux_face]), adj_vol)
+        aux_verts = cycle(aux_verts_bkp)
+        for index, aux_vert in zip([1, 3, 5], aux_verts):
+            T[index] = (aux_vert,
+                        self.mtu.get_average_position([node, aux_vert])
+                        )
+        vol_centroid = np.asarray(self.mesh_data.get_centroid(volume))
+        print(vol_centroid)
+        coords = [T[1][1], T[2][1], T[3][1], T[4][1], T[5][1], T[6][1]]
+        verts = self.mb.create_vertices(coords)
+        faces = [self.mb.create_element(types.MBTRI,
+                 [node, verts[0], verts[1]]),
+                 self.mb.create_element(types.MBTRI,
+                  [node, verts[1], verts[2]]),
+                 self.mb.create_element(types.MBTRI,
+                  [node, verts[2], verts[3]]),
+                 self.mb.create_element(types.MBTRI,
+                  [node, verts[3], verts[4]]),
+                 self.mb.create_element(types.MBTRI,
+                  [node, verts[4], verts[5]]),
+                 self.mb.create_element(types.MBTRI,
+                  [node, verts[5], verts[0]])
+                  ]
+        t = {}
+        for i in range(1, 7, 1):
+            try:
+                t[i] = (verts[i - 1], faces[i-1], T[i][2])
+            except:
+                t[i] = (verts[i - 1], faces[i-1])
 
-        def _get_continuity_face(self):
-            pass
+        """
+        self.mtu.construct_aentities(rng.Range([ed1, ed2, ed3, ed4, ed5, ed6]))
+        self.mb.write_file("weird.vtk")
+        print(verts)
+        """
+        return t
+
+    def A_aux(self):
+        return 1.0
 
     def by_lpew2(self, node):
         if node in self.dirichlet_nodes:
             print('a dirichlet node')
         if node in self.neumann_nodes:
+            self.neumann = True
             print('a neumann node')
         elif node in self.intern_nodes:
+            self.neumann = False
             vols_around = self.mtu.get_bridge_adjacencies(node, 0, 3)
             weights = np.array([])
             weight_sum = 0.0
             for a_vol in vols_around:
-                auxiliary_variables = self._arrange_auxiliary_faces_and_verts(
+                T = self._arrange_auxiliary_faces_and_verts(
                                       node, a_vol)
-
+                cycle_r = cycle([1, 2, 3, 4, 5, 6])
+                cycle_r_plus_1 = cycle([2, 3, 4, 5, 6, 1])
+                # for j_aux in range(1,7,1):
+                    #for _, r, r_plus_1 in zip(range(6), cycle_r, cycle_r_plus_1):
+                        # print(r, self.mb.get_coords([T[r][0]]), self._neta_lpew2(node,  a_vol, T[r][1], T[r][0]))
 
 
     def _area_vector(self, nodes, ref_node):
         ref_vect = nodes[0] - ref_node
         AB = nodes[1] - nodes[0]
         AC = nodes[2] - nodes[0]
-        area_vector = np.cross(AB, AC)/2.0
+        area_vector = np.cross(AB, AC) / 2.0
         if np.dot(area_vector, ref_vect) < 0.0:
             area_vector = - area_vector
             return [area_vector, -1]
@@ -226,7 +299,7 @@ class InterpolMethod(MpfaD3D):
         node = self.mb.get_coords([node])
         N_out = self._area_vector(face_nodes_i, node)[0]
         N_i = self._area_vector(face_nodes_crds, ref_node)[0]
-        neta = self._flux_term(N_out, vol_perm, N_i)/(3.0*tetra_vol)
+        neta = self._flux_term(N_out, vol_perm, N_i)/(3.0 * tetra_vol)
         return neta
 
     def _csi_lpew3(self, face, vol):

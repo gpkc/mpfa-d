@@ -243,4 +243,4 @@ class MpfaD3D:
         p = np.linalg.solve(self.A, self.b[0])
         # print("PRESSAO: ", p)
         self.mb.tag_set_data(self.pressure_tag, self.volumes, p)
-        # self.mb.write_file("pressure_solution.vtk")
+        self.mb.write_file("pressure_solution.vtk")

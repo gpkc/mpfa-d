@@ -86,4 +86,3 @@ class InterpMethodTest(unittest.TestCase):
             coord_x = self.mesh_2.get_centroid(a_volume)[0]
             self.assertAlmostEqual(
                 local_pressure[0][0], 1 - coord_x, delta=1e-15)
-            print("ca marche")
