@@ -35,6 +35,16 @@ class InterpMethodTest(unittest.TestCase):
         self.mpfad_2 = MpfaD3D(self.mesh_2)
         self.imd_2 = InterpolMethod(self.mesh_2)
 
+        self.mesh_3 = MeshManager('mesh_test_3.msh', dim=3)
+        self.mesh_3.set_media_property('Permeability', {1: K_1}, dim_target=3)
+        self.mesh_3.set_boundary_condition('Dirichlet', {102: 1.0, 101: 0.0},
+                                           dim_target=2, set_nodes=True)
+        self.mesh_3.set_boundary_condition('Neumann', {201: 0.0},
+                                           dim_target=2, set_nodes=True)
+        self.mpfad_3 = MpfaD3D(self.mesh_1)
+        self.imd_3 = InterpolMethod(self.mesh_1)
+
+
     def test_inverse_distance_yields_same_weight_for_equal_tetrahedra(self):
         intern_node = self.mesh_1.all_nodes[-1]
         vols_ws_by_inv_distance = self.imd_1.by_inverse_distance(intern_node)
@@ -47,12 +57,17 @@ class InterpMethodTest(unittest.TestCase):
         for vol, weight in vols_ws_by_least_squares.items():
             self.assertAlmostEqual(weight, 1.0/12.0, delta=1e-15)
 
-    # @unittest.skip("not ready for testing")
+    @unittest.skip("not ready for testing")
     def test_lpew2_yields_same_weight_for_equal_tetrahedra(self):
         intern_node = self.mesh_1.all_nodes[-1]
         vols_ws_by_lpew2 = self.imd_1.by_lpew2(intern_node)
         for vol, weight in vols_ws_by_lpew2.items():
             self.assertAlmostEqual(weight, 1.0/12.0, delta=1e-15)
+
+    def test_lpew2_neta_calculion_yelds_correct_values(self):
+        intern_node = self.mesh_3.all_nodes
+        print(intern_node)
+
 
     def test_linear_problem_with_inverse_distance_interpolation_mesh_1(self):
         self.mpfad_1.run_solver(self.imd_1.by_inverse_distance)

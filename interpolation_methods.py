@@ -244,7 +244,6 @@ class InterpolMethod(MpfaD3D):
                     #for _, r, r_plus_1 in zip(range(6), cycle_r, cycle_r_plus_1):
                         # print(r, self.mb.get_coords([T[r][0]]), self._neta_lpew2(node,  a_vol, T[r][1], T[r][0]))
 
-
     def _area_vector(self, nodes, ref_node):
         ref_vect = nodes[0] - ref_node
         AB = nodes[1] - nodes[0]
