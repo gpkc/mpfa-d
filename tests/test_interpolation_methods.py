@@ -41,8 +41,8 @@ class InterpMethodTest(unittest.TestCase):
                                            dim_target=2, set_nodes=True)
         self.mesh_3.set_boundary_condition('Neumann', {201: 0.0},
                                            dim_target=2, set_nodes=True)
-        self.mpfad_3 = MpfaD3D(self.mesh_1)
-        self.imd_3 = InterpolMethod(self.mesh_1)
+        self.mpfad_3 = MpfaD3D(self.mesh_3)
+        self.imd_3 = InterpolMethod(self.mesh_3)
 
 
     def test_inverse_distance_yields_same_weight_for_equal_tetrahedra(self):
@@ -56,18 +56,6 @@ class InterpMethodTest(unittest.TestCase):
         vols_ws_by_least_squares = self.imd_1.by_least_squares(intern_node)
         for vol, weight in vols_ws_by_least_squares.items():
             self.assertAlmostEqual(weight, 1.0/12.0, delta=1e-15)
-
-    @unittest.skip("not ready for testing")
-    def test_lpew2_yields_same_weight_for_equal_tetrahedra(self):
-        intern_node = self.mesh_1.all_nodes[-1]
-        vols_ws_by_lpew2 = self.imd_1.by_lpew2(intern_node)
-        for vol, weight in vols_ws_by_lpew2.items():
-            self.assertAlmostEqual(weight, 1.0/12.0, delta=1e-15)
-
-    def test_lpew2_neta_calculion_yelds_correct_values(self):
-        intern_node = self.mesh_3.all_nodes
-        print(intern_node)
-
 
     def test_linear_problem_with_inverse_distance_interpolation_mesh_1(self):
         self.mpfad_1.run_solver(self.imd_1.by_inverse_distance)
@@ -89,8 +77,8 @@ class InterpMethodTest(unittest.TestCase):
 
     def test_lpew3_yields_same_weight_for_equal_tetrahedra(self):
         intern_node = self.mesh_1.all_nodes[-1]
-        vols_ws_by_least_squares = self.imd_1.by_lpew3(intern_node)
-        for vol, weight in vols_ws_by_least_squares.items():
+        vols_ws_by_lpew3 = self.imd_1.by_lpew3(intern_node)
+        for vol, weight in vols_ws_by_lpew3.items():
             self.assertAlmostEqual(weight, 1.0/12.0, delta=1e-15)
 
     def test_linear_problem_with_lpew3_interpolation_mesh_2(self):
@@ -101,3 +89,24 @@ class InterpMethodTest(unittest.TestCase):
             coord_x = self.mesh_2.get_centroid(a_volume)[0]
             self.assertAlmostEqual(
                 local_pressure[0][0], 1 - coord_x, delta=1e-15)
+
+    def test_if_get_node_by_MeshManager_yields_same_as_ins_InterpolMethod(self):
+        # tis is a mesh manager test
+        intern_node = self.imd_3.intern_nodes.pop()
+        self.assertTrue(intern_node == self.mesh_3.all_nodes[0])
+
+    @unittest.skip("not ready for testing. mesh seems to be corrupted")
+    def test_if_support_region_for_lpew2_is_correct(self):
+        intern_node = self.imd_3.intern_nodes
+        volumes_arond = self.imd_3.mtu.get_bridge_adjacencies(intern_node.pop()
+                                                              , 0, 3)
+        for volume in volumes_arond:
+            adj_vols = self.imd_3.mtu.get_bridge_adjacencies(volume, 3, 3)
+            print(adj_vols)
+
+    # @unittest.skip("not ready for testing")
+    def test_lpew2_yields_same_weight_for_equal_tetrahedra(self):
+        intern_node = self.mesh_1.all_nodes[-1]
+        vols_ws_by_lpew2 = self.imd_1.by_lpew2(intern_node)
+        for vol, weight in vols_ws_by_lpew2.items():
+            self.assertAlmostEqual(weight, 1.0/12.0, delta=1e-15)
