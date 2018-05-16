@@ -47,6 +47,23 @@ class InterpMethodTest(unittest.TestCase):
         for vol, weight in vols_ws_by_least_squares.items():
             self.assertAlmostEqual(weight, 1.0/12.0, delta=1e-15)
 
+    def test_if_neta_lpew2_is_equal_for_all_volumes(self):
+        for volume in self.mesh_1.all_volumes:
+            for face in self.mesh_1.mtu.get_bridge_adjacencies(volume, 3, 2):
+                node, T1, T2 = self.mesh_1.mtu.get_bridge_adjacencies(face, 2, 0)
+
+                vol_centroid = self.mesh_1.get_centroid(volume)
+
+                face_nodes = self.mesh_1.mtu.get_bridge_adjacencies(face, 2, 0)
+                face_node_coords = self.mesh_1.mb.get_coords(face_nodes)
+                face_node_coords.reshape([3, 3])
+
+                area_vector_centroid = self.imd_1._area_vector(face_node_coords.reshape(
+                    [3, 3]), vol_centroid)[0]
+                print(area_vector_centroid)
+
+            #neta_test = self.imd_1._neta_lpew2(node, volume, face, T1)
+
     # @unittest.skip("not ready for testing")
     def test_lpew2_yields_same_weight_for_equal_tetrahedra(self):
         intern_node = self.mesh_1.all_nodes[-1]

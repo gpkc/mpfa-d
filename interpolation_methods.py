@@ -119,7 +119,7 @@ class InterpolMethod(MpfaD3D):
         vol_centroid = self.mesh_data.get_centroid(vol)
         face_nodes = self.mtu.get_bridge_adjacencies(face, 2, 0)
         face_node_coords = self.mb.get_coords(face_nodes)
-        face_node_coords.reshape([3,3])
+        face_node_coords.reshape([3, 3])
         vol_coords = np.append(face_node_coords, vol_centroid)
         tetra_volume = self.mesh_data.get_tetra_volume(vol_coords.reshape([4,3]))
         opposite_face_nodes = set(face_nodes).difference(set([reff_node]))
