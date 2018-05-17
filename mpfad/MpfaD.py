@@ -3,7 +3,7 @@ from itertools import cycle
 from pymoab import types
 
 
-class MpfaD3D:
+class MpfaD:
 
     def __init__(self, mesh_data):
 

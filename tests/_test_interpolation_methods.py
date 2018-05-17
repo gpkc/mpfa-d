@@ -94,14 +94,28 @@ class InterpMethodTest(unittest.TestCase):
         intern_node = self.imd_3.intern_nodes.pop()
         self.assertTrue(intern_node == self.mesh_3.all_nodes[0])
 
-    @unittest.skip("not ready for testing. mesh seems to be corrupted")
+    #@unittest.skip("not ready for testing. mesh seems to be corrupted")
     def test_if_support_region_for_lpew2_is_correct(self):
-        intern_node = self.imd_3.intern_nodes
-        volumes_arond = self.imd_3.mtu.get_bridge_adjacencies(intern_node.pop()
-                                                              , 0, 3)
-        for volume in volumes_arond:
-            adj_vols = self.imd_3.mtu.get_bridge_adjacencies(volume, 3, 3)
-            print(adj_vols)
+        from pymoab import core
+        from pymoab import topo_util
+
+        mb = core.Core()
+        mb.load_file('mesh_test_3.msh')
+        mb.write_file('mesh_test_3_.msh')
+        root_set = mb.get_root_set()
+        mtu = topo_util.MeshTopoUtil(mb)
+
+        all_nodes = mb.get_entities_by_dimension(0, 0)
+
+        mtu.construct_aentities(all_nodes)
+
+        nodes = mb.get_entities_by_dimension(0, root_set)
+
+        for node in nodes:
+            adj_vols = list(mtu.get_bridge_adjacencies(node, 3, 3))
+            if len(adj_vols) == 4:
+                for vol in adj_vols:
+                    pass
 
     @unittest.skip("not ready for testing")
     def test_lpew2_yields_same_weight_for_equal_tetrahedra(self):
