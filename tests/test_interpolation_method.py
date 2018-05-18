@@ -3,6 +3,7 @@ import pytest
 
 from mpfad.interpolation.InterpolationMethod import InterpolationMethodBase
 from mpfad.interpolation.IDW import IDW
+from mpfad.interpolation.LSW import LSW
 
 
 @pytest.fixture
@@ -24,6 +25,11 @@ def base_method(get_mocked_method):
 @pytest.fixture
 def idw_method(get_mocked_method):
     return get_mocked_method(IDW)
+
+
+@pytest.fixture
+def lsw_method(get_mocked_method):
+    return get_mocked_method(LSW)
 
 
 class TestInterpolationMethodBase:
@@ -58,3 +64,23 @@ class TestIDW:
         assert weight[0] == pytest.approx(0.4)
         assert weight[1] == pytest.approx(0.2)
         assert weight[2] == pytest.approx(0.4)
+
+
+class TestLSW:
+
+    def test_calc_G(self, lsw_method):
+        node_coords = np.array([0., 0., 0.])
+        vol_centroid = np.array([4., 0., 0.])
+
+        lsw_method.mesh_data.get_centroid.return_value = vol_centroid
+        lsw_method.mesh_data.get_coords.return_value = node_coords
+
+        test_var = lsw_method.calc_G(1., 2., 3., 4., 5., 6.,)
+
+        assert test_var == pytest.approx(-1.)
+
+    def test_calc_psi(self):
+        pass
+
+    def test_interpolate(self):
+        pass
