@@ -1,5 +1,6 @@
 import numpy as np
-
+import pdb
+np.seterr(all='ignore')
 node_coords = np.asarray([.0, .0, .0])
 nd_1_coords = np.asarray([-1., 0., 1.])
 nd_2_coords = np.asarray([1., 0., 1.])
@@ -11,6 +12,10 @@ nd_6_coords = np.asarray([1., 1., 1.])
 perm = [[1., 0., 0.],
         [0., 1., 0.],
         [0., 0., 1.]]
+
+adj_perm = [[1., 0., 0.],
+            [0., 1., 0.],
+            [0., 0., 1.]]
 
 big_tetra_vol = abs(np.linalg.det([nd_1_coords - node_coords,
                                    nd_2_coords - node_coords,
@@ -80,24 +85,37 @@ def _get_volume(node, face_verts, tetra_centroid):
     tetra_vol = abs(np.linalg.det(tetra_vecs) / 6.)
     return tetra_vol
 
-neta_ratio = []
-for r in range(1, 7, 1):
-    volume = _get_volume(node_coords, faces[r], tetra_c_coords)
-    N_face = np.cross(T[r + 1], T[r]) / 2.
 
-    N_i = np.cross(tetra_c_coords, T[r + 1]) / 2
-    n_k = np.dot(N_i, np.dot(perm, N_face)) / (3. * volume)
+for j in range(1, 7, 1):
+    for r in range(1, 7, 1):
+        neta_ratio = []
+        prod = 1.
+        for r_star in r_range(j, r):
+            volume = _get_volume(node_coords, faces[r], tetra_c_coords)
+            N_face = np.cross(T[r_star + 1], T[r_star]) / 2.
 
-    N_i = np.cross(T[r], tetra_c_coords) / 2
-    n_k_plus = np.dot(N_i, np.dot(perm, N_face)) / (3. * volume)
+            N_i = np.cross(tetra_c_coords, T[r + 1]) / 2
+            n_k = np.dot(N_i, np.dot(perm, N_face)) / (3. * volume)
 
-    volume = _get_volume(node_coords, faces[r], adj_centroid[r])
-    N_face_adj = -N_face
+            N_i = np.cross(T[r_star], tetra_c_coords) / 2
+            n_k_plus = np.dot(N_i, np.dot(perm, N_face)) / (3. * volume)
 
-    N_i_adj = np.cross(T[r + 1], adj_centroid[r]) / 2
-    n_k_adj = np.dot(N_i_adj, np.dot(perm, N_face_adj)) / (3. * volume)
+            volume = _get_volume(node_coords, faces[r_star], adj_centroid[r_star])
+            N_face_adj = N_face
 
-    N_i_adj = np.cross(adj_centroid[r], T[r]) / 2
-    n_k_adj_plus = np.dot(N_i_adj, np.dot(perm, N_face_adj)) / (3. * volume)
-    neta_ratio.append(np.nan_to_num((n_k_adj - n_k)/ (n_k_adj_plus - n_k_plus)))
-    print(n_k_adj, n_k, n_k_adj_plus, n_k_plus, neta_ratio)
+            N_i_adj = np.cross(T[r_star + 1], adj_centroid[r_star]) / 2
+            n_k_adj = np.dot(N_i_adj, np.dot(adj_perm, N_face_adj)) / (3. * volume)
+
+            N_i_adj = np.cross(adj_centroid[r_star], T[r_star]) / 2
+            n_k_adj_plus = np.dot(N_i_adj, np.dot(adj_perm, N_face_adj)) / (3. * volume)
+            if (n_k_adj_plus - n_k_plus) == 0:
+                neta = 0.
+                neta_ratio.append((np.nan_to_num(n_k_adj - n_k) / (n_k_adj_plus - n_k_plus)))
+            else:
+                neta = (n_k_adj - n_k) / (n_k_adj_plus - n_k_plus)
+                neta_ratio.append((np.nan_to_num(n_k_adj - n_k) / (n_k_adj_plus - n_k_plus)))
+
+            prod = (-1) ** (1 + r_star) * neta*prod
+            # print(j, r, r_star, n_k_adj, n_k, n_k_adj_plus, n_k_plus, neta)
+            # print(r_star, n_k_adj, n_k, n_k_adj_plus, n_k_plus, neta)
+        print(j, r, r_range(j, r), neta_ratio, prod)
