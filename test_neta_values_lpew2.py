@@ -27,11 +27,12 @@ T[2] = [np.average([node_coords[i], nd_1_coords[i],
                     nd_2_coords[i]]) for i in range(3)]
 T[3] = [np.average([node_coords[i], nd_2_coords[i]]) for i in range(3)]
 T[4] = [np.average([node_coords[i], nd_2_coords[i],
-                    nd_3_coords[i]])for i in range(3)]
+                    nd_3_coords[i]]) for i in range(3)]
 T[5] = [np.average([node_coords[i], nd_3_coords[i]]) for i in range(3)]
 T[6] = [np.average([node_coords[i], nd_3_coords[i],
-                    nd_1_coords[i]])for i in range(3)]
+                    nd_1_coords[i]]) for i in range(3)]
 T[7] = T[1]
+
 tetra_c_coords = [np.average([node_coords[i],
                               nd_1_coords[i],
                               nd_2_coords[i],
@@ -46,21 +47,21 @@ adj_centroid[2] = [np.average([node_coords[i],
                                nd_2_coords[i],
                                nd_4_coords[i]])for i in range(3)]
 adj_centroid[3] = [np.average([node_coords[i],
-                               nd_2_coords[i],
+                               nd_1_coords[i],
                                nd_3_coords[i],
                                nd_5_coords[i]])for i in range(3)]
 adj_centroid[4] = [np.average([node_coords[i],
-                               nd_2_coords[i],
+                               nd_1_coords[i],
                                nd_3_coords[i],
                                nd_5_coords[i]])for i in range(3)]
 adj_centroid[5] = [np.average([node_coords[i],
                                nd_3_coords[i],
-                               nd_1_coords[i],
+                               nd_2_coords[i],
                                nd_6_coords[i]])for i in range(3)]
 adj_centroid[6] = [np.average([node_coords[i],
                                nd_3_coords[i],
                                nd_6_coords[i],
-                               nd_1_coords[i]])for i in range(3)]
+                               nd_2_coords[i]])for i in range(3)]
 
 faces = {}
 faces[1] = [T[1], T[2]]
@@ -69,6 +70,12 @@ faces[3] = [T[3], T[4]]
 faces[4] = [T[4], T[5]]
 faces[5] = [T[5], T[6]]
 faces[6] = [T[6], T[1]]
+
+print(tetra_c_coords, T[2], adj_centroid[1])
+Q = node_coords
+vec_1 = np.cross(tetra_c_coords - Q, T[2] - Q)
+vec_2 = np.cross(T[2] - Q, adj_centroid[2] - Q)
+print(np.linalg.det([tetra_c_coords, Q, adj_centroid[1]]))
 
 
 def r_range(j, r):
