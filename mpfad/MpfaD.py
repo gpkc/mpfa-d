@@ -52,9 +52,6 @@ class MpfaD:
                 N_IJK = - N_IJK
         return N_IJK
 
-    def get_height(self):  # calcula h de tetraedro
-        pass
-
     def set_global_id(self):
         vol_ids = {}
         range_of_ids = range(len(self.mesh_data.all_volumes))
