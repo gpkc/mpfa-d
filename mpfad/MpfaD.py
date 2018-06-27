@@ -88,6 +88,8 @@ class MpfaD3D:
         nodes_weights = {}
         for a_node in self.intern_nodes:
             nodes_weights[a_node] = method(a_node)
+        for a_node in self.neumann_nodes:
+            nodes_weights[a_node] = method(a_node, neumann=True)
         return nodes_weights
 
     def _node_treatment(self, node, nodes_weights, id_1st, id_2nd, v_ids,
@@ -105,10 +107,23 @@ class MpfaD3D:
                 self.A[id_1st][v_id] += - value
                 self.A[id_2nd][v_id] += value
 
+        if node in self.neumann_nodes:
+            neu_term = nodes_weights[node]["Neumann"]
+            del nodes_weights[node]['Neumann']
+            for volume, weight in nodes_weights[node].items():
+                v_id = v_ids[volume]
+                value = (is_J) * transm * (cross_1st + cross_2nd) * weight
+                self.A[id_1st][v_id] += - value
+                self.A[id_2nd][v_id] += value
+
+                value_N = (is_J) * transm * (cross_1st + cross_2nd) * neu_term
+                self.b[0][id_1st] += value_N
+                self.b[0][id_2nd] += - value_N
+            nodes_weights[node]['Neumann'] = neu_term
+
     def run_solver(self, interpolation_method):
 
         nodes_weights = self.get_intern_nodes_weights(interpolation_method)
-
         v_ids = self.set_global_id()
 
         for a_node in self.neumann_nodes:  # | self.intern_nodes:
