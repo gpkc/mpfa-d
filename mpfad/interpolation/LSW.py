@@ -16,7 +16,7 @@ class LSW(InterpolationMethodBase):
         psi_i = (R_i * (I_jk*I_jk - I_jj*I_kk) +
                  R_j * (I_ij*I_kk - I_jk*I_ik) +
                  R_k * (I_jj*I_ik - I_ij*I_jk)) / G
-        print(psi_i)
+        # print(psi_i)
         return psi_i
 
     def interpolate(self, node):
@@ -52,7 +52,7 @@ class LSW(InterpolationMethodBase):
         for x_k, y_k, z_k, volume in rel_vol_position:
             numerator = 1.0 + x_k*psi_x + y_k*psi_y + z_k*psi_z
             denominator = num_vols + R_x*psi_x + R_y*psi_y + R_z*psi_z
-            print(psi_x, psi_y, psi_z)
+            # print(psi_x, psi_y, psi_z)
             nodes_weights[volume] = numerator / denominator
 
         return nodes_weights

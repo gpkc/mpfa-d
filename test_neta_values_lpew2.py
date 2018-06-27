@@ -71,11 +71,11 @@ faces[4] = [T[4], T[5]]
 faces[5] = [T[5], T[6]]
 faces[6] = [T[6], T[1]]
 
-print(tetra_c_coords, T[2], adj_centroid[1])
+# print(tetra_c_coords, T[2], adj_centroid[1])
 Q = node_coords
 vec_1 = np.cross(tetra_c_coords - Q, T[2] - Q)
 vec_2 = np.cross(T[2] - Q, adj_centroid[2] - Q)
-print(np.linalg.det([tetra_c_coords, Q, adj_centroid[1]]))
+# print(np.linalg.det([tetra_c_coords, Q, adj_centroid[1]]))
 
 
 def r_range(j, r):
@@ -125,4 +125,4 @@ for j in range(1, 7, 1):
             prod = (-1) ** (1 + r_star) * neta*prod
             # print(j, r, r_star, n_k_adj, n_k, n_k_adj_plus, n_k_plus, neta)
             # print(r_star, n_k_adj, n_k, n_k_adj_plus, n_k_plus, neta)
-        print(j, r, r_range(j, r), neta_ratio, prod)
+        # print(j, r, r_range(j, r), neta_ratio, prod)

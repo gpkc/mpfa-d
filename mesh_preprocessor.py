@@ -1,13 +1,11 @@
 import numpy as np
 from math import sqrt
-from math import pi
 from pymoab import core
 from pymoab import types
 from pymoab import topo_util
 
 
 class MeshManager:
-
 
     def __init__(self, mesh_file, dim=3):
 

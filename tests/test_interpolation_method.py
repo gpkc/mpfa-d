@@ -90,9 +90,6 @@ class TestLSW:
         I_xy, I_xz, I_yz = 0.958333333333333,	1.75, 1.91666666666667
         G = 0.19140625
 
-
-
-
         psi_x = lsw_method.calc_psi(R_x, R_y, R_z,
                                     I_xy, I_xz, I_yy,
                                     I_yz, I_zz, G)
@@ -107,7 +104,6 @@ class TestLSW:
         assert psi_y == pytest.approx(-1.71428571428571000000)
         assert psi_z == pytest.approx(-0.285714285714283)
 
-
     def test_interpolate(self, lsw_method):
         node_coords = np.array([0., 0., 0.])
         vols_centroids = [np.array([.1, .5, 3.]), np.array([1., 1., 1.]),
@@ -118,7 +114,7 @@ class TestLSW:
         lsw_method.mb.get_coords.return_value = node_coords
 
         weight = lsw_method.interpolate(None)
-        print(weight)
+        # print(weight)
 
         assert weight[0] == pytest.approx(1/3.)
         assert weight[1] == pytest.approx(4/9.)

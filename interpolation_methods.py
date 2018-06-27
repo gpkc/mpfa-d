@@ -231,10 +231,11 @@ class InterpolMethod(MpfaD3D):
 
     def by_lpew2(self, node):
         if node in self.dirichlet_nodes:
-            print('a dirichlet node')
+            # print('a dirichlet node')
+            pass
         if node in self.neumann_nodes:
             self.neumann = True
-            print('a neumann node')
+            # print('a neumann node')
         else:
             self.neumann = False
             vols_around = self.mtu.get_bridge_adjacencies(node, 0, 3)
@@ -256,7 +257,7 @@ class InterpolMethod(MpfaD3D):
                         else:
                             prod_nose = np.arange(r, j, 1)
 
-                        print(j, r, prod_nose)
+                        # print(j, r, prod_nose)
                         # for r_star in prod_list:
                         #     print(j, r, r_star)
                         # self._neta_lpew2(node, a_vol, T[r], T[r + 1])
