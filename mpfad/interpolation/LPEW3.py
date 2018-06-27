@@ -1,4 +1,5 @@
 import numpy as np
+import mpfad.helpers.geometric as geo
 from .InterpolationMethod import InterpolationMethodBase
 # from mpfad.helpers.geometric import get_tetra_volume
 # from mpfad.helpers.geometric import _area_vector
@@ -6,15 +7,11 @@ from .InterpolationMethod import InterpolationMethodBase
 
 class LPEW3(InterpolationMethodBase):
 
-    def _area_vector(self, nodes, ref_node):
-        ref_vect = nodes[0] - ref_node
-        AB = nodes[1] - nodes[0]
-        AC = nodes[2] - nodes[0]
-        area_vector = np.cross(AB, AC) / 2.0
-        if np.dot(area_vector, ref_vect) < 0.0:
-            area_vector = - area_vector
-            return [area_vector, -1]
-        return [area_vector, 1]
+    def _flux_term(self, vector_1st, permeab, vector_2nd, face_area=1.0):
+        aux_1 = np.dot(vector_1st, permeab)
+        aux_2 = np.dot(aux_1, vector_2nd)
+        flux_term = aux_2 / face_area
+        return flux_term
 
     def _lambda_lpew3(self, node, aux_node, face):
         adj_vols = self.mtu.get_bridge_adjacencies(face, 2, 3)
@@ -36,8 +33,8 @@ class LPEW3(InterpolationMethodBase):
             tetra_vol = self.mesh_data.get_tetra_volume(sub_vol)
             ref_node_i = list(set(vol_nodes) - set(face_nodes))
             ref_node_i = self.mb.get_coords(ref_node_i)
-            N_int = self._area_vector([node, aux_node, vol_cent], ref_node)[0]
-            N_i = self._area_vector(face_nodes_crds, ref_node_i)[0]
+            N_int = geo._area_vector([node, aux_node, vol_cent], ref_node)[0]
+            N_i = geo._area_vector(face_nodes_crds, ref_node_i)[0]
             lambda_l += self._flux_term(N_i, vol_perm, N_int)/(3.0*tetra_vol)
         return lambda_l
 
@@ -58,8 +55,8 @@ class LPEW3(InterpolationMethodBase):
         face_nodes_i = self.mb.get_coords(list(vol_nodes))
         face_nodes_i = np.reshape(face_nodes_i, (3, 3))
         node = self.mb.get_coords([node])
-        N_out = self._area_vector(face_nodes_i, node)[0]
-        N_i = self._area_vector(face_nodes_crds, ref_node)[0]
+        N_out = geo._area_vector(face_nodes_i, node)[0]
+        N_i = geo._area_vector(face_nodes_crds, ref_node)[0]
         neta = self._flux_term(N_out, vol_perm, N_i)/(3.0 * tetra_vol)
         return neta
 
@@ -70,7 +67,7 @@ class LPEW3(InterpolationMethodBase):
         face_nodes = self.mtu.get_bridge_adjacencies(face, 2, 0)
         face_nodes = self.mb.get_coords(face_nodes)
         face_nodes = np.reshape(face_nodes, (3, 3))
-        N_i = self._area_vector(face_nodes, vol_cent)[0]
+        N_i = geo._area_vector(face_nodes, vol_cent)[0]
         sub_vol = np.append(face_nodes, vol_cent)
         sub_vol = np.reshape(sub_vol, (4, 3))
         tetra_vol = self.mesh_data.get_tetra_volume(sub_vol)
@@ -92,7 +89,7 @@ class LPEW3(InterpolationMethodBase):
             aux_nodes_crds = self.mb.get_coords(aux_nodes)
             aux_nodes_crds = np.reshape(aux_nodes_crds, (2, 3))
             aux_vect = [node_crds, aux_nodes_crds[0], aux_nodes_crds[1]]
-            clock_test = self._area_vector(aux_vect, vol_cent)[1]
+            clock_test = geo._area_vector(aux_vect, vol_cent)[1]
             if clock_test < 0:
                 aux_nodes[0], aux_nodes[1] = aux_nodes[1], aux_nodes[0]
             count = self._lambda_lpew3(node, aux_nodes[0], a_face)
