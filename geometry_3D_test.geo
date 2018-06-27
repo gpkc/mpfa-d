@@ -46,15 +46,15 @@ Surface Loop(25) = {22, 20, 18, 24, 16, 14};
 Volume(26) = {25};
 
 mesh_size = 1.5;
-Transfinite Line {6, 8, 11, 10, 12, 9, 4, 2} = mesh_size;
-Transfinite Line {1, 3, 7, 5} = mesh_size/2.0
-Transfinite Surface{14};
-Transfinite Surface{16};
-Transfinite Surface{18};
-Transfinite Surface{20};
-Transfinite Surface{22};
-Transfinite Surface{24};
-Transfinite Volume{26};
+//Transfinite Line {6, 8, 11, 10, 12, 9, 4, 2} = mesh_size;
+//Transfinite Line {1, 3, 7, 5} = mesh_size/2.0
+//Transfinite Surface{14};
+//Transfinite Surface{16};
+//Transfinite Surface{18};
+//Transfinite Surface{20};
+//Transfinite Surface{22};
+//Transfinite Surface{24};
+//Transfinite Volume{26};
 //Recombine Surface{14, 15, 16, 18, 20, 22, 24};
 
 Physical Point(102) = {1, 4, 8, 5};
