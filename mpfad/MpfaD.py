@@ -1,9 +1,8 @@
 import numpy as np
-from itertools import cycle
 from pymoab import types
 
 
-class MpfaD:
+class MpfaD3D:
 
     def __init__(self, mesh_data):
 
