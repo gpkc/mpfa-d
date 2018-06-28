@@ -29,11 +29,15 @@ def get_tetra_volume(verts):
     pass
 
 
-def _area_vector(nodes, ref_node):
+def _area_vector(nodes, ref_node, norma=False):
+    # print('NODES: ', nodes, ref_node)
     ref_vect = nodes[0] - ref_node
     AB = nodes[1] - nodes[0]
     AC = nodes[2] - nodes[0]
     area_vector = np.cross(AB, AC) / 2.0
+    if norma:
+        area = np.sqrt(np.dot(area_vector, area_vector))
+        return area
     if np.dot(area_vector, ref_vect) < 0.0:
         area_vector = - area_vector
         return [area_vector, -1]
