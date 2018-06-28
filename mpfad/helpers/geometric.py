@@ -30,7 +30,6 @@ def get_tetra_volume(verts):
 
 
 def _area_vector(nodes, ref_node, norma=False):
-    # print('NODES: ', nodes, ref_node)
     ref_vect = nodes[0] - ref_node
     AB = nodes[1] - nodes[0]
     AC = nodes[2] - nodes[0]
