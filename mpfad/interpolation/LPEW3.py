@@ -17,6 +17,7 @@ class LPEW3(InterpolationMethodBase):
         adj_vols = self.mtu.get_bridge_adjacencies(face, 2, 3)
         face_nodes = self.mtu.get_bridge_adjacencies(face, 2, 0)
         ref_node = list(set(face_nodes) - (set([node]) | set([aux_node])))
+
         face_nodes_crds = self.mb.get_coords(face_nodes)
         face_nodes_crds = np.reshape(face_nodes_crds, (3, 3))
         ref_node = self.mb.get_coords(ref_node)
@@ -100,6 +101,9 @@ class LPEW3(InterpolationMethodBase):
         return sigma
 
     def _phi_lpew3(self, node, vol, face):
+        if len(vol) == 0:
+            return 0.0
+        vol = vol[0]
         face_nodes = self.mtu.get_bridge_adjacencies(face, 2, 0)
         vol_nodes = self.mb.get_adjacencies(vol, 0)
         aux_node = set(vol_nodes) - set(face_nodes)
@@ -119,6 +123,9 @@ class LPEW3(InterpolationMethodBase):
         return phi
 
     def _psi_sum_lpew3(self, node, vol, face):
+        if len(vol) == 0:
+            return 0.0
+        vol = vol[0]
         face_nodes = self.mtu.get_bridge_adjacencies(face, 2, 0)
         vol_nodes = self.mb.get_adjacencies(vol, 0)
         aux_node = set(vol_nodes) - set(face_nodes)
@@ -145,24 +152,44 @@ class LPEW3(InterpolationMethodBase):
 
     def _partial_weight_lpew3(self, node, vol):
         vol_faces = self.mtu.get_bridge_adjacencies(vol, 3, 2)
-        vols_neighs = self.mtu.get_bridge_adjacencies(vol, 2, 3)
+        adj_faces = self.mtu.get_bridge_adjacencies(node, 0, 2)
+        vol_node_faces = set(vol_faces) & set(adj_faces)
         zepta = 0.0
         delta = 0.0
-        for a_neigh in vols_neighs:
-            neigh_faces = self.mtu.get_bridge_adjacencies(a_neigh, 3, 2)
-            a_face = set(vol_faces) & set(neigh_faces)
-            a_face = list(a_face)
-            csi = self._csi_lpew3(a_face[0], vol)
-            psi_sum_neigh = self._psi_sum_lpew3(node, a_neigh, a_face[0])
-            psi_sum_vol = self._psi_sum_lpew3(node, vol, a_face[0])
+        for a_face in vol_node_faces:
+            a_neighs = self.mtu.get_bridge_adjacencies(a_face, 2, 3)
+            a_neighs = np.asarray(a_neighs, dtype='uint64')
+            a_neigh = a_neighs[a_neighs != vol]
+            csi = self._csi_lpew3(a_face, vol)
+            psi_sum_neigh = self._psi_sum_lpew3(node, a_neigh, a_face)
+            psi_sum_vol = self._psi_sum_lpew3(node, [vol], a_face)
             zepta += (psi_sum_vol + psi_sum_neigh) * csi
-            phi_vol = self._phi_lpew3(node, vol, a_face[0])
-            phi_neigh = self._phi_lpew3(node, a_neigh, a_face[0])
+            phi_vol = self._phi_lpew3(node, [vol], a_face)
+            phi_neigh = self._phi_lpew3(node, a_neigh, a_face)
             delta += (phi_vol + phi_neigh) * csi
         p_weight = zepta - delta
         return p_weight
 
-    def interpolate(self, node):
+    def neumann_treatment(self, node):
+        adj_faces = self.mtu.get_bridge_adjacencies(node, 0, 2)
+        N_term_sum = 0.0
+        for face in adj_faces:
+            if face not in self.neumann_faces:
+                continue
+            face_flux = self.mb.tag_get_data(self.neumann_tag, face)
+            face_nodes = self.mb.get_adjacencies(face, 0)
+            nodes_crds = self.mb.get_coords(face_nodes)
+            nodes_crds = np.reshape(nodes_crds, (len(face_nodes), 3))
+            face_area = geo._area_vector(nodes_crds,
+                                         np.array([0.0, 0.0, 0.0]), norma=True)
+            vol_N = self.mtu.get_bridge_adjacencies(face, 2, 3)
+            psi_N = self._psi_sum_lpew3(node, vol_N, face)
+            phi_N = self._phi_lpew3(node, vol_N, face)
+            N_term = (1.0 + psi_N - phi_N) * face_flux * face_area
+            N_term_sum += N_term
+        return N_term_sum
+
+    def interpolate(self, node, neumann=False):
         vols_around = self.mtu.get_bridge_adjacencies(node, 0, 3)
         weights = np.array([])
         weight_sum = 0.0
@@ -173,4 +200,7 @@ class LPEW3(InterpolationMethodBase):
         weights = weights / weight_sum
         node_weights = {
             vol: weight for vol, weight in zip(vols_around, weights)}
+        if neumann:
+            neu_term = self.neumann_treatment(node) / weight_sum
+            node_weights['Neumann'] = neu_term
         return node_weights
