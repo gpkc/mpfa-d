@@ -36,7 +36,8 @@ class LPEW3(InterpolationMethodBase):
             ref_node_i = self.mb.get_coords(ref_node_i)
             N_int = geo._area_vector([node, aux_node, vol_cent], ref_node)[0]
             N_i = geo._area_vector(face_nodes_crds, ref_node_i)[0]
-            lambda_l += self._flux_term(N_i, vol_perm, N_int)/(3.0*tetra_vol)
+            lambda_l += self._flux_term(N_i, vol_perm, N_int)/(tetra_vol)
+        # print('LAMBDAS: ', lambda_l, node, aux_node, self.mtu.get_average_position([face]))
         return lambda_l
 
     def _neta_lpew3(self, node, vol, face):
@@ -58,7 +59,8 @@ class LPEW3(InterpolationMethodBase):
         node = self.mb.get_coords([node])
         N_out = geo._area_vector(face_nodes_i, node)[0]
         N_i = geo._area_vector(face_nodes_crds, ref_node)[0]
-        neta = self._flux_term(N_out, vol_perm, N_i)/(3.0 * tetra_vol)
+        neta = self._flux_term(N_out, vol_perm, N_i)/(tetra_vol)
+        # print('NETAS: ', neta, node, self.mesh_data.get_centroid(vol), self.mtu.get_average_position([face]))
         return neta
 
     def _csi_lpew3(self, face, vol):
@@ -72,7 +74,8 @@ class LPEW3(InterpolationMethodBase):
         sub_vol = np.append(face_nodes, vol_cent)
         sub_vol = np.reshape(sub_vol, (4, 3))
         tetra_vol = self.mesh_data.get_tetra_volume(sub_vol)
-        csi = self._flux_term(N_i, vol_perm, N_i)/(3.0*tetra_vol)
+        csi = self._flux_term(N_i, vol_perm, N_i)/(tetra_vol)
+        # print('CSI: ', csi, self._flux_term(N_i, vol_perm, N_i), tetra_vol)
         return csi
 
     def _sigma_lpew3(self, node, vol):
@@ -120,6 +123,8 @@ class LPEW3(InterpolationMethodBase):
         sigma = self._sigma_lpew3(node, vol)
         neta = self._neta_lpew3(node, vol, face)
         phi = lambda_mult * neta / sigma
+        # print('PHI: ', phi, self.mb.get_coords([node]),
+        #       self.mesh_data.get_centroid(vol), self.mtu.get_average_position([face]))
         return phi
 
     def _psi_sum_lpew3(self, node, vol, face):
@@ -136,7 +141,7 @@ class LPEW3(InterpolationMethodBase):
         in_faces = adj_faces & vol_faces
         faces = in_faces - set([face])
         faces = list(faces)
-        phi_sum = 0.0
+        psi_sum = 0.0
         for i in range(len(faces)):
             a_face_nodes = self.mtu.get_bridge_adjacencies(faces[i], 2, 0)
             other_node = set(face_nodes) - set(a_face_nodes)
@@ -144,11 +149,18 @@ class LPEW3(InterpolationMethodBase):
             lbd_1 = self._lambda_lpew3(node, aux_node[0], faces[i])
             lbd_2 = self._lambda_lpew3(node, other_node[0], faces[i-1])
             neta = self._neta_lpew3(node, vol, faces[i])
-            phi = lbd_1 * lbd_2 * neta
-            phi_sum += + phi
+            psi = lbd_1 * lbd_2 * neta
+            # print('PSI PARTS: ', lbd_1, lbd_2, neta, self.mb.get_coords([node]),
+            #         self.mesh_data.get_centroid(vol), self.mtu.get_average_position([face]))
+
+            psi_sum += + psi
         sigma = self._sigma_lpew3(node, vol)
-        phi_sum = phi_sum / sigma
-        return phi_sum
+        psi_sum = psi_sum / sigma
+
+        # print('PSI: ', psi_sum, self.mb.get_coords([node]),
+        #       self.mesh_data.get_centroid(vol), self.mtu.get_average_position([face]))
+
+        return psi_sum
 
     def _partial_weight_lpew3(self, node, vol):
         vol_faces = self.mtu.get_bridge_adjacencies(vol, 3, 2)
@@ -168,6 +180,7 @@ class LPEW3(InterpolationMethodBase):
             phi_neigh = self._phi_lpew3(node, a_neigh, a_face)
             delta += (phi_vol + phi_neigh) * csi
         p_weight = zepta - delta
+        # print('ZEPTA_DELTA: ', p_weight)
         return p_weight
 
     def neumann_treatment(self, node):
@@ -183,10 +196,14 @@ class LPEW3(InterpolationMethodBase):
             face_area = geo._area_vector(nodes_crds,
                                          np.array([0.0, 0.0, 0.0]), norma=True)
             vol_N = self.mtu.get_bridge_adjacencies(face, 2, 3)
+            # print('VOL_N: ', len(vol_N))
             psi_N = self._psi_sum_lpew3(node, vol_N, face)
             phi_N = self._phi_lpew3(node, vol_N, face)
-            N_term = (1.0 + psi_N - phi_N) * face_flux * face_area
+            csi_N = self._csi_lpew3(face, vol_N)
+            N_term = (1.0 + (psi_N - phi_N) * csi_N) * face_flux * face_area
+            # print('FACE AREA: ', face_area)
             N_term_sum += N_term
+        # print('NEU TERM: ', N_term_sum)
         return N_term_sum
 
     def interpolate(self, node, neumann=False):
