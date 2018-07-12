@@ -125,7 +125,8 @@ class MpfaD3D:
 
         nodes_weights = self.get_intern_nodes_weights(interpolation_method)
         v_ids = self.set_global_id()
-
+        # Verify if its getting in the way of the method by providing
+        # solution beforehand
         for a_node in self.neumann_nodes:  # | self.intern_nodes:
             a_node_coords = self.mb.get_coords([a_node])[0]
             self.mb.tag_set_data(self.dirichlet_tag, a_node, 1.0 -
