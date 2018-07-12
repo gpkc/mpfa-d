@@ -84,7 +84,7 @@ class MpfaD3D:
             phys_aniso_term
         return cross_term
 
-    def get_intern_nodes_weights(self, method):
+    def get_nodes_weights(self, method):
         nodes_weights = {}
         for a_node in self.intern_nodes:
             nodes_weights[a_node] = method(a_node)
@@ -123,15 +123,17 @@ class MpfaD3D:
 
     def run_solver(self, interpolation_method):
 
-        nodes_weights = self.get_intern_nodes_weights(interpolation_method)
+        nodes_weights = self.get_nodes_weights(interpolation_method)
         v_ids = self.set_global_id()
+
         # Verify if its getting in the way of the method by providing
         # solution beforehand
+        """
         for a_node in self.neumann_nodes:  # | self.intern_nodes:
             a_node_coords = self.mb.get_coords([a_node])[0]
             self.mb.tag_set_data(self.dirichlet_tag, a_node, 1.0 -
                                  a_node_coords)
-
+        """
         for face in self.all_faces:
 
             if face in self.neumann_faces:
@@ -183,7 +185,6 @@ class MpfaD3D:
                 volume_id = v_ids[volume[0]]
                 self.A[volume_id][volume_id] += -2 * K_n_eff
                 self.b[0][volume_id] += RHS
-
             if face in self.intern_faces:
                 face_centroid = self.mtu.get_average_position([face])
                 left_volume, right_volume = \
@@ -251,8 +252,6 @@ class MpfaD3D:
                 self._node_treatment(J, nodes_weights, gid_right, gid_left,
                                      v_ids, K_n_eff, D_JI, cross_2nd=D_JK,
                                      is_J=-1)
-
         p = np.linalg.solve(self.A, self.b[0])
-        # print("PRESSAO: ", p)
         self.mb.tag_set_data(self.pressure_tag, self.volumes, p)
         # self.mb.write_file("pressure_solution.vtk")

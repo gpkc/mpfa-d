@@ -72,50 +72,62 @@ class MeshManager:
         self.all_nodes.append(new_vertices)
         return new_vertices
 
-
     def create_element(self, poly_type, vertices):
         new_volume = self.mb.create_element(poly_type, vertices)
-        self.all_volumes.append(new_element)
+        self.all_volumes.append(new_volume)
         return new_volume
 
-
     def set_information(self, information_name, physicals_values,
-                              dim_target, set_connect=False):
+                        dim_target, set_connect=False):
 
         information_tag = self.mb.tag_get_handle(information_name)
         for physical, value in physicals_values.items():
             for a_set in self.physical_sets:
-                physical_group = self.mb.tag_get_data(self.physical_tag, a_set, flat=True)
+                physical_group = self.mb.tag_get_data(self.physical_tag,
+                                                      a_set, flat=True)
 
                 if physical_group == physical:
                     group_elements = self.mb.get_entities_by_dimension(a_set, dim_target)
 
                     if information_name == 'Dirichlet':
                         # print('DIR GROUP', len(group_elements), group_elements)
-                        self.dirichlet_faces = self.dirichlet_faces | set(group_elements)
+                        self.dirichlet_faces = self.dirichlet_faces | set(
+                                                    group_elements)
 
                     if information_name == 'Neumann':
                         # print('NEU GROUP', len(group_elements), group_elements)
-                        self.neumann_faces = self.neumann_faces | set(group_elements)
+                        self.neumann_faces = self.neumann_faces | set(
+                                                  group_elements)
 
                     for element in group_elements:
                         self.mb.tag_set_data(information_tag, element, value)
 
                         if set_connect:
-                            connectivities = self.mtu.get_bridge_adjacencies(element, 0, 0)
+                            connectivities = self.mtu.get_bridge_adjacencies(
+                                                                element, 0, 0)
                             self.mb.tag_set_data(
-                                information_tag, connectivities, np.repeat(value, len(connectivities)))
+                                information_tag, connectivities,
+                                np.repeat(value, len(connectivities)))
 
         # self.mb.write_file('algo_ahora.vtk')
+    def get_boundary_nodes(self):
+        all_faces = self.dirichlet_faces | self.neumann_faces
+        boundary_nodes = set()
+        for face in all_faces:
+            nodes = self.mtu.get_bridge_adjacencies(face, 2, 0)
+            boundary_nodes.update(nodes)
+
+        return boundary_nodes
+
 
     def set_media_property(self, property_name, physicals_values,
-                                 dim_target=3, set_nodes=False):
+                           dim_target=3, set_nodes=False):
 
         self.set_information(property_name, physicals_values,
                              dim_target, set_connect=set_nodes)
 
     def set_boundary_condition(self, boundary_condition, physicals_values,
-                                     dim_target=3, set_nodes=False):
+                               dim_target=3, set_nodes=False):
 
         self.set_information(boundary_condition, physicals_values,
                              dim_target, set_connect=set_nodes)
