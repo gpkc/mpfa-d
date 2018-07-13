@@ -8,6 +8,7 @@ from .InterpolationMethod import InterpolationMethodBase
 class LPEW3(InterpolationMethodBase):
 
     def _flux_term(self, vector_1st, permeab, vector_2nd, face_area=1.0):
+        # Poruqe face_area é sempre 1 nesse caso? ele deveria ser a area associada ao vetor N_IJK
         aux_1 = np.dot(vector_1st, permeab)
         aux_2 = np.dot(aux_1, vector_2nd)
         flux_term = aux_2 / face_area
@@ -17,7 +18,6 @@ class LPEW3(InterpolationMethodBase):
         adj_vols = self.mtu.get_bridge_adjacencies(face, 2, 3)
         face_nodes = self.mtu.get_bridge_adjacencies(face, 2, 0)
         ref_node = list(set(face_nodes) - (set([node]) | set([aux_node])))
-
         face_nodes_crds = self.mb.get_coords(face_nodes)
         face_nodes_crds = np.reshape(face_nodes_crds, (3, 3))
         ref_node = self.mb.get_coords(ref_node)
@@ -85,7 +85,7 @@ class LPEW3(InterpolationMethodBase):
         in_faces = list(adj_faces & vol_faces)
         vol_cent = self.mesh_data.get_centroid(vol)
         clockwise = 1.0
-        counterwise = 1.0
+        counter_clockwise = 1.0
         for a_face in in_faces:
             aux_nodes = set(self.mtu.get_bridge_adjacencies(a_face, 2, 0))
             aux_nodes.remove(node)
@@ -93,14 +93,14 @@ class LPEW3(InterpolationMethodBase):
             aux_nodes_crds = self.mb.get_coords(aux_nodes)
             aux_nodes_crds = np.reshape(aux_nodes_crds, (2, 3))
             aux_vect = [node_crds, aux_nodes_crds[0], aux_nodes_crds[1]]
-            clock_test = geo._area_vector(aux_vect, vol_cent)[1]
-            if clock_test < 0:
+            spin = geo._area_vector(aux_vect, vol_cent)[1]
+            if spin < 0:
                 aux_nodes[0], aux_nodes[1] = aux_nodes[1], aux_nodes[0]
             count = self._lambda_lpew3(node, aux_nodes[0], a_face)
-            counterwise = counterwise * count
+            counter_clockwise = counter_clockwise * count
             clock = self._lambda_lpew3(node, aux_nodes[1], a_face)
             clockwise = clockwise * clock
-        sigma = clockwise + counterwise
+        sigma = clockwise + counter_clockwise
         return sigma
 
     def _phi_lpew3(self, node, vol, face):

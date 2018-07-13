@@ -101,7 +101,7 @@ class InterpMethodTest(unittest.TestCase):
             self.assertAlmostEqual(
                 local_pressure[0][0], 1 - coord_x, delta=1e-15)
 
-    @unittest.skip("we'll see it later")
+    # @unittest.skip("we'll see it later")
     def test_lpew3_yields_same_weight_for_equal_tetrahedra(self):
         intern_node = self.mesh_1.all_nodes[-1]
         vols_ws_by_lpew3 = LPEW3(self.mesh_1).interpolate(intern_node)
@@ -128,6 +128,7 @@ class InterpMethodTest(unittest.TestCase):
             self.assertAlmostEqual(
                 local_pressure[0][0], 1 - coord_x, delta=1e-15)
 
+    @unittest.skip("we'll see it later")
     def test_number_of_non_null_neumann_faces(self):
         neumann_faces = self.mpfad_6.neumann_faces
         count = 0
@@ -138,6 +139,7 @@ class InterpMethodTest(unittest.TestCase):
                 count += 1
         self.assertEqual(count, 2)
 
+    @unittest.skip("we'll see it later")
     def test_linear_problem_with_non_null_neumann_condition_lpew3(self):
         self.mpfad_6.run_solver(LPEW3(self.mesh_6).interpolate)
         for a_volume in self.mesh_6.all_volumes:
