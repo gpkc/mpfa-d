@@ -67,6 +67,17 @@ class InterpMethodTest(unittest.TestCase):
                                            dim_target=2, set_nodes=True)
         self.mpfad_6 = MpfaD3D(self.mesh_6)
 
+        perm = [1.0, 0.5, 0.0,
+                0.5, 1.0, 0.5,
+                0.0, 0.5, 1.0]
+        self.mesh_7 = MeshManager('mesh_test_7.msh', dim=3)
+        self.mesh_7.set_media_property('Permeability', {1: perm}, dim_target=3)
+        self.mesh_7.set_boundary_condition('Dirichlet', {102: 1.0},
+                                           dim_target=2, set_nodes=True)
+        self.mesh_77set_boundary_condition('Neumann', {202: -1.0, 201: 0.0},
+                                           dim_target=2, set_nodes=True)
+        self.mpfad_6 = MpfaD3D(self.mesh_6)
+
     @unittest.skip("we'll see it later")
     def test_inverse_distance_yields_same_weight_for_equal_tetrahedra(self):
         intern_node = self.mesh_1.all_nodes[-1]

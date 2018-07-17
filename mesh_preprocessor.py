@@ -1,4 +1,5 @@
 import numpy as np
+from math import pi
 from math import sqrt
 from pymoab import core
 from pymoab import types
@@ -72,20 +73,19 @@ class MeshManager:
         self.all_nodes.append(new_vertices)
         return new_vertices
 
-
     def create_element(self, poly_type, vertices):
         new_volume = self.mb.create_element(poly_type, vertices)
-        self.all_volumes.append(new_element)
+        self.all_volumes.append(new_volume)
         return new_volume
 
-
     def set_information(self, information_name, physicals_values,
-                              dim_target, set_connect=False):
+                        dim_target, set_connect=False):
 
         information_tag = self.mb.tag_get_handle(information_name)
         for physical, value in physicals_values.items():
             for a_set in self.physical_sets:
-                physical_group = self.mb.tag_get_data(self.physical_tag, a_set, flat=True)
+                physical_group = self.mb.tag_get_data(self.physical_tag, a_set,
+                                                      flat=True)
 
                 if physical_group == physical:
                     group_elements = self.mb.get_entities_by_dimension(a_set, dim_target)
@@ -102,11 +102,30 @@ class MeshManager:
                         self.mb.tag_set_data(information_tag, element, value)
 
                         if set_connect:
-                            connectivities = self.mtu.get_bridge_adjacencies(element, 0, 0)
+                            connectivities = self.mtu.get_bridge_adjacencies(
+                                                  element, 0, 0)
                             self.mb.tag_set_data(
-                                information_tag, connectivities, np.repeat(value, len(connectivities)))
+                                information_tag, connectivities,
+                                np.repeat(value, len(connectivities)))
 
-        # self.mb.write_file('algo_ahora.vtk')
+    def set_bc(self, information_name, physicals_values,
+                          set_connect=False):
+
+        information_tag = self.mb.tag_get_handle(information_name)
+        for physical, value in physicals_values.items():
+            for a_set in self.physical_sets:
+                physical_group = self.mb.tag_get_data(self.physical_tag, a_set,
+                                                      flat=True)
+                if physical_group == physical:
+                    nodes = self.mb.get_entities_by_dimension(a_set, 0)
+                    for node in nodes:
+                        x, y, z = self.mb.get_coords(node)
+                        u_D = (1 + np.sin(pi * x) * np.sin(pi *
+                              (y + 1/2.)) * np.sin(pi * (z + 1 / 3.)))
+                    
+
+
+
 
     def set_media_property(self, property_name, physicals_values,
                                  dim_target=3, set_nodes=False):
