@@ -84,57 +84,56 @@ class MeshManager:
         information_tag = self.mb.tag_get_handle(information_name)
         for physical, value in physicals_values.items():
             for a_set in self.physical_sets:
+<<<<<<< HEAD
                 physical_group = self.mb.tag_get_data(self.physical_tag, a_set,
                                                       flat=True)
+=======
+                physical_group = self.mb.tag_get_data(self.physical_tag,
+                                                      a_set, flat=True)
+>>>>>>> cc845ffd021a26271355e9254dd747e9e1ced003
 
                 if physical_group == physical:
                     group_elements = self.mb.get_entities_by_dimension(a_set, dim_target)
 
                     if information_name == 'Dirichlet':
                         # print('DIR GROUP', len(group_elements), group_elements)
-                        self.dirichlet_faces = self.dirichlet_faces | set(group_elements)
+                        self.dirichlet_faces = self.dirichlet_faces | set(
+                                                    group_elements)
 
                     if information_name == 'Neumann':
                         # print('NEU GROUP', len(group_elements), group_elements)
-                        self.neumann_faces = self.neumann_faces | set(group_elements)
+                        self.neumann_faces = self.neumann_faces | set(
+                                                  group_elements)
 
                     for element in group_elements:
                         self.mb.tag_set_data(information_tag, element, value)
 
                         if set_connect:
                             connectivities = self.mtu.get_bridge_adjacencies(
-                                                  element, 0, 0)
+                                                                element, 0, 0)
                             self.mb.tag_set_data(
                                 information_tag, connectivities,
                                 np.repeat(value, len(connectivities)))
 
-    def set_bc(self, information_name, physicals_values,
-                          set_connect=False):
+        # self.mb.write_file('algo_ahora.vtk')
+    def get_boundary_nodes(self):
+        all_faces = self.dirichlet_faces | self.neumann_faces
+        boundary_nodes = set()
+        for face in all_faces:
+            nodes = self.mtu.get_bridge_adjacencies(face, 2, 0)
+            boundary_nodes.update(nodes)
 
-        information_tag = self.mb.tag_get_handle(information_name)
-        for physical, value in physicals_values.items():
-            for a_set in self.physical_sets:
-                physical_group = self.mb.tag_get_data(self.physical_tag, a_set,
-                                                      flat=True)
-                if physical_group == physical:
-                    nodes = self.mb.get_entities_by_dimension(a_set, 0)
-                    for node in nodes:
-                        x, y, z = self.mb.get_coords(node)
-                        u_D = (1 + np.sin(pi * x) * np.sin(pi *
-                              (y + 1/2.)) * np.sin(pi * (z + 1 / 3.)))
-                    
-
-
+        return boundary_nodes
 
 
     def set_media_property(self, property_name, physicals_values,
-                                 dim_target=3, set_nodes=False):
+                           dim_target=3, set_nodes=False):
 
         self.set_information(property_name, physicals_values,
                              dim_target, set_connect=set_nodes)
 
     def set_boundary_condition(self, boundary_condition, physicals_values,
-                                     dim_target=3, set_nodes=False):
+                               dim_target=3, set_nodes=False):
 
         self.set_information(boundary_condition, physicals_values,
                              dim_target, set_connect=set_nodes)
