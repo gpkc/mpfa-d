@@ -71,7 +71,7 @@ flux = []
 all_N_IJK = []
 
 for face in face_verts:
-    I, K, J = np.asarray(face)
+    I, J, K = np.asarray(face)
     g_I = np.asarray(benchmark_1(I[0], I[1], I[2])[1])
     g_J = np.asarray(benchmark_1(J[0], J[1], J[2])[1])
     g_K = np.asarray(benchmark_1(K[0], K[1], K[2])[1])

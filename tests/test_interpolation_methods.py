@@ -67,17 +67,6 @@ class InterpMethodTest(unittest.TestCase):
                                            dim_target=2, set_nodes=True)
         self.mpfad_6 = MpfaD3D(self.mesh_6)
 
-        perm = [1.0, 0.5, 0.0,
-                0.5, 1.0, 0.5,
-                0.0, 0.5, 1.0]
-        self.mesh_7 = MeshManager('mesh_test_7.msh', dim=3)
-        self.mesh_7.set_media_property('Permeability', {1: perm}, dim_target=3)
-        self.mesh_7.set_boundary_condition('Dirichlet', {102: 1.0},
-                                           dim_target=2, set_nodes=True)
-        self.mesh_77set_boundary_condition('Neumann', {202: -1.0, 201: 0.0},
-                                           dim_target=2, set_nodes=True)
-        self.mpfad_6 = MpfaD3D(self.mesh_6)
-
     @unittest.skip("we'll see it later")
     def test_inverse_distance_yields_same_weight_for_equal_tetrahedra(self):
         intern_node = self.mesh_1.all_nodes[-1]
@@ -112,14 +101,14 @@ class InterpMethodTest(unittest.TestCase):
             self.assertAlmostEqual(
                 local_pressure[0][0], 1 - coord_x, delta=1e-15)
 
-    # @unittest.skip("we'll see it later")
+    @unittest.skip("we'll see it later")
     def test_lpew3_yields_same_weight_for_equal_tetrahedra(self):
         intern_node = self.mesh_1.all_nodes[-1]
         vols_ws_by_lpew3 = LPEW3(self.mesh_1).interpolate(intern_node)
         for vol, weight in vols_ws_by_lpew3.items():
             self.assertAlmostEqual(weight, 1.0/12.0, delta=1e-15)
 
-    @unittest.skip("we'll see it later")
+    # @unittest.skip("we'll see it later")
     def test_linear_problem_with_lpew3_interpolation_mesh_2(self):
         self.mpfad_2.run_solver(LPEW3(self.mesh_2).interpolate)
         for a_volume in self.mesh_2.all_volumes:
@@ -128,6 +117,7 @@ class InterpMethodTest(unittest.TestCase):
             coord_x = self.mesh_2.get_centroid(a_volume)[0]
             self.assertAlmostEqual(
                 local_pressure[0][0], 1 - coord_x, delta=1e-15)
+            print(local_pressure, 1 - coord_x)
 
     @unittest.skip("we'll see it later")
     def test_linear_problem_with_neumann_lpew3_interpolation_mesh_4(self):

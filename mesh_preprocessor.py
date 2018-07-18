@@ -84,13 +84,8 @@ class MeshManager:
         information_tag = self.mb.tag_get_handle(information_name)
         for physical, value in physicals_values.items():
             for a_set in self.physical_sets:
-<<<<<<< HEAD
-                physical_group = self.mb.tag_get_data(self.physical_tag, a_set,
-                                                      flat=True)
-=======
                 physical_group = self.mb.tag_get_data(self.physical_tag,
                                                       a_set, flat=True)
->>>>>>> cc845ffd021a26271355e9254dd747e9e1ced003
 
                 if physical_group == physical:
                     group_elements = self.mb.get_entities_by_dimension(a_set, dim_target)
@@ -115,15 +110,24 @@ class MeshManager:
                                 information_tag, connectivities,
                                 np.repeat(value, len(connectivities)))
 
-        # self.mb.write_file('algo_ahora.vtk')
     def get_boundary_nodes(self):
         all_faces = self.dirichlet_faces | self.neumann_faces
         boundary_nodes = set()
         for face in all_faces:
             nodes = self.mtu.get_bridge_adjacencies(face, 2, 0)
             boundary_nodes.update(nodes)
-
         return boundary_nodes
+
+    def get_non_boundary_volumes(self):
+        volumes = self.all_volumes
+        non_boundary_volumes = []
+        for volume in volumes:
+            volume_faces = set(self.mtu.get_bridge_adjacencies(volume, 3, 2))
+            if (volume_faces.intersection(self.dirichlet_faces | self.neumann_faces)) == set():
+                non_boundary_volumes.append(volume)
+
+        return non_boundary_volumes
+
 
 
     def set_media_property(self, property_name, physicals_values,

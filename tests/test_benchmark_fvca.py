@@ -55,20 +55,17 @@ class InterpMethodTest(unittest.TestCase):
 
         return K, u3
 
-    @unittest.skip("later")
+    # @unittest.skip("later")
     def test_benchmark_case_1(self):
         boundary_nodes = self.mesh.get_boundary_nodes()
-        print(self.mesh.all_nodes)
         for node in boundary_nodes:
             x, y, z = self.mesh.mb.get_coords([node])
-            print(x, y, z)
             g_D = self.benchmark_1(x, y, z)[1]
             self.mesh.mb.tag_set_data(self.mesh.dirichlet_tag, node, g_D)
-            print(self.lpew3.interpolate(node))
         volumes = self.mesh.all_volumes
-        for volume in volumes:
-            nodes = self.mesh.mtu.get_bridge_adjacencies(volume, 3, 0)
         self.mpfad.run_solver(LPEW3(self.mesh).interpolate)
+        rel2 = []
+        print(len(volumes))
         for volume in volumes:
             x_c, y_c, z_c = self.mesh.get_centroid(volume)
             analytical_solution = self.benchmark_1(x_c, y_c, z_c)[1]
@@ -76,8 +73,9 @@ class InterpMethodTest(unittest.TestCase):
                                   self.mpfad.pressure_tag, volume)[0][0]
             err = abs(analytical_solution -
                       calculated_solution) / analytical_solution
+            rel2.append(err)
         max_p = max(self.mpfad.mb.tag_get_data(
                               self.mpfad.pressure_tag, volumes))
         min_p = min(self.mpfad.mb.tag_get_data(
                               self.mpfad.pressure_tag, volumes))
-        # print('maximo e minimo', max_p, min_p)
+        print('maximo e minimo', max_p, min_p, sum(rel2) / len(rel2))
