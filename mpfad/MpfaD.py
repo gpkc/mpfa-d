@@ -101,7 +101,7 @@ class MpfaD3D:
             self.b[0][id_2nd] += - value
 
         if node in self.intern_nodes:
-            """
+
             pressure = self.mesh_data.mb.tag_get_data(self.dirichlet_tag, node)
             value = (is_J) * transm * (cross_1st + cross_2nd) * pressure
             self.b[0][id_1st] += value
@@ -112,6 +112,7 @@ class MpfaD3D:
                 value = (is_J) * transm * (cross_1st + cross_2nd) * weight
                 self.A[id_1st][v_id] += - value
                 self.A[id_2nd][v_id] += value
+            """
 
         if node in self.neumann_nodes:
             neu_term = nodes_weights[node]["Neumann"]
@@ -156,7 +157,12 @@ class MpfaD3D:
                 N_IJK = self.area_vector(JK, JI, test_vector)
                 JR = volume_centroid - self.mb.get_coords([J])
                 tan_JI = np.cross(JI, N_IJK)
+                if np.dot(tan_JI, JK) < 0:
+                    tan_JI = - tan_JI
+
                 tan_JK = np.cross(N_IJK, JK)
+                if np.dot(tan_JK, JI) < 0:
+                    tan_JK = - tan_JK
 
                 h_R = np.absolute(np.dot(N_IJK, JR) / np.sqrt(np.dot(N_IJK,
                                                               N_IJK)))
@@ -165,8 +171,8 @@ class MpfaD3D:
                 K_R = self.mb.tag_get_data(self.perm_tag,
                                            volume).reshape([3, 3])
                 K_R_n = self._flux_term(N_IJK, K_R, N_IJK, face_area)
-                K_R_JI = self._flux_term(N_IJK, K_R, tan_JI, face_area)
-                K_R_JK = self._flux_term(N_IJK, K_R, tan_JK, face_area)
+                K_R_JI = self._flux_term(N_IJK, K_R, -tan_JI, face_area)
+                K_R_JK = self._flux_term(N_IJK, K_R, -tan_JK, face_area)
 
                 D_JI = self._boundary_cross_term(tan_JK, JR, face_area,
                                                  K_R_JK, K_R_n, h_R)
@@ -196,12 +202,12 @@ class MpfaD3D:
 
                 dist_LR = right_vol_cent - left_vol_cent
                 tan_JI = np.cross(JI, N_IJK)
-                # if np.dot(tan_JI, JK) < 0:
-                #     tan_JI = - tan_JI
+                if np.dot(tan_JI, JK) < 0:
+                    tan_JI = - tan_JI
 
                 tan_JK = np.cross(N_IJK, JK)
-                # if np.dot(tan_JK, JI) < 0:
-                #     tan_JK = - tan_JK
+                if np.dot(tan_JK, JI) < 0:
+                    tan_JK = - tan_JK
 
                 K_R = self.mb.tag_get_data(self.perm_tag,
                                            right_volume).reshape([3, 3])
@@ -211,8 +217,8 @@ class MpfaD3D:
                                                                       N_IJK)))
 
                 K_R_n = self._flux_term(N_IJK, K_R, N_IJK, face_area)
-                K_R_JI = self._flux_term(N_IJK, K_R, tan_JI, face_area)
-                K_R_JK = self._flux_term(N_IJK, K_R, tan_JK, face_area)
+                K_R_JI = self._flux_term(N_IJK, K_R, -tan_JI, face_area)
+                K_R_JK = self._flux_term(N_IJK, K_R, -tan_JK, face_area)
 
                 K_L = self.mb.tag_get_data(self.perm_tag,
                                            left_volume).reshape([3, 3])
@@ -221,15 +227,15 @@ class MpfaD3D:
                                                                       N_IJK)))
 
                 K_L_n = self._flux_term(N_IJK, K_L, N_IJK, face_area)
-                K_L_JI = self._flux_term(N_IJK, K_L, tan_JI, face_area)
-                K_L_JK = self._flux_term(N_IJK, K_L, tan_JK, face_area)
+                K_L_JI = self._flux_term(N_IJK, K_L, -tan_JI, face_area)
+                K_L_JK = self._flux_term(N_IJK, K_L, -tan_JK, face_area)
 
-                D_JI = self._intern_cross_term(-tan_JK, dist_LR, face_area,
+                D_JI = self._intern_cross_term(tan_JK, dist_LR, face_area,
                                                K_R_JK, K_L_JK,
                                                K_R_n, K_L_n,
                                                h_R, h_L)
 
-                D_JK = self._intern_cross_term(-tan_JI, dist_LR, face_area,
+                D_JK = self._intern_cross_term(tan_JI, dist_LR, face_area,
                                                K_R_JI, K_L_JI,
                                                K_R_n, K_L_n,
                                                h_R, h_L)
