@@ -36,3 +36,4 @@ Volume(26) = {26};
 Physical Surface(101) = {14, 16, 18, 20, 22, 24};
 cl__1 = 1;
 Physical Volume(cl__1) = {26};
+Physical Surface(102) -= {16, 24, 20, 18, 22, 14};

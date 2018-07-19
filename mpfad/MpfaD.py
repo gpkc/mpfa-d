@@ -78,7 +78,7 @@ class MpfaD3D:
 
     def _boundary_cross_term(self, tan_vector, norm_vector, face_area,
                              tan_flux_term, norm_flux_term, cent_dist):
-        mesh_aniso_term = np.dot(tan_vector, norm_vector)/(face_area**2)
+        mesh_aniso_term = np.dot(tan_vector, norm_vector)/(face_area**2.0)
         phys_aniso_term = tan_flux_term / face_area
         cross_term = mesh_aniso_term * (norm_flux_term / cent_dist) - \
             phys_aniso_term
@@ -101,7 +101,7 @@ class MpfaD3D:
             self.b[0][id_2nd] += - value
 
         if node in self.intern_nodes:
-
+            """
             pressure = self.mesh_data.mb.tag_get_data(self.dirichlet_tag, node)
             value = (is_J) * transm * (cross_1st + cross_2nd) * pressure
             self.b[0][id_1st] += value
@@ -112,7 +112,7 @@ class MpfaD3D:
                 value = (is_J) * transm * (cross_1st + cross_2nd) * weight
                 self.A[id_1st][v_id] += - value
                 self.A[id_2nd][v_id] += value
-            """
+            # """
 
         if node in self.neumann_nodes:
             neu_term = nodes_weights[node]["Neumann"]
@@ -157,12 +157,7 @@ class MpfaD3D:
                 N_IJK = self.area_vector(JK, JI, test_vector)
                 JR = volume_centroid - self.mb.get_coords([J])
                 tan_JI = np.cross(JI, N_IJK)
-                if np.dot(tan_JI, JK) < 0:
-                    tan_JI = - tan_JI
-
                 tan_JK = np.cross(N_IJK, JK)
-                if np.dot(tan_JK, JI) < 0:
-                    tan_JK = - tan_JK
 
                 h_R = np.absolute(np.dot(N_IJK, JR) / np.sqrt(np.dot(N_IJK,
                                                               N_IJK)))
@@ -181,7 +176,7 @@ class MpfaD3D:
                 K_n_eff = K_R_n / h_R
 
                 RHS = -(D_JI * (g_J - g_I) + D_JK * (g_J - g_K) +
-                        2 * K_n_eff * g_J)
+                        2 * K_R_n / h_R * g_J)
                 volume_id = v_ids[volume[0]]
                 self.A[volume_id][volume_id] += -2 * K_n_eff
                 self.b[0][volume_id] += RHS
@@ -202,12 +197,7 @@ class MpfaD3D:
 
                 dist_LR = right_vol_cent - left_vol_cent
                 tan_JI = np.cross(JI, N_IJK)
-                if np.dot(tan_JI, JK) < 0:
-                    tan_JI = - tan_JI
-
                 tan_JK = np.cross(N_IJK, JK)
-                if np.dot(tan_JK, JI) < 0:
-                    tan_JK = - tan_JK
 
                 K_R = self.mb.tag_get_data(self.perm_tag,
                                            right_volume).reshape([3, 3])
@@ -230,12 +220,12 @@ class MpfaD3D:
                 K_L_JI = self._flux_term(N_IJK, K_L, -tan_JI, face_area)
                 K_L_JK = self._flux_term(N_IJK, K_L, -tan_JK, face_area)
 
-                D_JI = self._intern_cross_term(tan_JK, dist_LR, face_area,
+                D_JI = self._intern_cross_term(-tan_JK, dist_LR, face_area,
                                                K_R_JK, K_L_JK,
                                                K_R_n, K_L_n,
                                                h_R, h_L)
 
-                D_JK = self._intern_cross_term(tan_JI, dist_LR, face_area,
+                D_JK = self._intern_cross_term(-tan_JI, dist_LR, face_area,
                                                K_R_JI, K_L_JI,
                                                K_R_n, K_L_n,
                                                h_R, h_L)
@@ -261,5 +251,5 @@ class MpfaD3D:
         p = np.linalg.solve(self.A, self.b[0])
         self.mb.tag_set_data(self.pressure_tag, self.volumes, p)
 
-    def record_data(self):
-        self.mb.write_file("pressure_solution_mesh_3.vtk")
+    def record_data(self, file_name):
+        self.mb.write_file(file_name)
