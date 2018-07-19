@@ -26,7 +26,8 @@ class PressureSolverTest(unittest.TestCase):
                                            dim_target=2, set_nodes=True)
         self.mpfad_3 = MpfaD3D(self.mesh_3)
 
-    def test_if_method_yelds_exact_solution(self):
+    @unittest.skip('later')
+    def test_if_method_yields_exact_solution(self):
         self.mtu = self.mpfad_3.mtu
         self.mb = self.mpfad_3.mb
         self.mpfad_3.run_solver(LPEW3(self.mesh_3).interpolate)
@@ -37,6 +38,7 @@ class PressureSolverTest(unittest.TestCase):
             self.assertAlmostEqual(calc_solution, analytical_solution,
                                    delta=5e-15)
 
+    @unittest.skip('later')
     def test_if_inner_verts_weighted_calculation_yelds_exact_solution(self):
         self.mtu = self.mpfad_3.mtu
         self.mb = self.mpfad_3.mb
@@ -52,12 +54,13 @@ class PressureSolverTest(unittest.TestCase):
             self.assertAlmostEqual(p_vert, analytical_solution,
                                    delta=5e-15)
 
-    @unittest.skip('later')
+    # @unittest.skip('later')
     def test_if_flux_is_conservative_for_non_boundary_volumes(self):
         self.mtu = self.mpfad_3.mtu
         self.mb = self.mpfad_3.mb
         inner_volumes = self.mesh_3.get_non_boundary_volumes()
         self.mpfad_3.run_solver(LPEW3(self.mesh_3).interpolate)
+        self.mpfad_3.record_data('conservative_test.vtk')
         self.node_pressure_tag = self.mpfad_3.mb.tag_get_handle(
             "Node Pressure", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
                                                                 )
@@ -76,6 +79,11 @@ class PressureSolverTest(unittest.TestCase):
                 p_vert += p_vol * wt
             self.mpfad_3.mb.tag_set_data(self.node_pressure_tag, node, p_vert)
         for volume in inner_volumes:
+            # vol_nodes = self.mb.get_adjacencies(volume, 0)
+            # for v_node in vol_nodes:
+            #     print('TEST NODE:', v_node in self.mpfad_3.neumann_nodes)
+            #     print('TEST NODE:', v_node in self.mpfad_3.dirichlet_nodes)
+
             fl = []
             u = self.mb.tag_get_data(self.mpfad_3.pressure_tag, volume)
             all_faces = self.mtu.get_bridge_adjacencies(volume, 3, 2)
@@ -115,5 +123,8 @@ class PressureSolverTest(unittest.TestCase):
                 flux = -(2 * K_n_eff * (u - g_J) +
                          D_JI * (g_J - g_I) +
                          D_JK * (g_J - g_K))[0][0]
+                print('FLUXES: ', volume_centroid, flux)
                 fl.append(flux)
-            print('total flux', sum(fl))
+            total_flux = sum(fl)
+            print('total_flux', total_flux)
+            self.assertAlmostEqual(sum(fl), 0.0, delta=1e-15)
