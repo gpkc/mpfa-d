@@ -26,24 +26,23 @@ class InterpMethodTest(unittest.TestCase):
         return K, u1
 
     def benchmark_2(self, x, y, z):
-        k_11 = y ** 2 + z ** 2 + 1
-        k_12 = - x * y
-        k_13 = - x * z
-        k_21 = - x * y
-        k_22 = x ** 2 + z ** 2 + 1
-        k_23 = - y * z
-        k_31 = - x * z
-        k_32 = - y * z
-        k_33 = x ** 2 + y ** 2 + 1
+        k_xx = y ** 2 + z ** 2 + 1
+        k_xy = - x * y
+        k_xz = - x * z
+        k_yx = - x * y
+        k_yy = x ** 2 + z ** 2 + 1
+        k_yz = - y * z
+        k_zx = - x * z
+        k_zy = - y * z
+        k_zz = x ** 2 + y ** 2 + 1
 
-        K = [k_11, k_12, k_13,
-             k_21, k_22, k_23,
-             k_31, k_32, k_33]
+        K = [k_xx, k_xy, k_xz,
+             k_yx, k_yy, k_yz,
+             k_zx, k_zy, k_zz]
 
-        u2 = (x ** 3 * y ** 2 * z) + x * np.sin(2 * pi * x *
-                                                z) * np.sin(2 * pi * x *
-                                                            y) * np.sin(2 *
-                                                                        pi * z)
+        u2 = (x ** 3 * y ** 2 * z) + x * np.sin(2 * pi * x * z)
+                                       * np.sin(2 * pi * x * y)
+                                       * np.sin(2 * pi * z)
 
         return K, u2
 
@@ -55,9 +54,8 @@ class InterpMethodTest(unittest.TestCase):
 
         return K, u3
 
-    # @unittest.skip("later")
+    @unittest.skip("This test is a pass")
     def test_benchmark_case_1(self):
-        boundary_nodes = self.mesh.get_boundary_nodes()
         for node in self.mesh.all_nodes:
             x, y, z = self.mesh.mb.get_coords([node])
             g_D = self.benchmark_1(x, y, z)[1]
@@ -76,9 +74,44 @@ class InterpMethodTest(unittest.TestCase):
             err = abs(analytical_solution -
                       calculated_solution) ** 2
             rel2.append(err)
-        max_p = max(self.mpfad.mb.tag_get_data(
+        u_max = max(self.mpfad.mb.tag_get_data(
                               self.mpfad.pressure_tag, volumes))
-        min_p = min(self.mpfad.mb.tag_get_data(
+        u_min = min(self.mpfad.mb.tag_get_data(
                               self.mpfad.pressure_tag, volumes))
         l2_norm = sum(rel2) / sum(u_sol)
-        print('maximo e minimo', max_p, min_p, l2_norm)
+        non_zero_mat = np.nonzero(self.mpfad.A)
+
+
+        self.assertLessEqual(l2_norm, 6.13e-2)
+
+    def test_benchmark_case_2(self):
+        for node in self.mesh.all_nodes:
+            x, y, z = self.mesh.mb.get_coords([node])
+            g_D = self.benchmark_2(x, y, z)[1]
+            self.mesh.mb.tag_set_data(self.mesh.dirichlet_tag, node, g_D)
+        volumes = self.mesh.all_volumes
+        for volume in volumes:
+            x_c, y_c, z_c = self.mesh.get_centroid(volume)
+            perm = self.benchmark_2(x_c, y_c, z_c)[0]
+            self.mesh.mb.tag_set_data(self.mesh.perm_tag, volume, perm)
+        self.mpfad.run_solver(LPEW3(self.mesh).interpolate)
+
+        rel2 = []
+        u_sol = []
+        for volume in volumes:
+            x_c, y_c, z_c = self.mesh.get_centroid(volume)
+            analytical_solution = self.benchmark_1(x_c, y_c, z_c)[1]
+            calculated_solution = self.mpfad.mb.tag_get_data(
+                                  self.mpfad.pressure_tag, volume)[0][0]
+            u_sol.append(analytical_solution ** 2)
+            err = abs(analytical_solution -
+                      calculated_solution) ** 2
+            rel2.append(err)
+
+        l2_norm = sum(rel2) / sum(u_sol)
+        u_max = max(self.mpfad.mb.tag_get_data(
+                              self.mpfad.pressure_tag, volumes))
+        u_min = min(self.mpfad.mb.tag_get_data(
+                              self.mpfad.pressure_tag, volumes))
+        non_zero_mat = np.nonzero(self.mpfad.A)[0]
+        print(len(volumes), len(non_zero_mat), u_max, u_min, l2_norm)

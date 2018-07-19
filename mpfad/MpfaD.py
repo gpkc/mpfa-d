@@ -69,7 +69,7 @@ class MpfaD3D:
                            tan_term_1st, tan_term_2nd,
                            norm_term_1st, norm_term_2nd,
                            cent_dist_1st, cent_dist_2nd):
-        mesh_aniso_term = np.dot(tan_vector, cent_vector) / (face_area**2.0)
+        mesh_aniso_term = np.dot(tan_vector, cent_vector) / (face_area ** 2.0)
         phys_aniso_term = ((tan_term_1st / norm_term_1st) * cent_dist_1st) + \
                           ((tan_term_2nd / norm_term_2nd) * cent_dist_2nd)
 
@@ -78,7 +78,7 @@ class MpfaD3D:
 
     def _boundary_cross_term(self, tan_vector, norm_vector, face_area,
                              tan_flux_term, norm_flux_term, cent_dist):
-        mesh_aniso_term = np.dot(tan_vector, norm_vector)/(face_area**2.0)
+        mesh_aniso_term = np.dot(tan_vector, norm_vector)/(face_area ** 2.0)
         phys_aniso_term = tan_flux_term / face_area
         cross_term = mesh_aniso_term * (norm_flux_term / cent_dist) - \
             phys_aniso_term
@@ -166,12 +166,12 @@ class MpfaD3D:
                 K_R = self.mb.tag_get_data(self.perm_tag,
                                            volume).reshape([3, 3])
                 K_R_n = self._flux_term(N_IJK, K_R, N_IJK, face_area)
-                K_R_JI = self._flux_term(N_IJK, K_R, -tan_JI, face_area)
-                K_R_JK = self._flux_term(N_IJK, K_R, -tan_JK, face_area)
+                K_R_JI = self._flux_term(N_IJK, K_R, tan_JI, face_area)
+                K_R_JK = self._flux_term(N_IJK, K_R, tan_JK, face_area)
 
-                D_JI = self._boundary_cross_term(tan_JK, JR, face_area,
+                D_JI = self._boundary_cross_term(-tan_JK, JR, face_area,
                                                  K_R_JK, K_R_n, h_R)
-                D_JK = self._boundary_cross_term(tan_JI, JR, face_area,
+                D_JK = self._boundary_cross_term(-tan_JI, JR, face_area,
                                                  K_R_JI, K_R_n, h_R)
                 K_n_eff = K_R_n / h_R
 
@@ -207,8 +207,8 @@ class MpfaD3D:
                                                                       N_IJK)))
 
                 K_R_n = self._flux_term(N_IJK, K_R, N_IJK, face_area)
-                K_R_JI = self._flux_term(N_IJK, K_R, -tan_JI, face_area)
-                K_R_JK = self._flux_term(N_IJK, K_R, -tan_JK, face_area)
+                K_R_JI = self._flux_term(N_IJK, K_R, tan_JI, face_area)
+                K_R_JK = self._flux_term(N_IJK, K_R, tan_JK, face_area)
 
                 K_L = self.mb.tag_get_data(self.perm_tag,
                                            left_volume).reshape([3, 3])
@@ -217,8 +217,8 @@ class MpfaD3D:
                                                                       N_IJK)))
 
                 K_L_n = self._flux_term(N_IJK, K_L, N_IJK, face_area)
-                K_L_JI = self._flux_term(N_IJK, K_L, -tan_JI, face_area)
-                K_L_JK = self._flux_term(N_IJK, K_L, -tan_JK, face_area)
+                K_L_JI = self._flux_term(N_IJK, K_L, tan_JI, face_area)
+                K_L_JK = self._flux_term(N_IJK, K_L, tan_JK, face_area)
 
                 D_JI = self._intern_cross_term(-tan_JK, dist_LR, face_area,
                                                K_R_JK, K_L_JK,
