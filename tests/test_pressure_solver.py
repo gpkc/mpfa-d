@@ -1,5 +1,6 @@
 import unittest
 import numpy as np
+import mpfad.helpers.geometric as geo
 from mpfad.MpfaD import MpfaD3D
 from mpfad.interpolation.LPEW3 import LPEW3
 from mesh_preprocessor import MeshManager
@@ -54,13 +55,81 @@ class PressureSolverTest(unittest.TestCase):
             self.assertAlmostEqual(p_vert, analytical_solution,
                                    delta=5e-15)
 
-    # @unittest.skip('later')
+    def test_if_flux_is_conservative_for_all_volumes(self):
+
+        self.node_pressure_tag = self.mpfad_3.mb.tag_get_handle(
+            "Node Pressure", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
+                                                                )
+        self.mpfad_3.run_solver(LPEW3(self.mesh_3).interpolate)
+        inner_volumes = self.mesh_3.get_non_boundary_volumes(
+                        self.mpfad_3.dirichlet_nodes,
+                        self.mpfad_3.neumann_nodes)
+        self.node_pressure_tag = self.mpfad_3.mb.tag_get_handle(
+            "Node Pressure", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
+                                                                )
+        for node in self.mpfad_3.dirichlet_nodes:
+            self.mpfad_3.mb.tag_set_data(self.node_pressure_tag, node,
+                                         self.mpfad_3.mb.tag_get_data(
+                                            self.mpfad_3.dirichlet_tag, node)
+                                         )
+
+        for node in self.mpfad_3.intern_nodes:
+            nd_weights = LPEW3(self.mesh_3).interpolate(node)
+            p_vert = 0.0
+            for volume, wt in nd_weights.items():
+                p_vol = self.mpfad_3.mb.tag_get_data(self.mpfad_3.pressure_tag,
+                                                     volume)
+                p_vert += p_vol * wt
+            self.mpfad_3.mb.tag_set_data(self.node_pressure_tag, node, p_vert)
+
+        for a_volume in inner_volumes:
+            vol_centroid = self.mesh_3.mtu.get_average_position([a_volume])
+            vol_faces = self.mesh_3.mtu.get_bridge_adjacencies(a_volume, 2, 2)
+            vol_p = self.mesh_3.mb.tag_get_data(
+                    self.mpfad_3.pressure_tag, a_volume)[0][0]
+            # print('v: ', vol_p)
+            vol_nodes = self.mesh_3.mtu.get_bridge_adjacencies(a_volume, 0, 0)
+            vol_crds = self.mesh_3.mb.get_coords(vol_nodes)
+            vol_crds = np.reshape(vol_crds, ([4, 3]))
+            vol_volume = self.mesh_3.get_tetra_volume(vol_crds)
+            vol_perm = self.mesh_3.mb.tag_get_data(
+                       self.mpfad_3.perm_tag, a_volume).reshape([3, 3])
+            fluxes = []
+            for a_face in vol_faces:
+                f_nodes = self.mesh_3.mtu.get_bridge_adjacencies(a_face, 0, 0)
+                fc_nodes = self.mesh_3.mb.get_coords(f_nodes)
+                fc_nodes = np.reshape(fc_nodes, ([3, 3]))
+                grad = np.zeros(3)
+                for i in range(len(fc_nodes)):
+                    area_vect = geo._area_vector(np.array([fc_nodes[i],
+                                                          fc_nodes[i-1],
+                                                          vol_centroid]),
+                                                 fc_nodes[i-2])[0]
+                    p_node_op = self.mpfad_3.mb.tag_get_data(
+                                self.node_pressure_tag, f_nodes[i-2])[0][0]
+
+                    grad += area_vect * p_node_op
+
+                area_vect = geo._area_vector(fc_nodes, vol_centroid)[0]
+                grad += area_vect * vol_p
+                grad = grad / (3.0 * vol_volume)
+
+                flux = - np.dot(np.dot(vol_perm, grad), area_vect)
+                fluxes.append(flux)
+            fluxes_sum = abs(sum(fluxes))
+            self.assertAlmostEqual(fluxes_sum, 0.0, delta=1e-14)
+
+
+    @unittest.skip('later')
     def test_if_flux_is_conservative_for_non_boundary_volumes(self):
         self.mtu = self.mpfad_3.mtu
         self.mb = self.mpfad_3.mb
-        inner_volumes = self.mesh_3.get_non_boundary_volumes()
-        self.mpfad_3.run_solver(LPEW3(self.mesh_3).interpolate)
-        self.mpfad_3.record_data('conservative_test.vtk')
+        inner_volumes = self.mesh_3.get_non_boundary_volumes(
+                        self.mpfad_3.dirichlet_nodes,
+                        self.mpfad_3.neumann_nodes)
+        nd_weights = self.mpfad_3.run_solver(LPEW3(self.mesh_3).interpolate)
+
+        # self.mpfad_3.record_data('conservative_test.vtk')
         self.node_pressure_tag = self.mpfad_3.mb.tag_get_handle(
             "Node Pressure", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
                                                                 )
@@ -72,13 +141,15 @@ class PressureSolverTest(unittest.TestCase):
 
         for node in self.mpfad_3.intern_nodes:
             nd_weights = LPEW3(self.mesh_3).interpolate(node)
-            p_vert = 0.
+            p_vert = 0.0
             for volume, wt in nd_weights.items():
                 p_vol = self.mpfad_3.mb.tag_get_data(self.mpfad_3.pressure_tag,
                                                      volume)
                 p_vert += p_vol * wt
             self.mpfad_3.mb.tag_set_data(self.node_pressure_tag, node, p_vert)
+
         for volume in inner_volumes:
+
             # vol_nodes = self.mb.get_adjacencies(volume, 0)
             # for v_node in vol_nodes:
             #     print('TEST NODE:', v_node in self.mpfad_3.neumann_nodes)
