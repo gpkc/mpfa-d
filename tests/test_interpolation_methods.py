@@ -117,7 +117,7 @@ class InterpMethodTest(unittest.TestCase):
             coord_x = self.mesh_2.get_centroid(a_volume)[0]
             self.assertAlmostEqual(
                 local_pressure[0][0], 1 - coord_x, delta=1e-15)
-            print(local_pressure, 1 - coord_x)
+            # print(local_pressure, 1 - coord_x)
 
     @unittest.skip("we'll see it later")
     def test_linear_problem_with_neumann_lpew3_interpolation_mesh_4(self):
