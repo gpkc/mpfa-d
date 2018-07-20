@@ -69,19 +69,23 @@ class InterpMethodTest(unittest.TestCase):
             analytical_solution = self.benchmark_1(x_c, y_c, z_c)[1]
             calculated_solution = self.mpfad.mb.tag_get_data(
                                   self.mpfad.pressure_tag, volume)[0][0]
-            u_sol.append(analytical_solution)
-            rel2.append(np.absolute(analytical_solution - calculated_solution))
+            tetra_nodes = self.mpfad.mtu.get_bridge_adjacencies(volume, 3, 0)
+            tetra_coords = self.mpfad.mb.get_coords(tetra_nodes).reshape([4,3])
+            tetra_vol = self.mesh.get_tetra_volume(tetra_coords)
+            u_sol.append(analytical_solution ** 2 * tetra_vol)
+            rel2.append(np.absolute(analytical_solution - calculated_solution) ** 2
+                        * tetra_vol)
         u_max = max(self.mpfad.mb.tag_get_data(
                               self.mpfad.pressure_tag, volumes))
         u_min = min(self.mpfad.mb.tag_get_data(
                               self.mpfad.pressure_tag, volumes))
-        l2_norm = (np.dot(rel2, rel2)) ** (1 / 2)
+        l2_norm = (np.dot(rel2, rel2)/ np.dot(u_sol, u_sol)) ** (1 / 2)
         non_zero_mat = np.nonzero(self.mpfad.A)[0]
         # self.assertLessEqual(l2_norm, 6.13e-2)
         print("Test case 1", len(volumes), len(non_zero_mat), u_max, u_min, l2_norm)
         # self.mpfad.record_data('benchmark_1.vtk')
 
-    @unittest.skip('not ready for testing')
+    # @unittest.skip('not ready for testing')
     def test_benchmark_case_2(self):
         for node in self.mesh.get_boundary_nodes():
             x, y, z = self.mesh.mb.get_coords([node])
@@ -102,11 +106,14 @@ class InterpMethodTest(unittest.TestCase):
             calculated_solution = self.mpfad.mb.tag_get_data(
                                   self.mpfad.pressure_tag, volume)[0][0]
             u_sol.append(analytical_solution ** 2)
-            err = abs(analytical_solution -
-                      calculated_solution) ** 2
-            rel2.append(err)
+            tetra_nodes = self.mpfad.mtu.get_bridge_adjacencies(volume, 3, 0)
+            tetra_coords = self.mpfad.mb.get_coords(tetra_nodes).reshape([4,3])
+            tetra_vol = self.mesh.get_tetra_volume(tetra_coords)
+            u_sol.append(analytical_solution ** 2 * tetra_vol)
+            rel2.append(np.absolute(analytical_solution - calculated_solution) ** 2
+                        * tetra_vol)
 
-        l2_norm = (sum(rel2) / sum(u_sol)) ** (1 / 2)
+        l2_norm = (sum(rel2)) ** (1 / 2)
         u_max = max(self.mpfad.mb.tag_get_data(
                               self.mpfad.pressure_tag, volumes))
         u_min = min(self.mpfad.mb.tag_get_data(
