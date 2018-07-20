@@ -118,12 +118,12 @@ class MeshManager:
             boundary_nodes.update(nodes)
         return boundary_nodes
 
-    def get_non_boundary_volumes(self):
+    def get_non_boundary_volumes(self, dirichlet_nodes, neumann_nodes):
         volumes = self.all_volumes
         non_boundary_volumes = []
         for volume in volumes:
-            volume_faces = set(self.mtu.get_bridge_adjacencies(volume, 3, 2))
-            if (volume_faces.intersection(self.dirichlet_faces | self.neumann_faces)) == set():
+            volume_nodes = set(self.mtu.get_bridge_adjacencies(volume, 0, 0))
+            if (volume_nodes.intersection(dirichlet_nodes | neumann_nodes)) == set():
                 non_boundary_volumes.append(volume)
 
         return non_boundary_volumes
