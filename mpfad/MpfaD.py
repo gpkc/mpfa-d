@@ -157,7 +157,11 @@ class MpfaD3D:
                 N_IJK = self.area_vector(JK, JI, test_vector)
                 JR = volume_centroid - self.mb.get_coords([J])
                 tan_JI = np.cross(JI, N_IJK)
+                # if np.dot(tan_JI, JK) < 0.0:
+                #     tan_JI = -tan_JI
                 tan_JK = np.cross(N_IJK, JK)
+                # if np.dot(tan_JK, JI) < 0.0:
+                #     tan_JK = -tan_JK
 
                 h_R = np.absolute(np.dot(N_IJK, JR) / np.sqrt(np.dot(N_IJK,
                                                               N_IJK)))
@@ -196,8 +200,12 @@ class MpfaD3D:
                 face_area = np.sqrt(np.dot(N_IJK, N_IJK))
 
                 dist_LR = right_vol_cent - left_vol_cent
-                tan_JI = np.cross(JI, N_IJK)
+                # if np.dot(tan_JI, JK) < 0.0:
+                #     tan_JI = -tan_JI
+
                 tan_JK = np.cross(N_IJK, JK)
+                # if np.dot(tan_JK, JI) < 0.0:
+                #     tan_JK = -tan_JK
 
                 K_R = self.mb.tag_get_data(self.perm_tag,
                                            right_volume).reshape([3, 3])
@@ -252,4 +260,7 @@ class MpfaD3D:
         self.mb.tag_set_data(self.pressure_tag, self.volumes, p)
 
     def record_data(self, file_name):
-        self.mb.write_file(file_name)
+        volumes = self.mb.get_entities_by_dimension(0, 3)
+        ms = self.mb.create_meshset()
+        self.mb.add_entities(ms, volumes)
+        self.mb.write_file(file_name, [ms])
