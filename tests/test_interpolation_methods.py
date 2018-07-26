@@ -63,7 +63,7 @@ class InterpMethodTest(unittest.TestCase):
         self.mesh_6.set_media_property('Permeability', {1: K_1}, dim_target=3)
         self.mesh_6.set_boundary_condition('Dirichlet', {102: 1.0},
                                            dim_target=2, set_nodes=True)
-        self.mesh_6.set_boundary_condition('Neumann', {202: -1.0, 201: 0.0},
+        self.mesh_6.set_boundary_condition('Neumann', {202: 1.0, 201: 0.0},
                                            dim_target=2, set_nodes=True)
         self.mpfad_6 = MpfaD3D(self.mesh_6)
 
@@ -108,7 +108,7 @@ class InterpMethodTest(unittest.TestCase):
         for vol, weight in vols_ws_by_lpew3.items():
             self.assertAlmostEqual(weight, 1.0/12.0, delta=1e-15)
 
-    # @unittest.skip("we'll see it later")
+    @unittest.skip("we'll see it later")
     def test_linear_problem_with_lpew3_interpolation_mesh_2(self):
         self.mpfad_2.run_solver(LPEW3(self.mesh_2).interpolate)
         for a_volume in self.mesh_2.all_volumes:
@@ -129,18 +129,19 @@ class InterpMethodTest(unittest.TestCase):
             self.assertAlmostEqual(
                 local_pressure[0][0], 1 - coord_x, delta=1e-15)
 
-    @unittest.skip("we'll see it later")
+    # @unittest.skip("we'll see it later")
     def test_number_of_non_null_neumann_faces(self):
         neumann_faces = self.mpfad_6.neumann_faces
         count = 0
+
         for neumann_face in neumann_faces:
             flux = self.mesh_6.mb.tag_get_data(
                    self.mpfad_6.neumann_tag, neumann_face)
-            if flux == -0.5:
+            if flux == 1.0:
                 count += 1
         self.assertEqual(count, 2)
 
-    @unittest.skip("we'll see it later")
+    # @unittest.skip("we'll see it later")
     def test_linear_problem_with_non_null_neumann_condition_lpew3(self):
         self.mpfad_6.run_solver(LPEW3(self.mesh_6).interpolate)
         for a_volume in self.mesh_6.all_volumes:
