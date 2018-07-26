@@ -82,7 +82,7 @@ class InterpMethodTest(unittest.TestCase):
         l2_norm = (np.dot(rel2, rel2)/ np.dot(u_sol, u_sol)) ** (1 / 2)
         non_zero_mat = np.nonzero(self.mpfad.A)[0]
         # self.assertLessEqual(l2_norm, 6.13e-2)
-        print("Test case 1", len(volumes), len(non_zero_mat), u_max, u_min, l2_norm)
+        # print("Test case 1", len(volumes), len(non_zero_mat), u_max, u_min, l2_norm)
         # self.mpfad.record_data('benchmark_1.vtk')
 
     # @unittest.skip('not ready for testing')
@@ -119,4 +119,4 @@ class InterpMethodTest(unittest.TestCase):
         u_min = min(self.mpfad.mb.tag_get_data(
                               self.mpfad.pressure_tag, volumes))
         non_zero_mat = np.nonzero(self.mpfad.A)[0]
-        print("Test case 2", len(volumes), len(non_zero_mat), u_max, u_min, l2_norm)
+        # print("Test case 2", len(volumes), len(non_zero_mat), u_max, u_min, l2_norm)
