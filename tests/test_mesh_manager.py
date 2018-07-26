@@ -73,7 +73,9 @@ class PressureSolverTest(unittest.TestCase):
     def test_if_node_weighted_calculation_yelds_analytical_solution(self):
         self.mtu = self.mpfad_3.mtu
         self.mb = self.mpfad_3.mb
-        inner_volumes = self.mesh_3.get_non_boundary_volumes()
+        # inner_volumes = self.mesh_3.get_non_boundary_volumes(
+        #                 self.mpfad_3.dirichlet_nodes,
+        #                 self.mpfad_3.neumann_nodes)
         self.mpfad_3.run_solver(LPEW3(self.mesh_3).interpolate)
         for node in self.mpfad_3.intern_nodes:
             analytical_solution = 1 - self.mb.get_coords([node])[0]
