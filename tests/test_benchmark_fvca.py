@@ -10,7 +10,7 @@ class InterpMethodTest(unittest.TestCase):
 
     def setUp(self):
         K = self.benchmark_1(0., 0., 0.)[0]
-        self.mesh = MeshManager('benchmarkmesh.msh', dim=3)
+        self.mesh = MeshManager('mesh_tet5.h5m', dim=3)
         self.mesh.set_media_property('Permeability', {1: K}, dim_target=3)
         self.mesh.set_boundary_condition('Dirichlet', {101: 0.0},
                                          dim_target=2, set_nodes=True)
@@ -61,6 +61,9 @@ class InterpMethodTest(unittest.TestCase):
             g_D = self.benchmark_1(x, y, z)[1]
             self.mesh.mb.tag_set_data(self.mesh.dirichlet_tag, node, g_D)
         volumes = self.mesh.all_volumes
+        for volume in volumes:
+            self.mesh.mb.tag_set_data(self.mesh.perm_tag, volume,
+                                      self.benchmark_1(0., 0., 0.,)[0])
         self.mpfad.run_solver(LPEW3(self.mesh).interpolate)
         rel2 = []
         u_sol = []
@@ -79,13 +82,17 @@ class InterpMethodTest(unittest.TestCase):
                               self.mpfad.pressure_tag, volumes))
         u_min = min(self.mpfad.mb.tag_get_data(
                               self.mpfad.pressure_tag, volumes))
-        l2_norm = (np.dot(rel2, rel2)/ np.dot(u_sol, u_sol)) ** (1 / 2)
+        l2_norm = (np.dot(rel2, rel2)) ** (1 / 2)
+        rl2_norm = (np.dot(rel2, rel2) / np.dot(u_sol, u_sol)) ** (1 / 2)
         non_zero_mat = np.nonzero(self.mpfad.A)[0]
-        # self.assertLessEqual(l2_norm, 6.13e-2)
-        # print("Test case 1", len(volumes), len(non_zero_mat), u_max, u_min, l2_norm)
-        # self.mpfad.record_data('benchmark_1.vtk')
+        self.assertLessEqual(l2_norm, 6.13e-2)
+        print("Test case 1", 'unkonws: ', len(volumes),
+              'non zero mat: ', len(non_zero_mat), 'u_max: ', u_max,
+              'u_min: ', u_min, 'l2_norm: ', l2_norm,
+              'relative_l2_norm: ', rl2_norm)
+        self.mpfad.record_data('benchmark_1.vtk')
 
-    # @unittest.skip('not ready for testing')
+    @unittest.skip('not ready for testing')
     def test_benchmark_case_2(self):
         for node in self.mesh.get_boundary_nodes():
             x, y, z = self.mesh.mb.get_coords([node])

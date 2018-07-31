@@ -49,7 +49,6 @@ class GenerateMesh:
         with open(self.mesh_file) as msh:
             informations = []
             for i, line in enumerate(msh):
-                print(line)
                 line.strip().split('/n')
                 if "Number of vertices" in line:
                     informations.append(i + 2)
@@ -63,7 +62,6 @@ class GenerateMesh:
                     informations.append(i + 2)
                 if "Faces->Edgess" in line:
                     informations.append(i + 2)
-        print(informations)
 
         return informations
 
