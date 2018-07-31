@@ -180,6 +180,7 @@ class LPEW3(InterpolationMethodBase):
             phi_neigh = self._phi_lpew3(node, a_neigh, a_face)
             delta += (phi_vol + phi_neigh) * csi
         p_weight = zepta - delta
+        print(self.mb.get_coords([node]), self.mtu.get_average_position([vol]), p_weight)
         # print('ZEPTA_DELTA: ', p_weight)
         return p_weight
 
@@ -189,7 +190,7 @@ class LPEW3(InterpolationMethodBase):
         for face in adj_faces:
             if face not in self.neumann_faces:
                 continue
-            face_flux = self.mb.tag_get_data(self.neumann_tag, face)
+            face_flux = self.mb.tag_get_data(self.neumann_tag, face)[0][0]
             face_nodes = self.mb.get_adjacencies(face, 0)
             nodes_crds = self.mb.get_coords(face_nodes)
             nodes_crds = np.reshape(nodes_crds, (len(face_nodes), 3))
@@ -219,5 +220,5 @@ class LPEW3(InterpolationMethodBase):
             vol: weight for vol, weight in zip(vols_around, weights)}
         if neumann:
             neu_term = self.neumann_treatment(node) / weight_sum
-            node_weights['Neumann'] = neu_term
+            node_weights[node] = neu_term
         return node_weights

@@ -86,14 +86,15 @@ class MpfaD3D:
         return cross_term
 
     def get_nodes_weights(self, method):
-        nodes_weights = {}
-        for a_node in self.intern_nodes:
-            nodes_weights[a_node] = method(a_node)
-        for a_node in self.neumann_nodes:
-            nodes_weights[a_node] = method(a_node, neumann=True)
-        return nodes_weights
+        self.nodes_ws = {}
+        self.nodes_nts = {}
+        for node in self.intern_nodes:
+            self.nodes_ws[node] = method(node)
+        for node in self.neumann_nodes:
+            self.nodes_ws[node] = method(node, neumann=True)
+            self.nodes_nts[node] = self.nodes_ws[node].pop(node)
 
-    def _node_treatment(self, node, nodes_weights, id_1st, id_2nd, v_ids,
+    def _node_treatment(self, node, id_1st, id_2nd, v_ids,
                         transm, cross_1st, cross_2nd=0.0, is_J=1):
         value = (is_J) * transm * (cross_1st + cross_2nd)
         if node in self.dirichlet_nodes:
@@ -102,26 +103,25 @@ class MpfaD3D:
             self.b[0][id_2nd] += - value * pressure
 
         if node in self.intern_nodes:
-            for volume, weight in nodes_weights[node].items():
+            for volume, weight in self.nodes_ws[node].items():
                 v_id = v_ids[volume]
                 self.A[id_1st][v_id] += - value * weight
                 self.A[id_2nd][v_id] += value * weight
 
         if node in self.neumann_nodes:
-            neu_term = nodes_weights[node]["Neumann"]
-            del nodes_weights[node]['Neumann']
-            for volume, weight_N in nodes_weights[node].items():
+            neu_term = self.nodes_nts[node]
+            self.b[0][id_1st] += value * neu_term
+            self.b[0][id_2nd] += - value * neu_term
+
+            for volume, weight_N in self.nodes_ws[node].items():
                 v_id = v_ids[volume]
                 self.A[id_1st][v_id] += - value * weight_N
                 self.A[id_2nd][v_id] += value * weight_N
 
-                self.b[0][id_1st] += value * neu_term
-                self.b[0][id_2nd] += - value * neu_term
-            nodes_weights[node]['Neumann'] = neu_term
 
     def run_solver(self, interpolation_method):
 
-        nodes_weights = self.get_nodes_weights(interpolation_method)
+        self.get_nodes_weights(interpolation_method)
         v_ids = self.set_global_id()
 
         for face in self.all_faces:
@@ -133,8 +133,8 @@ class MpfaD3D:
                 face_nodes = self.mtu.get_bridge_adjacencies(face, 0, 0)
                 node_crds = self.mb.get_coords(face_nodes).reshape([3, 3])
                 face_area = geo._area_vector(node_crds, norma=True)
-                print('FACE AREA', face_area, face_flow)
-                self.b[0][v_ids[volume[0]]] += -face_flow * face_area
+                # print('FACE AREA', face_area, face_flow)
+                self.b[0][v_ids[volume[0]]] += - face_flow * face_area
 
             if face in self.dirichlet_faces:
                 volume = self.mtu.get_bridge_adjacencies(face, 2, 3)
@@ -246,13 +246,16 @@ class MpfaD3D:
                 self.A[gid_left][gid_left] += -2 * K_n_eff
                 self.A[gid_left][gid_right] += 2 * K_n_eff
 
-                self._node_treatment(I, nodes_weights, gid_right, gid_left,
+                self._node_treatment(I, gid_right, gid_left,
                                      v_ids, K_n_eff, D_JI)
-                self._node_treatment(K, nodes_weights, gid_right, gid_left,
+                self._node_treatment(K, gid_right, gid_left,
                                      v_ids, K_n_eff, D_JK)
-                self._node_treatment(J, nodes_weights, gid_right, gid_left,
+                self._node_treatment(J, gid_right, gid_left,
                                      v_ids, K_n_eff, D_JI, cross_2nd=D_JK,
                                      is_J=-1)
+        print(' ')
+        print(self.A)
+        print(self.b)
         p = np.linalg.solve(self.A, self.b[0])
         self.mb.tag_set_data(self.pressure_tag, self.volumes, p)
 
