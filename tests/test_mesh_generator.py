@@ -5,7 +5,7 @@ from mesh_generator import GenerateMesh
 class MeshGeneratorTest(unittest.TestCase):
 
     def setUp(self):
-        path = 'mesh_bench/meshB_tetra/tet.2.msh'
+        path = 'mesh_bench/meshB_tetra/tet_5.msh'
         self.mesh_tetra00 = GenerateMesh(path)
 
     def tearDown(self):
@@ -56,9 +56,3 @@ class MeshGeneratorTest(unittest.TestCase):
         self.mesh_tetra00.create_dirichlet_boundary_conditions()
 
     """
-    def test_if_mesh_works_in_mesh_preprocessor(self):
-        self.mesh_tetra00.create_tags()
-        self.mesh_tetra00.get_all_vertices()
-        self.mesh_tetra00.create_volumes()
-        self.mesh_tetra00.create_dirichlet_boundary_conditions()
-        self.mesh_tetra00.write_msh_file('mesh_tet2.h5m')
