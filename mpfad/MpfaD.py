@@ -1,5 +1,7 @@
 import numpy as np
 from pymoab import types
+from scipy.sparse import csr_matrix
+from scipy.sparse.linalg import spsolve
 import mpfad.helpers.geometric as geo
 
 
@@ -41,8 +43,15 @@ class MpfaD3D:
         self.intern_faces = set(self.all_faces) - boundary_faces
 
         self.volumes = self.mesh_data.all_volumes
-        self.A = np.zeros([len(self.volumes), len(self.volumes)])
-        self.b = np.zeros([1, len(self.volumes)])
+
+        self.A = csr_matrix((len(self.volumes), len(self.volumes)),
+                            dtype=np.float)
+
+        # self.A = np.zeros([len(self.volumes), len(self.volumes)])
+        print('CRIOU MATRIZ A')
+        self.b = csr_matrix((len(self.volumes), 1),
+                            dtype=np.float)
+        # self.b = np.zeros([1, len(self.volumes)])
 
     def area_vector(self, JK, JI, test_vector=np.zeros(3)):
         N_IJK = np.cross(JK, JI) / 2.0
@@ -99,25 +108,28 @@ class MpfaD3D:
         value = (is_J) * transm * (cross_1st + cross_2nd)
         if node in self.dirichlet_nodes:
             pressure = self.mesh_data.mb.tag_get_data(self.dirichlet_tag, node)
-            self.b[0][id_1st] += value * pressure
-            self.b[0][id_2nd] += - value * pressure
+
+            self.b[id_1st, 0] += value * pressure
+            self.b[id_2nd, 0] += - value * pressure
 
         if node in self.intern_nodes:
             for volume, weight in self.nodes_ws[node].items():
                 v_id = v_ids[volume]
-                self.A[id_1st][v_id] += - value * weight
-                self.A[id_2nd][v_id] += value * weight
+
+                self.A[id_1st, v_id] += - value * weight
+                self.A[id_2nd, v_id] += value * weight
 
         if node in self.neumann_nodes:
             neu_term = self.nodes_nts[node]
-            self.b[0][id_1st] += value * neu_term
-            self.b[0][id_2nd] += - value * neu_term
+
+            self.b[id_1st, 0] += value * neu_term
+            self.b[id_2nd, 0] += - value * neu_term
 
             for volume, weight_N in self.nodes_ws[node].items():
                 v_id = v_ids[volume]
-                self.A[id_1st][v_id] += - value * weight_N
-                self.A[id_2nd][v_id] += value * weight_N
 
+                self.A[id_1st, v_id] += - value * weight_N
+                self.A[id_2nd, v_id] += value * weight_N
 
     def run_solver(self, interpolation_method):
 
@@ -132,9 +144,10 @@ class MpfaD3D:
                 volume = np.asarray(volume, dtype='uint64')
                 face_nodes = self.mtu.get_bridge_adjacencies(face, 0, 0)
                 node_crds = self.mb.get_coords(face_nodes).reshape([3, 3])
+                print("BBBB", self.b, volume[0], v_ids[volume[0]], self.b[10,0])
                 face_area = geo._area_vector(node_crds, norma=True)
                 # print('FACE AREA', face_area, face_flow)
-                self.b[0][v_ids[volume[0]]] += - face_flow * face_area
+                self.b[v_ids[volume[0]], 0] += - face_flow * face_area
 
             if face in self.dirichlet_faces:
                 volume = self.mtu.get_bridge_adjacencies(face, 2, 3)
@@ -177,8 +190,9 @@ class MpfaD3D:
                 RHS = -(D_JI * (g_J - g_I) + D_JK * (g_J - g_K) +
                         2 * K_R_n / h_R * g_J)
                 volume_id = v_ids[volume[0]]
-                self.A[volume_id][volume_id] += -2 * K_n_eff
-                self.b[0][volume_id] += RHS
+
+                self.A[volume_id, volume_id] += -2 * K_n_eff
+                self.b[volume_id, 0] += RHS
 
             if face in self.intern_faces:
                 face_centroid = self.mtu.get_average_position([face])
@@ -240,11 +254,11 @@ class MpfaD3D:
                 gid_right = v_ids[right_volume]
                 gid_left = v_ids[left_volume]
 
-                self.A[gid_right][gid_right] += -2 * K_n_eff
-                self.A[gid_right][gid_left] += 2 * K_n_eff
+                self.A[gid_right, gid_right] += -2 * K_n_eff
+                self.A[gid_right, gid_left] += 2 * K_n_eff
 
-                self.A[gid_left][gid_left] += -2 * K_n_eff
-                self.A[gid_left][gid_right] += 2 * K_n_eff
+                self.A[gid_left, gid_left] += -2 * K_n_eff
+                self.A[gid_left, gid_right] += 2 * K_n_eff
 
                 self._node_treatment(I, gid_right, gid_left,
                                      v_ids, K_n_eff, D_JI)
@@ -253,10 +267,13 @@ class MpfaD3D:
                 self._node_treatment(J, gid_right, gid_left,
                                      v_ids, K_n_eff, D_JI, cross_2nd=D_JK,
                                      is_J=-1)
-        print(' ')
-        print(self.A)
-        print(self.b)
-        p = np.linalg.solve(self.A, self.b[0])
+        # print(' ')
+        # print(self.A)
+        # print(self.b)
+
+        p = spsolve(self.A, self.b)
+        print('Pressure', p)
+        # p = np.linalg.solve(self.A, self.b[0])
         self.mb.tag_set_data(self.pressure_tag, self.volumes, p)
 
     def record_data(self, file_name):
