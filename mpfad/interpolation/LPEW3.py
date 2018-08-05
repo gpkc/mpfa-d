@@ -180,7 +180,7 @@ class LPEW3(InterpolationMethodBase):
             phi_neigh = self._phi_lpew3(node, a_neigh, a_face)
             delta += (phi_vol + phi_neigh) * csi
         p_weight = zepta - delta
-        print(self.mb.get_coords([node]), self.mtu.get_average_position([vol]), p_weight)
+        # print(self.mb.get_coords([node]), self.mtu.get_average_position([vol]), p_weight)
         # print('ZEPTA_DELTA: ', p_weight)
         return p_weight
 
@@ -201,7 +201,7 @@ class LPEW3(InterpolationMethodBase):
             psi_N = self._psi_sum_lpew3(node, vol_N, face)
             phi_N = self._phi_lpew3(node, vol_N, face)
             csi_N = self._csi_lpew3(face, vol_N)
-            N_term = (1.0 + (psi_N - phi_N) * csi_N) * face_flux * face_area
+            N_term = (-1.0 + (psi_N - phi_N)) * face_flux * face_area
             # print('FACE AREA: ', face_area)
             N_term_sum += N_term
         # print('NEU TERM: ', N_term_sum)
