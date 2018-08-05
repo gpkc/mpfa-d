@@ -142,6 +142,33 @@ class MpfaD3D:
                 self.A[id_1st, v_id] += value * weight_N
                 self.A[id_2nd, v_id] += - value * weight_N
 
+    def __node_treatment(self, node, id_1st, id_2nd, v_ids, RHS):
+        value = RHS
+        if node in self.dirichlet_nodes:
+            pressure = self.mesh_data.mb.tag_get_data(self.dirichlet_tag, node)
+
+            self.b[id_1st, 0] += - value * pressure
+            self.b[id_2nd, 0] += value * pressure
+
+        if node in self.intern_nodes:
+            for volume, weight in self.nodes_ws[node].items():
+                v_id = v_ids[volume]
+
+                self.A[id_1st, v_id] += value * weight
+                self.A[id_2nd, v_id] += - value * weight
+
+        if node in self.neumann_nodes:
+            neu_term = self.nodes_nts[node]
+
+            self.b[id_1st, 0] += - value * neu_term
+            self.b[id_2nd, 0] += value * neu_term
+
+            for volume, weight_N in self.nodes_ws[node].items():
+                v_id = v_ids[volume]
+
+                self.A[id_1st, v_id] += value * weight_N
+                self.A[id_2nd, v_id] += - value * weight_N
+
     def run_solver(self, interpolation_method):
 
         self.get_nodes_weights(interpolation_method)
@@ -163,16 +190,18 @@ class MpfaD3D:
             if face in self.dirichlet_faces:
                 volume = self.mtu.get_bridge_adjacencies(face, 2, 3)
                 volume = np.asarray(volume, dtype='uint64')
-                volume_centroid = self.mtu.get_average_position(volume)
+                R = self.mtu.get_average_position(volume)
                 face_centroid = self.mtu.get_average_position([face])
-                I, J, K = self.mtu.get_bridge_adjacencies(face, 0, 0)
+                nodes = self.mtu.get_bridge_adjacencies(face, 0, 0)
+                I, J, K = nodes
+                nodes_crds = self.mb.get_coords(nodes).reshape([len(nodes), 3])
                 g_I = self.mb.tag_get_data(self.dirichlet_tag, I)
                 g_J = self.mb.tag_get_data(self.dirichlet_tag, J)
                 g_K = self.mb.tag_get_data(self.dirichlet_tag, K)
 
                 JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
                 JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
-                test_vector = face_centroid - volume_centroid
+                test_vector = face_centroid - R
                 # print('IN VECTS ', JK, JI)
                 _eval = self._area_vector(JK, JI, test_vector)
                 N_IJK = _eval[0]
@@ -182,7 +211,33 @@ class MpfaD3D:
                     K, I = I, K
                     JK, JI = JI, JK
 
-                JR = volume_centroid - self.mb.get_coords([J])
+                #####
+                JR = R - self.mb.get_coords([J])
+                h_R = np.absolute(np.dot(N_IJK, JR) / np.sqrt(np.dot(N_IJK,
+                                                              N_IJK)))
+                K_R = self.mb.tag_get_data(self.perm_tag,
+                                           volume).reshape([3, 3])
+                K_R_n = self._flux_term(N_IJK, K_R, N_IJK, face_area)
+                K_n_eff = K_R_n / h_R
+
+                face_area = np.sqrt(np.dot(N_IJK, N_IJK))
+                RHS = 0.0
+                for i in range(len(nodes)):
+                    p_i = self.mb.tag_get_data(self.dirichlet_tag, nodes[i])
+                    op_nodes = np.array([nodes_crds[i-1], nodes_crds[i-2], R])
+                    N_i = geo._area_vector(op_nodes, nodes_crds[i])[0]
+                    # print('TEST ', N_IJK, K_R, N_i, face_area)
+                    K_R_i = self._flux_term(N_IJK, K_R, N_i, face_area)
+                    RHS += p_i * K_R_i
+
+                RHS = RHS / h_R
+
+                volume_id = v_ids[volume[0]]
+                self.A[volume_id, volume_id] += K_n_eff
+                self.b[volume_id, 0] += - RHS
+                #####
+                """
+                JR = R - self.mb.get_coords([J])
                 tan_JI = np.cross(JI, N_IJK)
                 # if np.dot(tan_JI, JK) < 0.0:
                 #     tan_JI = -tan_JI
@@ -214,6 +269,7 @@ class MpfaD3D:
 
                 self.A[volume_id, volume_id] += -2.0 * K_n_eff
                 self.b[volume_id, 0] += - RHS
+                """
 
             if face in self.intern_faces:
                 face_centroid = self.mtu.get_average_position([face])
@@ -222,13 +278,15 @@ class MpfaD3D:
                 L = self.mtu.get_average_position([left_volume])
                 R = self.mtu.get_average_position([right_volume])
 
-                I, J, K = self.mtu.get_bridge_adjacencies(face, 0, 0)
+                nodes = self.mtu.get_bridge_adjacencies(face, 0, 0)
+                I, J, K = nodes
+                nodes_crds = self.mb.get_coords(nodes).reshape([len(nodes), 3])
                 JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
                 JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
 
                 RJ = J - R
 
-                _eval= self._area_vector(JK, JI, RJ)
+                _eval = self._area_vector(JK, JI, RJ)
                 N_IJK = _eval[0]
                 test = _eval[1]
 
@@ -240,6 +298,50 @@ class MpfaD3D:
 
                 face_area = np.sqrt(np.dot(N_IJK, N_IJK))
 
+                ####
+                K_R = self.mb.tag_get_data(self.perm_tag,
+                                           right_volume).reshape([3, 3])
+                h_R = face_centroid - R
+                h_R = np.absolute(np.dot(N_IJK, h_R) / np.sqrt(np.dot(N_IJK,
+                                                                      N_IJK)))
+                K_R_n = self._flux_term(N_IJK, K_R, N_IJK, face_area)
+
+                K_L = self.mb.tag_get_data(self.perm_tag,
+                                           left_volume).reshape([3, 3])
+                h_L = face_centroid - L
+                h_L = np.absolute(np.dot(N_IJK, h_L) / np.sqrt(np.dot(N_IJK,
+                                                                      N_IJK)))
+                K_L_n = self._flux_term(N_IJK, K_L, N_IJK, face_area)
+
+                den_K = K_R_n * h_L + K_L_n * h_R
+                K_n_eff = K_R_n * K_L_n / den_K
+
+                gid_right = v_ids[right_volume]
+                gid_left = v_ids[left_volume]
+
+                self.A[gid_right, gid_right] += K_n_eff
+                self.A[gid_right, gid_left] += - K_n_eff
+
+                self.A[gid_left, gid_left] += K_n_eff
+                self.A[gid_left, gid_right] += - K_n_eff
+
+                for i in range(len(nodes)):
+                    op_crds_R = np.array([nodes_crds[i-1], nodes_crds[i-2], R])
+                    op_crds_L = np.array([nodes_crds[i-1], nodes_crds[i-2], L])
+
+                    N_Ri = geo._area_vector(op_crds_R, nodes_crds[i])[0]
+                    N_Li = geo._area_vector(op_crds_L, nodes_crds[i])[0]
+
+                    # print('TEST ', N_IJK, K_R, N_i, face_area)
+                    K_R_i = self._flux_term(N_IJK, K_R, N_Ri, face_area)
+                    K_L_i = self._flux_term(N_IJK, K_R, N_Li, face_area)
+
+                    RHS = (K_R_i * K_L_n - K_L_i * K_R_n) / den_K
+
+                    self.__node_treatment(nodes[i], gid_right, gid_left,
+                                          v_ids, RHS)
+                ####
+                """
                 dist_LR = R - L
 
                 tan_JI = np.cross(JI, N_IJK)
@@ -299,9 +401,13 @@ class MpfaD3D:
                 self._node_treatment(J, gid_right, gid_left,
                                      v_ids, K_n_eff, D_JI, cross_2nd=D_JK,
                                      is_J=-1)
-        # print(' ')
-        # print(self.A)
-        # print(self.b)
+
+        """
+        print(' ')
+        print(self.A.todense())
+        print(self.b.todense())
+        for vol in self.volumes:
+            print(v_ids[vol], self.mtu.get_average_position([vol]))
 
         self.A = self.A.tocsc()
         self.b = self.b.tocsc()
