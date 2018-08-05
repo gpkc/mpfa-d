@@ -146,6 +146,7 @@ class MpfaD3D:
         value = RHS
         if node in self.dirichlet_nodes:
             pressure = self.mesh_data.mb.tag_get_data(self.dirichlet_tag, node)
+            # print('DIR', value, pressure)
 
             self.b[id_1st, 0] += - value * pressure
             self.b[id_2nd, 0] += value * pressure
@@ -165,6 +166,7 @@ class MpfaD3D:
 
             for volume, weight_N in self.nodes_ws[node].items():
                 v_id = v_ids[volume]
+                # print('VOL ', v_id, weight_N)
 
                 self.A[id_1st, v_id] += value * weight_N
                 self.A[id_2nd, v_id] += - value * weight_N
@@ -194,7 +196,6 @@ class MpfaD3D:
                 face_centroid = self.mtu.get_average_position([face])
                 nodes = self.mtu.get_bridge_adjacencies(face, 0, 0)
                 I, J, K = nodes
-                nodes_crds = self.mb.get_coords(nodes).reshape([len(nodes), 3])
                 g_I = self.mb.tag_get_data(self.dirichlet_tag, I)
                 g_J = self.mb.tag_get_data(self.dirichlet_tag, J)
                 g_K = self.mb.tag_get_data(self.dirichlet_tag, K)
@@ -210,7 +211,8 @@ class MpfaD3D:
                 if test == -1:
                     K, I = I, K
                     JK, JI = JI, JK
-
+                nodes = np.asarray([I, J, K], dtype='uint64')
+                nodes_crds = self.mb.get_coords(nodes).reshape([len(nodes), 3])
                 #####
                 JR = R - self.mb.get_coords([J])
                 h_R = np.absolute(np.dot(N_IJK, JR) / np.sqrt(np.dot(N_IJK,
@@ -230,7 +232,8 @@ class MpfaD3D:
                     K_R_i = self._flux_term(N_IJK, K_R, N_i, face_area)
                     RHS += p_i * K_R_i
 
-                RHS = RHS / h_R
+                RHS = RHS[0][0] / h_R
+                # print('RHS', RHS)
 
                 volume_id = v_ids[volume[0]]
                 self.A[volume_id, volume_id] += K_n_eff
@@ -280,11 +283,10 @@ class MpfaD3D:
 
                 nodes = self.mtu.get_bridge_adjacencies(face, 0, 0)
                 I, J, K = nodes
-                nodes_crds = self.mb.get_coords(nodes).reshape([len(nodes), 3])
                 JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
                 JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
 
-                RJ = J - R
+                RJ = self.mb.get_coords([J]) - R
 
                 _eval = self._area_vector(JK, JI, RJ)
                 N_IJK = _eval[0]
@@ -296,6 +298,9 @@ class MpfaD3D:
                     JK, JI = JI, JK
                     # print('AFTER', I, K, JK, JI)
 
+                # print('PRO', N_IJK, nodes_crds, R, RJ, R, J)
+                nodes = np.asarray([I, J, K], dtype='uint64')
+                nodes_crds = self.mb.get_coords(nodes).reshape([len(nodes), 3])
                 face_area = np.sqrt(np.dot(N_IJK, N_IJK))
 
                 ####
@@ -334,9 +339,13 @@ class MpfaD3D:
 
                     # print('TEST ', N_IJK, K_R, N_i, face_area)
                     K_R_i = self._flux_term(N_IJK, K_R, N_Ri, face_area)
-                    K_L_i = self._flux_term(N_IJK, K_R, N_Li, face_area)
+                    K_L_i = self._flux_term(- N_IJK, K_L, N_Li, face_area)
 
                     RHS = (K_R_i * K_L_n - K_L_i * K_R_n) / den_K
+                    # print('NOD', nodes_crds[i], nodes_crds[i-1], nodes_crds[i-2], R, L)
+                    # print('PRO', N_IJK, nodes_crds, R)
+                    # print('VEC', N_IJK, N_Ri, N_Li)
+                    # print('RHS', RHS, K_R_i, K_L_n, K_L_i, K_R_n, den_K)
 
                     self.__node_treatment(nodes[i], gid_right, gid_left,
                                           v_ids, RHS)
@@ -406,14 +415,14 @@ class MpfaD3D:
         print(' ')
         print(self.A.todense())
         print(self.b.todense())
-        for vol in self.volumes:
-            print(v_ids[vol], self.mtu.get_average_position([vol]))
+        # for vol in self.volumes:
+        #     print(v_ids[vol], self.mtu.get_average_position([vol]))
 
         self.A = self.A.tocsc()
         self.b = self.b.tocsc()
 
         p = spsolve(self.A, self.b)
-        print('Pressure', p)
+        # print('Pressure', p)
         # p = np.linalg.solve(self.A, self.b[0])
         self.mb.tag_set_data(self.pressure_tag, self.volumes, p)
 
