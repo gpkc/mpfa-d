@@ -63,7 +63,7 @@ class BenchmarkFVCA:
             self.mesh.mb.tag_set_data(self.mesh.perm_tag, volume,
                                       self._benchmark_1(0., 0., 0.,)[0])
         self.mpfad.run_solver(LPEW3(self.mesh).interpolate)
-        rel2 = []
+        err = []
         u_sol = []
         for volume in volumes:
             x_c, y_c, z_c = self.mesh.get_centroid(volume)
@@ -73,15 +73,16 @@ class BenchmarkFVCA:
             tetra_nodes = self.mpfad.mtu.get_bridge_adjacencies(volume, 3, 0)
             tetra_coords = self.mpfad.mb.get_coords(tetra_nodes).reshape([4,3])
             tetra_vol = self.mesh.get_tetra_volume(tetra_coords)
-            u_sol.append(analytical_solution ** 2 * tetra_vol)
-            rel2.append(np.absolute(analytical_solution - calculated_solution) ** 2
-                        * tetra_vol)
+            u_sol.append((analytical_solution ** 2))
+            err.append(((analytical_solution - calculated_solution) ** 2))
+
         u_max = max(self.mpfad.mb.tag_get_data(
                               self.mpfad.pressure_tag, volumes))
         u_min = min(self.mpfad.mb.tag_get_data(
                               self.mpfad.pressure_tag, volumes))
-        l2_norm = (np.dot(rel2, rel2)) ** (1 / 2)
-        rl2_norm = (np.dot(rel2, rel2) / np.dot(u_sol, u_sol)) ** (1 / 2)
+
+        l2_norm = np.sqrt(np.sum(err))
+        rl2_norm = l2_norm / np.sqrt(np.sum(u_sol))
         non_zero_mat = np.nonzero(self.mpfad.A)[0]
         # self.assertLessEqual(l2_norm, 6.13e-2)
         with open(log_name, 'w') as f:
@@ -92,7 +93,7 @@ class BenchmarkFVCA:
             f.write('L2 norm:\t %.6f\n' % (l2_norm))
             f.write('Relative L2 norm:\t %.6f\n' % (rl2_norm))
 
-        print('END OF ' + log_name + '!!!\n')
+        print('END OF ' + log_name + '!!!')
         self.mpfad.record_data('benchmark_1' + log_name + '.vtk')
 
     def benchmark_case_2(self, log_name):
@@ -107,7 +108,7 @@ class BenchmarkFVCA:
             self.mesh.mb.tag_set_data(self.mesh.perm_tag, volume, perm)
         self.mpfad.run_solver(LPEW3(self.mesh).interpolate)
 
-        rel2 = []
+        err = []
         u_sol = []
         for volume in volumes:
             x_c, y_c, z_c = self.mesh.get_centroid(volume)
@@ -116,13 +117,14 @@ class BenchmarkFVCA:
                                   self.mpfad.pressure_tag, volume)[0][0]
             u_sol.append(analytical_solution ** 2)
             tetra_nodes = self.mpfad.mtu.get_bridge_adjacencies(volume, 3, 0)
-            tetra_coords = self.mpfad.mb.get_coords(tetra_nodes).reshape([4,3])
+            tetra_coords = self.mpfad.mb.get_coords(tetra_nodes).reshape([4, 3])
             tetra_vol = self.mesh.get_tetra_volume(tetra_coords)
-            u_sol.append(analytical_solution ** 2 * tetra_vol)
-            rel2.append(np.absolute(analytical_solution - calculated_solution) ** 2
-                        * tetra_vol)
+            u_sol.append((analytical_solution ** 2))
+            err.append(((analytical_solution - calculated_solution) ** 2))
 
-        l2_norm = (sum(rel2)) ** (1 / 2)
+        l2_norm = np.sqrt(np.sum(err))
+        rl2_norm = l2_norm / np.sqrt(np.sum(u_sol))
+
         u_max = max(self.mpfad.mb.tag_get_data(
                               self.mpfad.pressure_tag, volumes))
         u_min = min(self.mpfad.mb.tag_get_data(
@@ -135,11 +137,10 @@ class BenchmarkFVCA:
             f.write('Umin:\t %.6f\n' % (u_min))
             f.write('Umax:\t %.6f\n' % (u_max))
             f.write('L2 norm:\t %.6f\n' % (l2_norm))
+            f.write('Relative L2 norm:\t %.6f\n' % (rl2_norm))
 
         self.mpfad.record_data('benchmark_2' + log_name + '.vtk')
 
         print('END OF ' + log_name + '!!!\n')
 
-
-            # f.write('Relative L2 norm:\t %.4f\n' % (rl2_norm))
         # print("Test case 2", len(volumes), len(non_zero_mat), u_max, u_min, l2_norm)
