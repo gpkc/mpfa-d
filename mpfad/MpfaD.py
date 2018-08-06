@@ -413,7 +413,8 @@ class MpfaD3D:
 
         """
         print(' ')
-        print(self.A.todense())
+        # print(self.A.todense())
+        print('\n'.join([''.join(['{:10.4f}'.format(item) for item in row]) for row in np.asarray(self.A.todense())]))
         print(self.b.todense())
         # for vol in self.volumes:
         #     print(v_ids[vol], self.mtu.get_average_position([vol]))
