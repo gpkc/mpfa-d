@@ -127,8 +127,8 @@ class MpfaD3D:
             for volume, weight in self.nodes_ws[node].items():
                 v_id = v_ids[volume]
 
-                self.A[id_1st, v_id] += value * weight
-                self.A[id_2nd, v_id] += - value * weight
+                self.A[id_1st, v_id] += - value * weight
+                self.A[id_2nd, v_id] += value * weight
 
         if node in self.neumann_nodes:
             neu_term = self.nodes_nts[node]
@@ -139,8 +139,8 @@ class MpfaD3D:
             for volume, weight_N in self.nodes_ws[node].items():
                 v_id = v_ids[volume]
 
-                self.A[id_1st, v_id] += value * weight_N
-                self.A[id_2nd, v_id] += - value * weight_N
+                self.A[id_1st, v_id] += - value * weight_N
+                self.A[id_2nd, v_id] += value * weight_N
 
     def run_solver(self, interpolation_method):
 
@@ -206,13 +206,13 @@ class MpfaD3D:
                                                  K_R_JI, K_R_n, h_R)
                 K_n_eff = K_R_n / h_R
 
-                # RHS = -(D_JI * (g_J - g_I) + D_JK * (g_J - g_K) +
-                #         2 * K_R_n / h_R * g_J)
+                RHS = -(D_JI * (g_J - g_I) + D_JK * (g_J - g_K) +
+                        2 * K_R_n / h_R * g_J)
 
-                RHS = ((2.0 * K_R_n / h_R) - D_JI - D_JK) * g_J + D_JI * g_I + D_JK * g_K
+                # RHS = ((2.0 * K_R_n / h_R) - D_JI - D_JK) * g_J + D_JI * g_I + D_JK * g_K
                 volume_id = v_ids[volume[0]]
 
-                self.A[volume_id, volume_id] += -2.0 * K_n_eff
+                self.A[volume_id, volume_id] += 2.0 * K_n_eff
                 self.b[volume_id, 0] += - RHS
 
             if face in self.intern_faces:
@@ -286,11 +286,11 @@ class MpfaD3D:
                 gid_right = v_ids[right_volume]
                 gid_left = v_ids[left_volume]
 
-                self.A[gid_right, gid_right] += -2.0 * K_n_eff
-                self.A[gid_right, gid_left] += 2.0 * K_n_eff
+                self.A[gid_right, gid_right] += 2.0 * K_n_eff
+                self.A[gid_right, gid_left] += - 2.0 * K_n_eff
 
-                self.A[gid_left, gid_left] += -2.0 * K_n_eff
-                self.A[gid_left, gid_right] += 2.0 * K_n_eff
+                self.A[gid_left, gid_left] += 2.0 * K_n_eff
+                self.A[gid_left, gid_right] += - 2.0 * K_n_eff
 
                 self._node_treatment(I, gid_right, gid_left,
                                      v_ids, K_n_eff, D_JI)
