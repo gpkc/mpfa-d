@@ -200,8 +200,7 @@ class LPEW3(InterpolationMethodBase):
             # print('VOL_N: ', len(vol_N))
             psi_N = self._psi_sum_lpew3(node, vol_N, face)
             phi_N = self._phi_lpew3(node, vol_N, face)
-            csi_N = self._csi_lpew3(face, vol_N)
-            N_term = (1.0 + (psi_N - phi_N) * csi_N) * face_flux * face_area
+            N_term = -3.0 * (1.0 + (psi_N - phi_N)) * face_flux * face_area
             # print('FACE AREA: ', face_area)
             N_term_sum += N_term
         # print('NEU TERM: ', N_term_sum)
