@@ -82,7 +82,7 @@ class MpfaD3D:
     def _flux_term(self, vector_1st, permeab, vector_2nd, face_area=1.0):
         aux_1 = np.dot(vector_1st, permeab)
         aux_2 = np.dot(aux_1, vector_2nd)
-        flux_term = aux_2 / face_area
+        flux_term = aux_2 / (face_area ** 2.0)
         return flux_term
 
     # chamar essa função de cross_diffusion_term
@@ -127,8 +127,8 @@ class MpfaD3D:
             for volume, weight in self.nodes_ws[node].items():
                 v_id = v_ids[volume]
 
-                self.A[id_1st, v_id] += - value * weight
-                self.A[id_2nd, v_id] += value * weight
+                self.A[id_1st, v_id] += value * weight
+                self.A[id_2nd, v_id] += - value * weight
 
         if node in self.neumann_nodes:
             neu_term = self.nodes_nts[node]
@@ -139,8 +139,8 @@ class MpfaD3D:
             for volume, weight_N in self.nodes_ws[node].items():
                 v_id = v_ids[volume]
 
-                self.A[id_1st, v_id] += - value * weight_N
-                self.A[id_2nd, v_id] += value * weight_N
+                self.A[id_1st, v_id] += value * weight_N
+                self.A[id_2nd, v_id] += - value * weight_N
 
     def run_solver(self, interpolation_method):
 
@@ -228,7 +228,7 @@ class MpfaD3D:
 
                 RJ = J - R
 
-                _eval= self._area_vector(JK, JI, RJ)
+                _eval = self._area_vector(JK, JI, RJ)
                 N_IJK = _eval[0]
                 test = _eval[1]
 
@@ -271,12 +271,12 @@ class MpfaD3D:
                 K_L_JI = self._flux_term(N_IJK, K_L, tan_JI, face_area)
                 K_L_JK = self._flux_term(N_IJK, K_L, tan_JK, face_area)
 
-                D_JI = self._intern_cross_term(-tan_JK, dist_LR, face_area,
+                D_JI = self._intern_cross_term(-tan_JI, dist_LR, face_area,
                                                K_R_JK, K_L_JK,
                                                K_R_n, K_L_n,
                                                h_R, h_L)
 
-                D_JK = self._intern_cross_term(-tan_JI, dist_LR, face_area,
+                D_JK = self._intern_cross_term(-tan_JK, dist_LR, face_area,
                                                K_R_JI, K_L_JI,
                                                K_R_n, K_L_n,
                                                h_R, h_L)
@@ -286,18 +286,18 @@ class MpfaD3D:
                 gid_right = v_ids[right_volume]
                 gid_left = v_ids[left_volume]
 
-                self.A[gid_right, gid_right] += 2.0 * K_n_eff
-                self.A[gid_right, gid_left] += - 2.0 * K_n_eff
+                self.A[gid_right, gid_right] += 2.0 * face_area * K_n_eff
+                self.A[gid_right, gid_left] += - 2.0 * face_area * K_n_eff
 
-                self.A[gid_left, gid_left] += 2.0 * K_n_eff
-                self.A[gid_left, gid_right] += - 2.0 * K_n_eff
+                self.A[gid_left, gid_left] += 2.0 * face_area * K_n_eff
+                self.A[gid_left, gid_right] += - 2.0 * face_area * K_n_eff
 
                 self._node_treatment(I, gid_right, gid_left,
-                                     v_ids, K_n_eff, D_JI)
+                                     v_ids, K_n_eff*face_area, D_JK)
                 self._node_treatment(K, gid_right, gid_left,
-                                     v_ids, K_n_eff, D_JK)
+                                     v_ids, K_n_eff*face_area, D_JI)
                 self._node_treatment(J, gid_right, gid_left,
-                                     v_ids, K_n_eff, D_JI, cross_2nd=D_JK,
+                                     v_ids, K_n_eff*face_area, D_JI, cross_2nd=D_JK,
                                      is_J=-1)
         # print(' ')
         # print(self.A)
