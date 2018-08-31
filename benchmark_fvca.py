@@ -16,12 +16,31 @@ class BenchmarkFVCA:
         self.mpfad = MpfaD3D(self.mesh)
         self.lpew3 = LPEW3(self.mesh)
 
+    def record_data(self):
+        pass
+
+    def norms_calculator(self, error_vector, volumes_vector, u_vector):
+        error_vector = np.array(error_vector)
+        volumes_vector = np.array(volumes_vector)
+        u_vector = np.array(u_vector)
+        l2_norm = np.dot(error_vector, error_vector) ** (1 / 2)
+        l2_volume_norm = np.dot(error_vector ** 2, volumes_vector) ** (1 / 2)
+        erl2 = (np.dot(error_vector ** 2, volumes_vector) /
+                np.dot(u_vector ** 2, volumes_vector)) ** (1 / 2)
+        avr_error = l2_norm / len(volumes_vector)
+        max_error = max(error_vector)
+        min_error = min(error_vector)
+        results = [l2_norm, l2_volume_norm, erl2,
+                   avr_error, max_error, min_error]
+        return results
+
     def _benchmark_1(self, x, y, z):
         K = [1.0, 0.5, 0.0,
              0.5, 1.0, 0.5,
              0.0, 0.5, 1.0]
-        u1 = 1 + np.sin(pi * x) * np.sin(pi * (y + 1/2)) * np.sin(pi * (z +
-                                                                        1/3))
+        y = y + 1/2.
+        z = z + 1/3.
+        u1 = 1 + np.sin(pi * x) * np.sin(pi * y) * np.sin(pi * z)
         return K, u1
 
     def _benchmark_2(self, x, y, z):
@@ -45,7 +64,7 @@ class BenchmarkFVCA:
 
         return K, u2
 
-    def benchmark_3(self, x, y, z):
+    def _benchmark_3(self, x, y, z):
         K = [1E-0, 0E-0, 0E-0,
              0E-0, 1E-0, 0E-0,
              0E-0, 0E-0, 1E-3]
@@ -63,34 +82,40 @@ class BenchmarkFVCA:
             self.mesh.mb.tag_set_data(self.mesh.perm_tag, volume,
                                       self._benchmark_1(0., 0., 0.,)[0])
         self.mpfad.run_solver(LPEW3(self.mesh).interpolate)
-        rel2 = []
-        u_sol = []
+        err = []
+        vols = []
+        u = []
         for volume in volumes:
             x_c, y_c, z_c = self.mesh.get_centroid(volume)
             analytical_solution = self._benchmark_1(x_c, y_c, z_c)[1]
             calculated_solution = self.mpfad.mb.tag_get_data(
                                   self.mpfad.pressure_tag, volume)[0][0]
             tetra_nodes = self.mpfad.mtu.get_bridge_adjacencies(volume, 3, 0)
-            tetra_coords = self.mpfad.mb.get_coords(tetra_nodes).reshape([4,3])
+            tetra_coords = self.mpfad.mb.get_coords(tetra_nodes).reshape([4, 3]
+                                                                         )
             tetra_vol = self.mesh.get_tetra_volume(tetra_coords)
-            u_sol.append(analytical_solution ** 2 * tetra_vol)
-            rel2.append(np.absolute(analytical_solution - calculated_solution) ** 2
-                        * tetra_vol)
+            err.append(np.absolute((analytical_solution - calculated_solution)))
+            vols.append(tetra_vol)
+            u.append(analytical_solution)
         u_max = max(self.mpfad.mb.tag_get_data(
                               self.mpfad.pressure_tag, volumes))
         u_min = min(self.mpfad.mb.tag_get_data(
                               self.mpfad.pressure_tag, volumes))
-        l2_norm = (np.dot(rel2, rel2)) ** (1 / 2)
-        rl2_norm = (np.dot(rel2, rel2) / np.dot(u_sol, u_sol)) ** (1 / 2)
+        results = self.norms_calculator(err, vols, u)
         non_zero_mat = np.nonzero(self.mpfad.A)[0]
-        # self.assertLessEqual(l2_norm, 6.13e-2)
         with open(log_name, 'w') as f:
+            # l2_norm, l2_volume_norm, erl2,
+            #            avr_error, max_error, min_error
             f.write('TEST CASE 1\n\nUnknowns:\t %.6f\n' % (len(volumes)))
             f.write('Non-zero matrix:\t %.6f\n' % (len(non_zero_mat)))
             f.write('Umin:\t %.6f\n' % (u_min))
             f.write('Umax:\t %.6f\n' % (u_max))
-            f.write('L2 norm:\t %.6f\n' % (l2_norm))
-            f.write('Relative L2 norm:\t %.6f\n' % (rl2_norm))
+            f.write('L2 norm:\t %.6f\n' % (results[0]))
+            f.write('l2 norm volume weighted:\t %.6f\n' % (results[1]))
+            f.write('Relative L2 norm:\t %.6f\n' % (results[2]))
+            f.write('average error:\t %.6f\n' % (results[3]))
+            f.write('maximum error:\t %.6f\n' % (results[4]))
+            f.write('minimum error:\t %.6f\n' % (results[5]))
 
         print('END OF ' + log_name + '!!!\n')
         self.mpfad.record_data('benchmark_1' + log_name + '.vtk')
@@ -116,11 +141,12 @@ class BenchmarkFVCA:
                                   self.mpfad.pressure_tag, volume)[0][0]
             u_sol.append(analytical_solution ** 2)
             tetra_nodes = self.mpfad.mtu.get_bridge_adjacencies(volume, 3, 0)
-            tetra_coords = self.mpfad.mb.get_coords(tetra_nodes).reshape([4,3])
+            tetra_coords = self.mpfad.mb.get_coords(tetra_nodes).reshape([4, 3]
+                                                                         )
             tetra_vol = self.mesh.get_tetra_volume(tetra_coords)
             u_sol.append(analytical_solution ** 2 * tetra_vol)
-            rel2.append(np.absolute(analytical_solution - calculated_solution) ** 2
-                        * tetra_vol)
+            rel2.append(np.absolute(analytical_solution - calculated_solution)
+                        ** 2 * tetra_vol)
 
         l2_norm = (sum(rel2)) ** (1 / 2)
         u_max = max(self.mpfad.mb.tag_get_data(
@@ -139,6 +165,54 @@ class BenchmarkFVCA:
         self.mpfad.record_data('benchmark_2' + log_name + '.vtk')
 
         print('END OF ' + log_name + '!!!\n')
+
+    def benchmark_case_3(self, log_name):
+        for node in self.mesh.get_boundary_nodes():
+            x, y, z = self.mesh.mb.get_coords([node])
+            g_D = self._benchmark_3(x, y, z)[1]
+            self.mesh.mb.tag_set_data(self.mesh.dirichlet_tag, node, g_D)
+        volumes = self.mesh.all_volumes
+        for volume in volumes:
+            self.mesh.mb.tag_set_data(self.mesh.perm_tag, volume,
+                                      self._benchmark_3(0., 0., 0.,)[0])
+        self.mpfad.run_solver(LPEW3(self.mesh).interpolate)
+        err = []
+        vols = []
+        u = []
+        for volume in volumes:
+            x_c, y_c, z_c = self.mesh.get_centroid(volume)
+            analytical_solution = self._benchmark_3(x_c, y_c, z_c)[1]
+            calculated_solution = self.mpfad.mb.tag_get_data(
+                                  self.mpfad.pressure_tag, volume)[0][0]
+            tetra_nodes = self.mpfad.mtu.get_bridge_adjacencies(volume, 3, 0)
+            tetra_coords = self.mpfad.mb.get_coords(tetra_nodes).reshape([4, 3]
+                                                                         )
+            tetra_vol = self.mesh.get_tetra_volume(tetra_coords)
+            err.append(np.absolute((analytical_solution - calculated_solution)))
+            vols.append(tetra_vol)
+            u.append(analytical_solution)
+        u_max = max(self.mpfad.mb.tag_get_data(
+                              self.mpfad.pressure_tag, volumes))
+        u_min = min(self.mpfad.mb.tag_get_data(
+                              self.mpfad.pressure_tag, volumes))
+        results = self.norms_calculator(err, vols, u)
+        non_zero_mat = np.nonzero(self.mpfad.A)[0]
+        with open(log_name, 'w') as f:
+            # l2_norm, l2_volume_norm, erl2,
+            #            avr_error, max_error, min_error
+            f.write('TEST CASE 1\n\nUnknowns:\t %.6f\n' % (len(volumes)))
+            f.write('Non-zero matrix:\t %.6f\n' % (len(non_zero_mat)))
+            f.write('Umin:\t %.6f\n' % (u_min))
+            f.write('Umax:\t %.6f\n' % (u_max))
+            f.write('L2 norm:\t %.6f\n' % (results[0]))
+            f.write('l2 norm volume weighted:\t %.6f\n' % (results[1]))
+            f.write('Relative L2 norm:\t %.6f\n' % (results[2]))
+            f.write('average error:\t %.6f\n' % (results[3]))
+            f.write('maximum error:\t %.6f\n' % (results[4]))
+            f.write('minimum error:\t %.6f\n' % (results[5]))
+
+        print('END OF ' + log_name + '!!!\n')
+        self.mpfad.record_data('benchmark_1' + log_name + '.vtk')
 
 
             # f.write('Relative L2 norm:\t %.4f\n' % (rl2_norm))
