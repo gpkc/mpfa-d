@@ -29,11 +29,9 @@ class GenerateMesh:
 
     def create_vert(self, vert_coords):
         vert = self.mb.create_vertices(vert_coords)
-
         return vert
 
     def create_volume(self, n_face, verts):
-
         if n_face == 4:
             mbtype = types.MBTET
         if n_face == 5:
@@ -42,7 +40,6 @@ class GenerateMesh:
             mbtype = types.MBHEX
         if n_face > 6:
             mbtype = types.MBPRSIM
-
         return self.mb.create_element(mbtype, verts)
 
     def locate_information(self):

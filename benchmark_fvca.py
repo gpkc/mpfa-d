@@ -34,14 +34,34 @@ class BenchmarkFVCA:
                    avr_error, max_error, min_error]
         return results
 
+    def calculate_gradient(self, x, y, z, benchmark, delta=0.00001):
+        perm = np.array(benchmark(x, y, z)[0]).reshape([3, 3])
+        grad_x = (benchmark(x + delta, y, z)[1] -
+                  benchmark(x, y, z)[1]) / delta
+        grad_y = (benchmark(x, y + delta, z)[1] -
+                  benchmark(x, y, z)[1]) / delta
+        grad_z = (benchmark(x, y, z + delta)[1] -
+                  benchmark(x, y, z)[1]) / delta
+        grad = np.array([grad_x, grad_y, grad_z])
+        return perm * grad
+
+    def calculate_divergent(self, x, y, z, benchmark, delta=0.00001):
+        k_grad_x = (self.calculate_gradient(x + delta, y, z, benchmark)[0]
+                    - self.calculate_gradient(x, y, z, benchmark)[0]) / delta
+        k_grad_y = (self.calculate_gradient(x, y + delta, z, benchmark)[1]
+                    - self.calculate_gradient(x, y, z, benchmark)[1]) / delta
+        k_grad_z = (self.calculate_gradient(x, y, z + delta, benchmark)[2]
+                    - self.calculate_gradient(x, y, z, benchmark)[2]) / delta
+        return -np.sum(k_grad_x + k_grad_y + k_grad_z)
+
     def _benchmark_1(self, x, y, z):
-        K = [1.0, 0.5, 0.0,
-             0.5, 1.0, 0.5,
-             0.0, 0.5, 1.0]
+        K = [1.0, 0.0, 0.0,
+             0.0, 1.0, 0.0,
+             0.0, 0.0, 1.0]
         y = y + 1/2.
         z = z + 1/3.
         u1 = 1 + np.sin(pi * x) * np.sin(pi * y) * np.sin(pi * z)
-        return K, u1
+        return K, x ** 3  # u1
 
     def _benchmark_2(self, x, y, z):
         k_xx = y ** 2 + z ** 2 + 1
