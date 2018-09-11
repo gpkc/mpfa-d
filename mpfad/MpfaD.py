@@ -177,10 +177,10 @@ class MpfaD3D:
             self.get_nodes_weights(interpolation_method)
         v_ids = self.set_global_id()
 
-        for volume in self.volumes:
-            volume_id = v_ids[volume]
-            source_term = self.mb.tag_get_data(self.source_tag, volume)
-            self.b[0][volume_id] += source_term[0][0]
+        # for volume in self.volumes:
+        #     volume_id = v_ids[volume]
+        #     source_term = self.mb.tag_get_data(self.source_tag, volume)
+        #     self.b[0][volume_id] += source_term[0][0]
 
         for face in self.all_faces:
 
@@ -324,7 +324,7 @@ class MpfaD3D:
         # print(self.A)
         # print(self.b[0])
         p = np.linalg.solve(self.A, self.b[0])
-        # print(p)
+        print(p)
         self.mb.tag_set_data(self.pressure_tag, self.volumes, p)
 
     def record_data(self, file_name):

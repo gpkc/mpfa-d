@@ -39,7 +39,11 @@ class PressureSolverTest(unittest.TestCase):
             self.assertAlmostEqual(calc_solution, analytical_solution,
                                    delta=5e-15)
 
+<<<<<<< HEAD
     #@unittest.skip('later')
+=======
+    # @unittest.skip('later')
+>>>>>>> b0ab657cc22c340851909bb5770b0f7a3d986fce
     def test_if_inner_verts_weighted_calculation_yelds_exact_solution(self):
         self.mtu = self.mpfad_3.mtu
         self.mb = self.mpfad_3.mb
@@ -54,7 +58,7 @@ class PressureSolverTest(unittest.TestCase):
                 p_vert += p_vol * wt
             self.assertAlmostEqual(p_vert, analytical_solution,
                                    delta=5e-15)
-
+    @unittest.skip('later')
     def test_if_flux_is_conservative_for_all_volumes(self):
 
         self.node_pressure_tag = self.mpfad_3.mb.tag_get_handle(
