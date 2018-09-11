@@ -15,9 +15,9 @@ class PressureSolverTest(unittest.TestCase):
     """
     def setUp(self):
 
-        K_1 = np.array([2.0, 0.0, 0.0,
-                        0.0, 2.0, 0.0,
-                        0.0, 0.0, 2.0])
+        K_1 = np.array([1.0, 0.0, 0.0,
+                        0.0, 1.0, 0.0,
+                        0.0, 0.0, 1.0])
 
         self.mesh_3 = MeshManager('mesh_test_conservative.msh', dim=3)
         self.mesh_3.set_media_property('Permeability', {1: K_1}, dim_target=3)
@@ -27,7 +27,7 @@ class PressureSolverTest(unittest.TestCase):
                                            dim_target=2, set_nodes=True)
         self.mpfad_3 = MpfaD3D(self.mesh_3)
 
-    @unittest.skip('later')
+    #@unittest.skip('later')
     def test_if_method_yields_exact_solution(self):
         self.mtu = self.mpfad_3.mtu
         self.mb = self.mpfad_3.mb
@@ -39,7 +39,7 @@ class PressureSolverTest(unittest.TestCase):
             self.assertAlmostEqual(calc_solution, analytical_solution,
                                    delta=5e-15)
 
-    @unittest.skip('later')
+    #@unittest.skip('later')
     def test_if_inner_verts_weighted_calculation_yelds_exact_solution(self):
         self.mtu = self.mpfad_3.mtu
         self.mb = self.mpfad_3.mb

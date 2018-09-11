@@ -180,7 +180,7 @@ class LPEW3(InterpolationMethodBase):
             phi_neigh = self._phi_lpew3(node, a_neigh, a_face)
             delta += (phi_vol + phi_neigh) * csi
         p_weight = zepta - delta
-        print(self.mb.get_coords([node]), self.mtu.get_average_position([vol]), p_weight)
+        # print(self.mb.get_coords([node]), self.mtu.get_average_position([vol]), p_weight)
         # print('ZEPTA_DELTA: ', p_weight)
         return p_weight
 

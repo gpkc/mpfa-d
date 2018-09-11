@@ -31,6 +31,9 @@ class MeshManager:
         self.perm_tag = self.mb.tag_get_handle(
             "Permeability", 9, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
 
+        self.source_tag = self.mb.tag_get_handle(
+            "Source term", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+
         # self.pressure_grad_tag = self.mb.tag_get_handle(
         #     "Pressure_Gradient", 3, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
 

@@ -1,8 +1,9 @@
 import numpy as np
 from pymoab import types
-from scipy.sparse import lil_matrix
-from scipy.sparse.linalg import spsolve
+# from scipy.sparse import lil_matrix
+# from scipy.sparse.linalg import spsolve
 import mpfad.helpers.geometric as geo
+from math import pi
 
 
 class MpfaD3D:
@@ -16,6 +17,7 @@ class MpfaD3D:
         self.dirichlet_tag = mesh_data.dirichlet_tag
         self.neumann_tag = mesh_data.neumann_tag
         self.perm_tag = mesh_data.perm_tag
+        self.source_tag = mesh_data.source_tag
 
         self.pressure_tag = self.mb.tag_get_handle(
             "Pressure", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
@@ -32,7 +34,7 @@ class MpfaD3D:
         self.neumann_nodes = self.neumann_nodes - self.dirichlet_nodes
 
         boundary_nodes = (self.dirichlet_nodes | self.neumann_nodes)
-        self.intern_nodes = set(mesh_data.all_nodes) - boundary_nodes
+        self.intern_nodes = set(self.mesh_data.all_nodes) - boundary_nodes
 
         self.dirichlet_faces = mesh_data.dirichlet_faces
         self.neumann_faces = mesh_data.neumann_faces
@@ -44,108 +46,141 @@ class MpfaD3D:
 
         self.volumes = self.mesh_data.all_volumes
 
-        self.A = lil_matrix((len(self.volumes), len(self.volumes)),
-                            dtype=np.float)
+        # use pytrilinos to enhance performance
+        # self.A = lil_matrix((len(self.volumes), len(self.volumes)),
+        #                     dtype=np.float)
 
-        # self.A = np.zeros([len(self.volumes), len(self.volumes)])
+        self.A = np.zeros([len(self.volumes), len(self.volumes)])
         # print('CRIOU MATRIZ A')
-        self.b = lil_matrix((len(self.volumes), 1),
-                            dtype=np.float)
-        # self.b = np.zeros([1, len(self.volumes)])
+        # self.b = lil_matrix((len(self.volumes), 1),
+        #                     dtype=np.float)
+        self.b = np.zeros([1, len(self.volumes)])
 
-    def _area_vector(self, AB, AC, ref_vect=np.zeros(3), norma=False):
-        # print('VECT', AB, AC)
-        area_vector = np.cross(AB, AC) / 2.0
-        if norma:
-            area = np.sqrt(np.dot(area_vector, area_vector))
-            return area
-        if np.dot(area_vector, ref_vect) < 0.0:
-            area_vector = - area_vector
-            return [area_vector, -1]
-        return [area_vector, 1]
+    #this must be part of preprocessing
+    def _benchmark_1(self, x, y, z):
+        K = [1.0, 0.5, 0.0,
+             0.5, 1.0, 0.5,
+             0.0, 0.5, 1.0]
+        y = y + 1/2.
+        z = z + 1/3.
+        u1 = 1 + np.sin(pi * x) * np.sin(pi * y) * np.sin(pi * z)
+        return K, u1
 
-    def area_vector(self, JK, JI, test_vector=np.zeros(3)):
-        N_IJK = np.cross(JK, JI) / 2.0
-        if test_vector.all() != (np.zeros(3)).all():
-            check_left_or_right = np.dot(test_vector, N_IJK)
-            if check_left_or_right < 0:
-                N_IJK = - N_IJK
-        return N_IJK
+    def _benchmark_2(self, x, y, z):
+        k_xx = y ** 2 + z ** 2 + 1
+        k_xy = - x * y
+        k_xz = - x * z
+        k_yx = - x * y
+        k_yy = x ** 2 + z ** 2 + 1
+        k_yz = - y * z
+        k_zx = - x * z
+        k_zy = - y * z
+        k_zz = x ** 2 + y ** 2 + 1
+
+        K = [k_xx, k_xy, k_xz,
+             k_yx, k_yy, k_yz,
+             k_zx, k_zy, k_zz]
+        # K = [1 + x, 0.0, 0.0,
+        #      0.0, 1 + y, 0.0,
+        #      0.0, 0.0, 1 + z]
+
+        u2 = ((x ** 3 * y ** 2 * z) + x * np.sin(2 * pi * x * z)
+                                        * np.sin(2 * pi * x * y)
+                                        * np.sin(2 * pi * z))
+
+        return K, u2
 
     def set_global_id(self):
         vol_ids = {}
         range_of_ids = range(len(self.mesh_data.all_volumes))
         for id_, volume in zip(range_of_ids, self.mesh_data.all_volumes):
             vol_ids[volume] = id_
+            self.normal_vol_tag = self.mb.tag_get_handle(
+                "Normal vol {0}".format(volume), 3,
+                types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+            self.LR_tag = self.mb.tag_get_handle(
+                "LR {0}".format(volume), 3,
+                types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
         return vol_ids
 
-    def _flux_term(self, vector_1st, permeab, vector_2nd, face_area=1.0):
-        aux_1 = np.dot(vector_1st, permeab)
-        aux_2 = np.dot(aux_1, vector_2nd)
-        flux_term = aux_2 / face_area
-        return flux_term
+    def get_boundary_node_pressure(self, node):
+        pressure = self.mesh_data.mb.tag_get_data(self.dirichlet_tag, node)[0]
+        return pressure
 
-    # chamar essa função de cross_diffusion_term
-    def _intern_cross_term(self, tan_vector, cent_vector, face_area,
-                           tan_term_1st, tan_term_2nd,
-                           norm_term_1st, norm_term_2nd,
-                           cent_dist_1st, cent_dist_2nd):
-        mesh_aniso_term = np.dot(tan_vector, cent_vector) / (face_area ** 2.0)
-        phys_aniso_term = ((tan_term_1st / norm_term_1st) * cent_dist_1st) + \
-                          ((tan_term_2nd / norm_term_2nd) * cent_dist_2nd)
+    def vmv_multiply(self, normal_vector, tensor, CD):
+        vmv = (np.dot(np.dot(normal_vector, tensor), CD) /
+               np.dot(normal_vector, normal_vector))
+        return vmv
 
-        cross_flux_term = mesh_aniso_term - phys_aniso_term / face_area
-        return cross_flux_term
+    def get_cross_diffusion_term(self, tan, LR, S, h1, Kn1, Kt1, h2, Kt2, Kn2):
+        mesh_anisotropy_term = (np.dot(tan, LR)/(S ** 2))
+        physical_anisotropy_term = -((1 / S) * (h1 * (Kt1 / Kn1)
+                                     + h2 * (Kt2 / Kn2)))
+        cross_diffusion_term = mesh_anisotropy_term + physical_anisotropy_term
 
-    def _boundary_cross_term(self, tan_vector, norm_vector, face_area,
-                             tan_flux_term, norm_flux_term, cent_dist):
-        mesh_aniso_term = np.dot(tan_vector, norm_vector)/(face_area ** 2.0)
-        phys_aniso_term = tan_flux_term / face_area
-        cross_term = mesh_aniso_term * (norm_flux_term / cent_dist) - \
-            phys_aniso_term
-        return cross_term
+        return cross_diffusion_term
 
     def get_nodes_weights(self, method):
         self.nodes_ws = {}
         self.nodes_nts = {}
+        count = 0
         for node in self.intern_nodes:
+            print(f"{count} / {len(self.intern_nodes)}")
+            count += 1
             self.nodes_ws[node] = method(node)
         for node in self.neumann_nodes:
             self.nodes_ws[node] = method(node, neumann=True)
             self.nodes_nts[node] = self.nodes_ws[node].pop(node)
 
-    def _node_treatment(self, node, id_1st, id_2nd, v_ids,
-                        transm, cross_1st, cross_2nd=0.0, is_J=1):
-        value = (is_J) * transm * (cross_1st + cross_2nd)
+    def _node_treatment(self, node, id_left, id_right, v_ids,
+                        K_eq, D_JK=0, D_JI=0.0):
+        RHS = K_eq * (0.5 * D_JK + 0.5 * D_JI)
         if node in self.dirichlet_nodes:
-            pressure = self.mesh_data.mb.tag_get_data(self.dirichlet_tag, node)
+            pressure = self.get_boundary_node_pressure(node)
 
-            self.b[id_1st, 0] += - value * pressure
-            self.b[id_2nd, 0] += value * pressure
+            self.b[0][id_left] += RHS * pressure
+            self.b[0][id_right] += -RHS * pressure
 
         if node in self.intern_nodes:
+            pressure = 0
             for volume, weight in self.nodes_ws[node].items():
                 v_id = v_ids[volume]
 
-                self.A[id_1st, v_id] += - value * weight
-                self.A[id_2nd, v_id] += value * weight
+                self.A[id_left][v_id] += -RHS * weight
+                self.A[id_right][v_id] += RHS * weight
+
+                # self.b[id_1st, 0] += - RHS * neu_term
+                # self.b[id_2nd, 0] += RHS * neu_term
 
         if node in self.neumann_nodes:
             neu_term = self.nodes_nts[node]
 
-            self.b[id_1st, 0] += - value * neu_term
-            self.b[id_2nd, 0] += value * neu_term
+            self.b[0][id_left] += RHS * neu_term
+            self.b[0][id_right] += -RHS * neu_term
+
+            # self.b[id_1st, 0] += - RHS * neu_term
+            # self.b[id_2nd, 0] += RHS * neu_term
 
             for volume, weight_N in self.nodes_ws[node].items():
                 v_id = v_ids[volume]
 
-                self.A[id_1st, v_id] += - value * weight_N
-                self.A[id_2nd, v_id] += value * weight_N
+                self.A[id_left][v_id] += -RHS * weight_N
+                self.A[id_right][v_id] += RHS * weight_N
+
+                # self.A[id_1st, v_id] += - RHS * weight_N
+                # self.A[id_2nd, v_id] += RHS * weight_N
 
     def run_solver(self, interpolation_method):
-
-        self.get_nodes_weights(interpolation_method)
+        bmk = self._benchmark_2
+        node_interpolation = True
+        if node_interpolation:
+            self.get_nodes_weights(interpolation_method)
         v_ids = self.set_global_id()
+
+        for volume in self.volumes:
+            volume_id = v_ids[volume]
+            source_term = self.mb.tag_get_data(self.source_tag, volume)
+            self.b[0][volume_id] += source_term[0][0]
 
         for face in self.all_faces:
 
@@ -155,160 +190,141 @@ class MpfaD3D:
                 volume = np.asarray(volume, dtype='uint64')
                 face_nodes = self.mtu.get_bridge_adjacencies(face, 0, 0)
                 node_crds = self.mb.get_coords(face_nodes).reshape([3, 3])
-                # print("BBBB", self.b, volume[0], v_ids[volume[0]], self.b[10,0])
                 face_area = geo._area_vector(node_crds, norma=True)
-                # print('FACE AREA', face_area, face_flow)
-                self.b[v_ids[volume[0]], 0] += - face_flow * face_area
+
+                self.b[0][v_ids[volume[0]]] += - face_flow * face_area
+                # self.b[v_ids[volume[0]], 0] += - face_flow * face_area
 
             if face in self.dirichlet_faces:
-                volume = self.mtu.get_bridge_adjacencies(face, 2, 3)
-                volume = np.asarray(volume, dtype='uint64')
-                volume_centroid = self.mtu.get_average_position(volume)
-                face_centroid = self.mtu.get_average_position([face])
                 I, J, K = self.mtu.get_bridge_adjacencies(face, 0, 0)
-                g_I = self.mb.tag_get_data(self.dirichlet_tag, I)
-                g_J = self.mb.tag_get_data(self.dirichlet_tag, J)
-                g_K = self.mb.tag_get_data(self.dirichlet_tag, K)
-
+                left_volume = np.asarray(self.mtu.get_bridge_adjacencies(
+                                         face, 2, 3), dtype='uint64')
                 JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
                 JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
-                test_vector = face_centroid - volume_centroid
-                # print('IN VECTS ', JK, JI)
-                _eval = self._area_vector(JK, JI, test_vector)
-                N_IJK = _eval[0]
-                test = _eval[1]
+                LJ = self.mb.get_coords([J]) - self.mb.get_coords(left_volume)
+                N_IJK = np.cross(JI, JK) / 2.
+                test = np.dot(LJ, N_IJK)
+                if test < 0.:
+                    I, K = K, I
+                    JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
+                    JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
+                    N_IJK = np.cross(JI, JK) / 2.
 
-                if test == -1:
-                    K, I = I, K
-                    JK, JI = JI, JK
-
-                JR = volume_centroid - self.mb.get_coords([J])
-                tan_JI = np.cross(JI, N_IJK)
-                # if np.dot(tan_JI, JK) < 0.0:
-                #     tan_JI = -tan_JI
+                tan_JI = np.cross(N_IJK, JI)
                 tan_JK = np.cross(N_IJK, JK)
-                # if np.dot(tan_JK, JI) < 0.0:
-                #     tan_JK = -tan_JK
-
-                h_R = np.absolute(np.dot(N_IJK, JR) / np.sqrt(np.dot(N_IJK,
-                                                              N_IJK)))
                 face_area = np.sqrt(np.dot(N_IJK, N_IJK))
 
-                K_R = self.mb.tag_get_data(self.perm_tag,
-                                           volume).reshape([3, 3])
-                K_R_n = self._flux_term(N_IJK, K_R, N_IJK, face_area)
-                K_R_JI = self._flux_term(N_IJK, K_R, tan_JI, face_area)
-                K_R_JK = self._flux_term(N_IJK, K_R, tan_JK, face_area)
+                K_L = self.mb.tag_get_data(self.perm_tag,
+                                           left_volume).reshape([3, 3])
+                h_L = geo.get_height(N_IJK, LJ)
 
-                D_JI = self._boundary_cross_term(-tan_JK, JR, face_area,
-                                                 K_R_JK, K_R_n, h_R)
-                D_JK = self._boundary_cross_term(-tan_JI, JR, face_area,
-                                                 K_R_JI, K_R_n, h_R)
-                K_n_eff = K_R_n / h_R
+                g_I = pressure = self.get_boundary_node_pressure(I)
+                g_J = pressure = self.get_boundary_node_pressure(J)
+                g_K = pressure = self.get_boundary_node_pressure(K)
 
-                RHS = -(D_JI * (g_J - g_I) + D_JK * (g_J - g_K) +
-                        2 * K_R_n / h_R * g_J)
-
-                # RHS = ((2.0 * K_R_n / h_R) - D_JI - D_JK) * g_J + D_JI * g_I + D_JK * g_K
-                volume_id = v_ids[volume[0]]
-
-                self.A[volume_id, volume_id] += 2.0 * K_n_eff
-                self.b[volume_id, 0] += - RHS
+                K_n_L = self.vmv_multiply(N_IJK, K_L, N_IJK)
+                K_L_JI = self.vmv_multiply(N_IJK, K_L, tan_JI)
+                K_L_JK = self.vmv_multiply(N_IJK, K_L, tan_JK)
+                RHS = ((1/(2 * h_L * face_area)) * ((np.dot(-tan_JK, LJ) *
+                       K_n_L + h_L * face_area * K_L_JK) * (g_I - g_J) - 2 *
+                       (face_area ** 2) * K_n_L * g_J + (np.dot(-tan_JI, LJ) *
+                       K_n_L + h_L * face_area * K_L_JI) * (g_J - g_K)))
+                LHS = (1 / h_L)*(face_area * K_n_L)
+                self.A[v_ids[left_volume[0]]][v_ids[left_volume[0]]] += LHS
+                self.b[0][v_ids[left_volume[0]]] += -RHS
 
             if face in self.intern_faces:
-                face_centroid = self.mtu.get_average_position([face])
                 left_volume, right_volume = \
                     self.mtu.get_bridge_adjacencies(face, 2, 3)
                 L = self.mtu.get_average_position([left_volume])
                 R = self.mtu.get_average_position([right_volume])
-
+                dist_LR = R - L
                 I, J, K = self.mtu.get_bridge_adjacencies(face, 0, 0)
                 JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
                 JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
 
-                RJ = J - R
+                N_IJK = np.cross(JI, JK) / 2.
+                test = np.dot(N_IJK, dist_LR)
 
-                _eval= self._area_vector(JK, JI, RJ)
-                N_IJK = _eval[0]
-                test = _eval[1]
+                if test < 0:
+                    left_volume, right_volume = right_volume, left_volume
+                    L = self.mtu.get_average_position([left_volume])
+                    R = self.mtu.get_average_position([right_volume])
+                    dist_LR = R - L
 
-                if test == -1:
-                    # print('TEST', I, K, JK, JI)
-                    K, I = I, K
-                    JK, JI = JI, JK
-                    # print('AFTER', I, K, JK, JI)
-
+                LJ = L - self.mb.get_coords([J])
+                RJ = R - self.mb.get_coords([J])
                 face_area = np.sqrt(np.dot(N_IJK, N_IJK))
-
-                dist_LR = R - L
-
-                tan_JI = np.cross(JI, N_IJK)
-                # if np.dot(tan_JI, JK) < 0.0:
-                #     tan_JI = -tan_JI
-
+                tan_JI = np.cross(N_IJK, JI)
                 tan_JK = np.cross(N_IJK, JK)
-                # if np.dot(tan_JK, JI) < 0.0:
-                #     tan_JK = -tan_JK
 
                 K_R = self.mb.tag_get_data(self.perm_tag,
                                            right_volume).reshape([3, 3])
 
-                h_R = face_centroid - R
-                h_R = np.absolute(np.dot(N_IJK, h_R) / np.sqrt(np.dot(N_IJK,
-                                                                      N_IJK)))
+                h_R = geo.get_height(N_IJK, RJ)
 
-                K_R_n = self._flux_term(N_IJK, K_R, N_IJK, face_area)
-                K_R_JI = self._flux_term(N_IJK, K_R, tan_JI, face_area)
-                K_R_JK = self._flux_term(N_IJK, K_R, tan_JK, face_area)
+                K_R_n = self.vmv_multiply(N_IJK, K_R, N_IJK)
+                K_R_JI = self.vmv_multiply(N_IJK, K_R, tan_JI)
+                K_R_JK = self.vmv_multiply(N_IJK, K_R, tan_JK)
 
                 K_L = self.mb.tag_get_data(self.perm_tag,
                                            left_volume).reshape([3, 3])
-                h_L = face_centroid - L
-                h_L = np.absolute(np.dot(N_IJK, h_L) / np.sqrt(np.dot(N_IJK,
-                                                                      N_IJK)))
+                h_L_ = np.absolute(np.dot(N_IJK, LJ) / face_area)
+                h_L = geo.get_height(N_IJK, LJ)
 
-                K_L_n = self._flux_term(N_IJK, K_L, N_IJK, face_area)
-                K_L_JI = self._flux_term(N_IJK, K_L, tan_JI, face_area)
-                K_L_JK = self._flux_term(N_IJK, K_L, tan_JK, face_area)
+                K_L_n = self.vmv_multiply(N_IJK, K_L, N_IJK)
+                K_L_JI = self.vmv_multiply(N_IJK, K_L, tan_JI)
+                K_L_JK = self.vmv_multiply(N_IJK, K_L, tan_JK)
 
-                D_JI = self._intern_cross_term(-tan_JK, dist_LR, face_area,
-                                               K_R_JK, K_L_JK,
-                                               K_R_n, K_L_n,
-                                               h_R, h_L)
-
-                D_JK = self._intern_cross_term(-tan_JI, dist_LR, face_area,
-                                               K_R_JI, K_L_JI,
-                                               K_R_n, K_L_n,
-                                               h_R, h_L)
-
-                K_n_eff = K_R_n * K_L_n / (K_R_n * h_L + K_L_n * h_R)
+                D_JI = self.get_cross_diffusion_term(tan_JI, dist_LR, face_area,
+                                                     h_L, K_L_n, K_L_JI, h_R,
+                                                     K_R_JI, K_R_n)
+                D_JK = self.get_cross_diffusion_term(tan_JK, dist_LR, face_area,
+                                                     h_L, K_L_n, K_L_JK, h_R,
+                                                     K_R_JK, K_R_n)
+                K_eq = (K_R_n * K_L_n)/(K_R_n * h_L + K_L_n * h_R) * face_area
 
                 gid_right = v_ids[right_volume]
                 gid_left = v_ids[left_volume]
 
-                self.A[gid_right, gid_right] += 2.0 * K_n_eff
-                self.A[gid_right, gid_left] += - 2.0 * K_n_eff
+                self.A[gid_right][gid_right] += K_eq
+                self.A[gid_right][gid_left] += - K_eq
 
-                self.A[gid_left, gid_left] += 2.0 * K_n_eff
-                self.A[gid_left, gid_right] += - 2.0 * K_n_eff
+                self.A[gid_left][gid_left] += K_eq
+                self.A[gid_left][gid_right] += - K_eq
 
-                self._node_treatment(I, gid_right, gid_left,
-                                     v_ids, K_n_eff, D_JI)
-                self._node_treatment(K, gid_right, gid_left,
-                                     v_ids, K_n_eff, D_JK)
-                self._node_treatment(J, gid_right, gid_left,
-                                     v_ids, K_n_eff, D_JI, cross_2nd=D_JK,
-                                     is_J=-1)
-        # print(' ')
+                if not node_interpolation:
+
+                    x_I, y_I, z_I = self.mb.get_coords([I])
+                    p_I = bmk(x_I, y_I, z_I)[1]
+                    x_J, y_J, z_J = self.mb.get_coords([J])
+                    p_J = bmk(x_J, y_J, z_J)[1]
+                    x_K, y_K, z_K = self.mb.get_coords([K])
+                    p_K = bmk(x_K, y_K, z_K)[1]
+
+                    RHS = 0.5 * K_eq * (-D_JK * (p_J - p_I) + D_JI * (p_J - p_K))
+                    self.b[0][gid_left] += RHS
+                    self.b[0][gid_right] += -RHS
+
+
+                if node_interpolation:
+                    self._node_treatment(I, gid_left, gid_right,
+                                         v_ids, K_eq, D_JK=D_JK)
+                    self._node_treatment(K, gid_left, gid_right,
+                                         v_ids, K_eq, D_JI=-D_JI)
+                    self._node_treatment(J, gid_left, gid_right,
+                                         v_ids, K_eq, D_JI=D_JI,
+                                         D_JK=-D_JK)
+
+        # self.A = self.A.tocsc()
+        # self.b = self.b.tocsc()
+
+        # p = spsolve(self.A, self.b)
+        # print('Pressure', p)
         # print(self.A)
-        # print(self.b)
-
-        self.A = self.A.tocsc()
-        self.b = self.b.tocsc()
-
-        p = spsolve(self.A, self.b)
-        print('Pressure', p)
-        # p = np.linalg.solve(self.A, self.b[0])
+        # print(self.b[0])
+        p = np.linalg.solve(self.A, self.b[0])
+        # print(p)
         self.mb.tag_set_data(self.pressure_tag, self.volumes, p)
 
     def record_data(self, file_name):
