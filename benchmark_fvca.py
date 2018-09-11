@@ -34,7 +34,6 @@ class BenchmarkFVCA:
         return results
 
     def calculate_gradient(self, x, y, z, benchmark, delta=0.00001):
-        perm = np.array(benchmark(x, y, z)[0]).reshape([3, 3])
         grad_x = (benchmark(x + delta, y, z)[1] -
                   benchmark(x, y, z)[1]) / delta
         grad_y = (benchmark(x, y + delta, z)[1] -
@@ -59,13 +58,13 @@ class BenchmarkFVCA:
         return -np.sum(k_grad_x + k_grad_y + k_grad_z)
 
     def _benchmark_1(self, x, y, z):
-        K = [1.0, 0.0, 0.0,
-             0.0, 1.0, 0.0,
-             0.0, 0.0, 1.0]
+        K = [1.0, 0.5, 0.0,
+             0.5, 1.0, 0.5,
+             0.0, 0.5, 1.0]
         y = y + 1/2.
         z = z + 1/3.
         u1 = 1 + np.sin(pi * x) * np.sin(pi * y) * np.sin(pi * z)
-        return K, x ** 3  # u1
+        return K, x  # u1
 
     def _benchmark_2(self, x, y, z):
         k_xx = y ** 2 + z ** 2 + 1
@@ -97,6 +96,25 @@ class BenchmarkFVCA:
         u3 = np.sin(2 * pi * x) * np.sin(2 * pi * y) * np.sin(2 * pi * z)
 
         return K, u3
+
+    def memory_test(self, log_name):
+        info_set = ['iterating over verts',
+                    'iterating over edges',
+                    'iterating over faces',
+                    'iterating over volumes']
+        for info, dim in zip(info_set, range(0, 4)):
+            print(info)
+            entities = self.mesh.mb.get_entities_by_dimension(
+                self.mesh.root_set, dim)
+            for entity in entities:
+                for d in range(2, 3):
+                    stuff = self.mesh.mtu.get_bridge_adjacencies(entity, dim, d)
+                    print(stuff)
+
+
+        # for elem in in self.mb.get_entities_by_dimension:
+        #     all_faces = self.mesh.mtu.get_bridge_adjacencies(vert, 0, 2)
+        #     all_volumes = self.mesh.mtu.get_bridge_adjacencies(vert, 0, 3)
 
     def benchmark_case_1(self, log_name):
         for node in self.mesh.get_boundary_nodes():

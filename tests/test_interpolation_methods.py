@@ -149,10 +149,10 @@ class InterpMethodTest(unittest.TestCase):
                              self.mpfad_6.pressure_tag, a_volume)
             coord_x = self.mesh_6.get_centroid(a_volume)[0]
 
-            print(local_pressure, 1 - coord_x, local_pressure/(1 - coord_x))
+            # print(local_pressure, 1 - coord_x, local_pressure/(1 - coord_x))
 
-            # self.assertAlmostEqual(
-            #     local_pressure[0][0], 1 - coord_x, delta=1e-15)
+            self.assertAlmostEqual(
+                local_pressure[0][0], 1 - coord_x, delta=1e-15)
 
     @unittest.skip("we'll see it later")
     def test_lin_prob_heterog_mesh_lpew3_neumann_intern_nodes_mesh_5(self):

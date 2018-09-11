@@ -26,7 +26,7 @@ def _area_vector(nodes, ref_node=np.zeros(3), norma=False):
 
 def get_height(normal_vector, distance_vector):
     return np.absolute(np.dot(normal_vector, distance_vector) /
-            np.sqrt(np.dot(normal_vector, normal_vector)))
+                       np.sqrt(np.dot(normal_vector, normal_vector)))
 
 def get_tetra_volume(verts):
     pass

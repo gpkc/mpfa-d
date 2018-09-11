@@ -31,7 +31,7 @@ class LPEW3(InterpolationMethodBase):
             vol_nodes = self.mb.get_adjacencies(a_vol, 0)
             sub_vol = np.append(face_nodes_crds, vol_cent)
             sub_vol = np.reshape(sub_vol, (4, 3))
-            tetra_vol = self.mesh_data.get_tetra_volume(sub_vol)
+            tetra_vol = self.mesh_data.get_tetra_volume(sub_vol) # inherit from helpers
             ref_node_i = list(set(vol_nodes) - set(face_nodes))
             ref_node_i = self.mb.get_coords(ref_node_i)
             N_int = geo._area_vector([node, aux_node, vol_cent], ref_node)[0]
@@ -51,7 +51,7 @@ class LPEW3(InterpolationMethodBase):
         ref_node = self.mb.get_coords(ref_node)
         vol_nodes_crds = self.mb.get_coords(list(vol_nodes))
         vol_nodes_crds = np.reshape(vol_nodes_crds, (4, 3))
-        tetra_vol = self.mesh_data.get_tetra_volume(vol_nodes_crds)
+        tetra_vol = self.mesh_data.get_tetra_volume(vol_nodes_crds) # inherit from helpers
         vol_nodes = set(vol_nodes)
         vol_nodes.remove(node)
         face_nodes_i = self.mb.get_coords(list(vol_nodes))
@@ -73,7 +73,7 @@ class LPEW3(InterpolationMethodBase):
         N_i = geo._area_vector(face_nodes, vol_cent)[0]
         sub_vol = np.append(face_nodes, vol_cent)
         sub_vol = np.reshape(sub_vol, (4, 3))
-        tetra_vol = self.mesh_data.get_tetra_volume(sub_vol)
+        tetra_vol = self.mesh_data.get_tetra_volume(sub_vol) # inherit from helpers
         csi = self._flux_term(N_i, vol_perm, N_i)/(tetra_vol)
         # print('CSI: ', csi, self._flux_term(N_i, vol_perm, N_i), tetra_vol)
         return csi
@@ -195,13 +195,10 @@ class LPEW3(InterpolationMethodBase):
             face_area = geo._area_vector(nodes_crds,
                                          np.array([0.0, 0.0, 0.0]), norma=True)
             vol_N = self.mtu.get_bridge_adjacencies(face, 2, 3)
-            # print('VOL_N: ', len(vol_N))
             psi_N = self._psi_sum_lpew3(node, vol_N, face)
             phi_N = self._phi_lpew3(node, vol_N, face)
             N_term = -3.0 * (1 + (psi_N - phi_N)) * face_flux * face_area
-            # print('FACE AREA: ', face_area)
             N_term_sum += N_term
-        # print('NEU TERM: ', N_term_sum)
         return N_term_sum
 
     def interpolate(self, node, neumann=False):
