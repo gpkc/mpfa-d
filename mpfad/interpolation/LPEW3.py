@@ -123,8 +123,6 @@ class LPEW3(InterpolationMethodBase):
         sigma = self._sigma_lpew3(node, vol)
         neta = self._neta_lpew3(node, vol, face)
         phi = lambda_mult * neta / sigma
-        # print('PHI: ', phi, self.mb.get_coords([node]),
-        #       self.mesh_data.get_centroid(vol), self.mtu.get_average_position([face]))
         return phi
 
     def _psi_sum_lpew3(self, node, vol, face):
@@ -150,16 +148,9 @@ class LPEW3(InterpolationMethodBase):
             lbd_2 = self._lambda_lpew3(node, other_node[0], faces[i-1])
             neta = self._neta_lpew3(node, vol, faces[i])
             psi = lbd_1 * lbd_2 * neta
-            # print('PSI PARTS: ', lbd_1, lbd_2, neta, self.mb.get_coords([node]),
-            #         self.mesh_data.get_centroid(vol), self.mtu.get_average_position([face]))
-
             psi_sum += + psi
         sigma = self._sigma_lpew3(node, vol)
         psi_sum = psi_sum / sigma
-
-        # print('PSI: ', psi_sum, self.mb.get_coords([node]),
-        #       self.mesh_data.get_centroid(vol), self.mtu.get_average_position([face]))
-
         return psi_sum
 
     def _partial_weight_lpew3(self, node, vol):

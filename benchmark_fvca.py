@@ -64,7 +64,7 @@ class BenchmarkFVCA:
         y = y + 1/2.
         z = z + 1/3.
         u1 = 1 + np.sin(pi * x) * np.sin(pi * y) * np.sin(pi * z)
-        return K, x  # u1
+        return K, u1
 
     def _benchmark_2(self, x, y, z):
         k_xx = y ** 2 + z ** 2 + 1
@@ -150,7 +150,7 @@ class BenchmarkFVCA:
         u_min = min(self.mpfad.mb.tag_get_data(
                               self.mpfad.pressure_tag, volumes))
         results = self.norms_calculator(err, vols, u)
-        non_zero_mat = np.nonzero(self.mpfad.A)[0]
+        non_zero_mat = np.nonzero(self.mpfad.A_prime)[0]
         with open(log_name, 'w') as f:
             f.write('TEST CASE 1\n\nUnknowns:\t %.6f\n' % (len(volumes)))
             f.write('Non-zero matrix:\t %.6f\n' % (len(non_zero_mat)))
