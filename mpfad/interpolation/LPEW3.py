@@ -1,19 +1,24 @@
 import numpy as np
 import mpfad.helpers.geometric as geo
 from .InterpolationMethod import InterpolationMethodBase
+import gc
+
 # from mpfad.helpers.geometric import get_tetra_volume
 # from mpfad.helpers.geometric import _area_vector
 
 
 class LPEW3(InterpolationMethodBase):
 
+    gc.enable()
+
+    @profile(precision=10)
     def _flux_term(self, vector_1st, permeab, vector_2nd, face_area=1.0):
-        # Poruqe face_area é sempre 1 nesse caso? ele deveria ser a area associada ao vetor N_IJK
         aux_1 = np.dot(vector_1st, permeab)
         aux_2 = np.dot(aux_1, vector_2nd)
         flux_term = aux_2 / face_area
         return flux_term
 
+    @profile(precision=10)
     def _lambda_lpew3(self, node, aux_node, face):
         adj_vols = self.mtu.get_bridge_adjacencies(face, 2, 3)
         face_nodes = self.mtu.get_bridge_adjacencies(face, 2, 0)
@@ -31,15 +36,16 @@ class LPEW3(InterpolationMethodBase):
             vol_nodes = self.mb.get_adjacencies(a_vol, 0)
             sub_vol = np.append(face_nodes_crds, vol_cent)
             sub_vol = np.reshape(sub_vol, (4, 3))
-            tetra_vol = self.mesh_data.get_tetra_volume(sub_vol) # inherit from helpers
+            # TODO: inherit from helpers
+            tetra_vol = self.mesh_data.get_tetra_volume(sub_vol)
             ref_node_i = list(set(vol_nodes) - set(face_nodes))
             ref_node_i = self.mb.get_coords(ref_node_i)
             N_int = geo._area_vector([node, aux_node, vol_cent], ref_node)[0]
             N_i = geo._area_vector(face_nodes_crds, ref_node_i)[0]
-            lambda_l += self._flux_term(N_i, vol_perm, N_int)/(tetra_vol)
-        # print('LAMBDAS: ', lambda_l, node, aux_node, self.mtu.get_average_position([face]))
+            lambda_l += np.dot(np.dot(N_i, vol_perm), N_int) / tetra_vol
         return lambda_l
 
+    @profile(precision=10)
     def _neta_lpew3(self, node, vol, face):
         vol_perm = self.mb.tag_get_data(self.perm_tag, vol)
         vol_perm = np.reshape(vol_perm, (3, 3))
@@ -51,7 +57,8 @@ class LPEW3(InterpolationMethodBase):
         ref_node = self.mb.get_coords(ref_node)
         vol_nodes_crds = self.mb.get_coords(list(vol_nodes))
         vol_nodes_crds = np.reshape(vol_nodes_crds, (4, 3))
-        tetra_vol = self.mesh_data.get_tetra_volume(vol_nodes_crds) # inherit from helpers
+        #  TODO: tetra_vol inherit from helpers
+        tetra_vol = self.mesh_data.get_tetra_volume(vol_nodes_crds)
         vol_nodes = set(vol_nodes)
         vol_nodes.remove(node)
         face_nodes_i = self.mb.get_coords(list(vol_nodes))
@@ -59,10 +66,10 @@ class LPEW3(InterpolationMethodBase):
         node = self.mb.get_coords([node])
         N_out = geo._area_vector(face_nodes_i, node)[0]
         N_i = geo._area_vector(face_nodes_crds, ref_node)[0]
-        neta = self._flux_term(N_out, vol_perm, N_i)/(tetra_vol)
-        # print('NETAS: ', neta, node, self.mesh_data.get_centroid(vol), self.mtu.get_average_position([face]))
+        neta = np.dot(np.dot(N_out, vol_perm), N_i) / tetra_vol
         return neta
 
+    @profile(precision=10)
     def _csi_lpew3(self, face, vol):
         vol_perm = self.mb.tag_get_data(self.perm_tag, vol)
         vol_perm = np.reshape(vol_perm, (3, 3))
@@ -73,11 +80,12 @@ class LPEW3(InterpolationMethodBase):
         N_i = geo._area_vector(face_nodes, vol_cent)[0]
         sub_vol = np.append(face_nodes, vol_cent)
         sub_vol = np.reshape(sub_vol, (4, 3))
-        tetra_vol = self.mesh_data.get_tetra_volume(sub_vol) # inherit from helpers
-        csi = self._flux_term(N_i, vol_perm, N_i)/(tetra_vol)
-        # print('CSI: ', csi, self._flux_term(N_i, vol_perm, N_i), tetra_vol)
+        #  TODO: inherit from helpers
+        tetra_vol = self.mesh_data.get_tetra_volume(sub_vol)
+        csi = np.dot(np.dot(N_i, vol_perm), N_i) / tetra_vol
         return csi
 
+    @profile(precision=10)
     def _sigma_lpew3(self, node, vol):
         node_crds = self.mb.get_coords([node])
         adj_faces = set(self.mtu.get_bridge_adjacencies(node, 0, 2))
@@ -103,6 +111,7 @@ class LPEW3(InterpolationMethodBase):
         sigma = clockwise + counter_clockwise
         return sigma
 
+    @profile(precision=10)
     def _phi_lpew3(self, node, vol, face):
         if len(vol) == 0:
             return 0.0
@@ -125,6 +134,7 @@ class LPEW3(InterpolationMethodBase):
         phi = lambda_mult * neta / sigma
         return phi
 
+    @profile(precision=10)
     def _psi_sum_lpew3(self, node, vol, face):
         if len(vol) == 0:
             return 0.0
@@ -153,6 +163,7 @@ class LPEW3(InterpolationMethodBase):
         psi_sum = psi_sum / sigma
         return psi_sum
 
+    @profile(precision=10)
     def _partial_weight_lpew3(self, node, vol):
         vol_faces = self.mtu.get_bridge_adjacencies(vol, 3, 2)
         adj_faces = self.mtu.get_bridge_adjacencies(node, 0, 2)
@@ -173,6 +184,7 @@ class LPEW3(InterpolationMethodBase):
         p_weight = zepta - delta
         return p_weight
 
+    @profile(precision=10)
     def neumann_treatment(self, node):
         adj_faces = self.mtu.get_bridge_adjacencies(node, 0, 2)
         N_term_sum = 0.0
@@ -192,17 +204,21 @@ class LPEW3(InterpolationMethodBase):
             N_term_sum += N_term
         return N_term_sum
 
+    @profile(precision=10)
     def interpolate(self, node, neumann=False):
         vols_around = self.mtu.get_bridge_adjacencies(node, 0, 3)
         weights = np.array([])
         weight_sum = 0.0
-        for a_vol in vols_around:
-            p_weight = self._partial_weight_lpew3(node, a_vol)
-            weights = np.append(weights, p_weight)
-            weight_sum += p_weight
+        # for a_vol in vols_around:
+        #     p_weight = self._partial_weight_lpew3(node, a_vol)
+        #     weights = np.append(weights, p_weight)
+        #     weight_sum += p_weight
+        weights = [self._partial_weight_lpew3(node, a_vol)
+                   for a_vol in vols_around]
+        weight_sum = np.sum(weights)
         weights = weights / weight_sum
         node_weights = {
-           vol: weight for vol, weight in zip(vols_around, weights)}
+            vol: weight for vol, weight in zip(vols_around, weights)}
         if neumann:
             neu_term = self.neumann_treatment(node) / weight_sum
             node_weights[node] = neu_term

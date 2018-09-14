@@ -50,60 +50,24 @@ class MpfaD3D:
 
         self.volumes = self.mesh_data.all_volumes
 
-        # use pytrilinos to enhance performance
-        # self.A = lil_matrix((len(self.volumes), len(self.volumes)),
-        #                     dtype=np.float)
-
         # try:
         #     self.A = lil_matrix((len(self.volumes), len(self.volumes)),
         #                         dtype=np.float)
+        #     self.b = lil_matrix((len(self.volumes), 1), dtype=np.float)
         # except:
         #     self.A = np.zeros([len(self.volumes), len(self.volumes)])
+        #     self.b = np.zeros([1, len(self.volumes)])
 
         std_map = Epetra.Map(len(self.volumes), 0, self.comm)
         self.A_prime = Epetra.CrsMatrix(Epetra.Copy, std_map, 0)
         self.b_prime = Epetra.Vector(std_map)
         self.x_prime = Epetra.Vector(std_map)
 
-        # try:
-        #     self.b = lil_matrix((len(self.volumes), 1),
-        #                         dtype=np.float)
-        # except:
-        #     self.b = np.zeros([1, len(self.volumes)])
-
-    # #this must be part of preprocessing
-    def _benchmark_1(self, x, y, z):
-        K = [1.0, 0.5, 0.0,
-             0.5, 1.0, 0.5,
-             0.0, 0.5, 10.0]
-        y = y + 1/2.
-        z = z + 1/3.
-        u1 = 1 + np.sin(pi * x) * np.sin(pi * y) * np.sin(pi * z)
-        return K, u1
-    #
-    # def _benchmark_2(self, x, y, z):
-    #     k_xx = y ** 2 + z ** 2 + 1
-    #     k_xy = - x * y
-    #     k_xz = - x * z
-    #     k_yx = - x * y
-    #     k_yy = x ** 2 + z ** 2 + 1
-    #     k_yz = - y * z
-    #     k_zx = - x * z
-    #     k_zy = - y * z
-    #     k_zz = x ** 2 + y ** 2 + 1
-    #
-    #     K = [k_xx, k_xy, k_xz,
-    #          k_yx, k_yy, k_yz,
-    #          k_zx, k_zy, k_zz]
-    #     # K = [1 + x, 0.0, 0.0,
-    #     #      0.0, 1 + y, 0.0,
-    #     #      0.0, 0.0, 1 + z]
-    #
-    #     u2 = ((x ** 3 * y ** 2 * z) + x * np.sin(2 * pi * x * z)
-    #                                     * np.sin(2 * pi * x * y)
-    #                                     * np.sin(2 * pi * z))
-    #
-    #     return K, u2
+    def record_data(self, file_name):
+        volumes = self.mb.get_entities_by_dimension(0, 3)
+        ms = self.mb.create_meshset()
+        self.mb.add_entities(ms, volumes)
+        self.mb.write_file(file_name, [ms])
 
     def set_global_id(self):
         vol_ids = {}
@@ -146,9 +110,9 @@ class MpfaD3D:
     def get_nodes_weights(self, method):
         self.nodes_ws = {}
         self.nodes_nts = {}
-        count = 0
+        count = 1
         for node in self.intern_nodes:
-            print(f"{count} / {len(self.intern_nodes)}")
+            print("{0} / {1}".format(count, len(self.intern_nodes)))
             count += 1
             self.nodes_ws[node] = method(node)
         for node in self.neumann_nodes:
@@ -157,19 +121,16 @@ class MpfaD3D:
 
     def _node_treatment(self, node, id_left, id_right, v_ids,
                         K_eq, D_JK=0, D_JI=0.0):
-        RHS = K_eq * (0.5 * D_JK + 0.5 * D_JI)
+        RHS = 0.5 * K_eq * (D_JK + D_JI)
         if node in self.dirichlet_nodes:
             pressure = self.get_boundary_node_pressure(node)
 
             # self.b[0][id_left] += RHS * pressure
             # self.b[0][id_right] += -RHS * pressure
-
-            self.b_prime[id_left] += RHS * pressure
-            self.b_prime[id_right] += -RHS * pressure
-
             # self.b[id_left, 0] += RHS * pressure
             # self.b[id_right, 0] += -RHS * pressure
-
+            self.b_prime[id_left] += RHS * pressure
+            self.b_prime[id_right] += -RHS * pressure
 
         if node in self.intern_nodes:
             for volume, weight in self.nodes_ws[node].items():
@@ -177,37 +138,32 @@ class MpfaD3D:
 
                 # self.A[id_left][v_id] += -RHS * weight
                 # self.A[id_right][v_id] += RHS * weight
-
-                self.A_prime.InsertGlobalValues(id_left, v_id, -RHS * weight)
-                self.A_prime.InsertGlobalValues(id_right, v_id, RHS * weight)
-
                 # self.A[id_left, v_id] += -RHS * weight
                 # self.A[id_right, v_id] += RHS * weight
+                self.A_prime.InsertGlobalValues(id_left, v_id, -RHS * weight)
+                self.A_prime.InsertGlobalValues(id_right, v_id, RHS * weight)
 
         if node in self.neumann_nodes:
             neu_term = self.nodes_nts[node]
 
             # self.b[0][id_right] += -RHS * neu_term
             # self.b[0][id_left] += RHS * neu_term
-
-            self.b_prime[id_right] += -RHS * neu_term
-            self.b_prime[id_left] += RHS * neu_term
-
             # self.b[id_left, 0] += RHS * neu_term
             # self.b[id_right, 0] += -RHS * neu_term
+            self.b_prime[id_right] += -RHS * neu_term
+            self.b_prime[id_left] += RHS * neu_term
 
             for volume, weight_N in self.nodes_ws[node].items():
                 v_id = v_ids[volume]
 
                 # self.A[id_left][v_id] += -RHS * weight_N
                 # self.A[id_right][v_id] += RHS * weight_N
-
+                # self.A[id_left, v_id] += -RHS * weight_N
+                # self.A[id_right, v_id] += RHS * weight_N
                 self.A_prime.InsertGlobalValues(id_left, v_id, -RHS * weight_N)
                 self.A_prime.InsertGlobalValues(id_right, v_id, RHS * weight_N)
 
-                # self.A[id_left, v_id] += -RHS * weight_N
-                # self.A[id_right, v_id] += RHS * weight_N
-
+    @profile(precision=10)
     def run_solver(self, interpolation_method):
         node_interpolation = True
         if node_interpolation:
@@ -217,14 +173,17 @@ class MpfaD3D:
         try:
             for volume in self.volumes:
                 volume_id = v_ids[volume]
-                source_term = self.mb.tag_get_data(self.source_tag, volume)
-                # self.b[0][volume_id] += source_term[0][0]
-                self.b_prime[volume_id] += source_term[0][0]
-                # self.b[volume_id, 0] += source_term[0][0]
+                RHS = self.mb.tag_get_data(self.source_tag, volume)[0][0]
+                # self.b[0][volume_id] += RHS
+                # # self.b[volume_id, 0] += RHS
+                self.b_prime[volume_id] += RHS
         except:
             pass
-
+        count = 0.
         for face in self.all_faces:
+
+            print(count / len(self.all_faces) * 100, ' %...')
+            count +=1
 
             if face in self.neumann_faces:
                 face_flow = self.mb.tag_get_data(self.neumann_tag, face)[0][0]
@@ -234,10 +193,11 @@ class MpfaD3D:
                 face_nodes = self.mtu.get_bridge_adjacencies(face, 0, 0)
                 node_crds = self.mb.get_coords(face_nodes).reshape([3, 3])
                 face_area = geo._area_vector(node_crds, norma=True)
+                RHS = face_flow * face_area
 
-                # self.b[0][id_volume] += - face_flow * face_area
-                self.b_prime[id_volume] += - face_flow * face_area
-                # self.b[id_volume, 0] += - face_flow * face_area
+                # self.b[0][id_volume] += - RHS
+                # self.b[id_volume, 0] += - RHS
+                self.b_prime[id_volume] += - RHS
 
             if face in self.dirichlet_faces:
                 I, J, K = self.mtu.get_bridge_adjacencies(face, 0, 0)
@@ -263,33 +223,35 @@ class MpfaD3D:
                                            left_volume).reshape([3, 3])
                 h_L = geo.get_height(N_IJK, LJ)
 
-                g_I = pressure = self.get_boundary_node_pressure(I)
-                g_J = pressure = self.get_boundary_node_pressure(J)
-                g_K = pressure = self.get_boundary_node_pressure(K)
+                g_I = self.get_boundary_node_pressure(I)
+                g_J = self.get_boundary_node_pressure(J)
+                g_K = self.get_boundary_node_pressure(K)
 
                 K_n_L = self.vmv_multiply(N_IJK, K_L, N_IJK)
                 K_L_JI = self.vmv_multiply(N_IJK, K_L, tan_JI)
                 K_L_JK = self.vmv_multiply(N_IJK, K_L, tan_JK)
 
-                D_JK = self.get_cross_diffusion_term(-tan_JK, LJ, face_area,
+                K_n_L = self.vmv_multiply(N_IJK, K_L, N_IJK)
+                K_L_JI = self.vmv_multiply(N_IJK, K_L, tan_JI)
+                K_L_JK = self.vmv_multiply(N_IJK, K_L, tan_JK)
+
+                D_JK = self.get_cross_diffusion_term(tan_JK, LJ, face_area,
                                                      h_L, K_n_L, K_L_JK,
                                                      boundary=True)
-                D_JI = self.get_cross_diffusion_term(-tan_JI, LJ, face_area,
-                                                     h_L, K_n_L, K_L_JK,
+                D_JI = self.get_cross_diffusion_term(tan_JI, LJ, face_area,
+                                                     h_L, K_n_L, K_L_JI,
                                                      boundary=True)
                 K_eq = (1 / h_L)*(face_area * K_n_L)
 
-                RHS = (D_JK*(g_I - g_J) - K_n_L / h_L * face_area * g_J +
-                       D_JI * (g_J - g_K))
+                RHS = (D_JK * (g_I - g_J) - K_eq * g_J + D_JI * (g_J - g_K))
                 LHS = K_eq
 
                 # self.A[id_volume][id_volume] += LHS
+                # self.A[id_volume, id_volume] += LHS
                 self.A_prime.InsertGlobalValues(id_volume, id_volume, LHS)
                 # self.b[0][id_volume] += -RHS
-                self.b_prime[id_volume] += -RHS
-
-                # self.A[id_volume, id_volume] += LHS
                 # self.b[id_volume, 0] += -RHS
+                self.b_prime[id_volume] += -RHS
 
             if face in self.intern_faces:
                 left_volume, right_volume = \
@@ -329,7 +291,6 @@ class MpfaD3D:
 
                 K_L = self.mb.tag_get_data(self.perm_tag,
                                            left_volume).reshape([3, 3])
-                h_L_ = np.absolute(np.dot(N_IJK, LJ) / face_area)
                 h_L = geo.get_height(N_IJK, LJ)
 
                 K_L_n = self.vmv_multiply(N_IJK, K_L, N_IJK)
@@ -346,24 +307,22 @@ class MpfaD3D:
                                                      K_R_JK, K_R_n)
                 K_eq = (K_R_n * K_L_n)/(K_R_n * h_L + K_L_n * h_R) * face_area
 
-                gid_right = v_ids[right_volume]
-                gid_left = v_ids[left_volume]
+                id_right = v_ids[right_volume]
+                id_left = v_ids[left_volume]
 
-                # self.A[gid_right][gid_right] += K_eq
-                # self.A[gid_right][gid_left] += -K_eq
-                self.A_prime.InsertGlobalValues(gid_right, gid_right, K_eq)
-                self.A_prime.InsertGlobalValues(gid_right, gid_left, -K_eq)
+                # self.A[id_right][id_right] += K_eq
+                # self.A[id_right][id_left] += -K_eq
+                # self.A[id_right, id_right] += K_eq
+                # self.A[id_right, id_left] += -K_eq
+                self.A_prime.InsertGlobalValues(id_right, id_right, K_eq)
+                self.A_prime.InsertGlobalValues(id_right, id_left, -K_eq)
 
-                # self.A[gid_left][gid_left] += K_eq
-                # self.A[gid_left][gid_right] += -K_eq
-                self.A_prime.InsertGlobalValues(gid_left, gid_left, K_eq)
-                self.A_prime.InsertGlobalValues(gid_left, gid_right, -K_eq)
-
-                # self.A[gid_right, gid_right] += K_eq
-                # self.A[gid_right, gid_left] += -K_eq
-
-                # self.A[gid_left, gid_left] += K_eq
-                # self.A[gid_left, gid_right] += -K_eq
+                # self.A[id_left][id_left] += K_eq
+                # self.A[id_left][id_right] += -K_eq
+                # self.A[id_left, id_left] += K_eq
+                # self.A[id_left, id_right] += -K_eq
+                self.A_prime.InsertGlobalValues(id_left, id_left, K_eq)
+                self.A_prime.InsertGlobalValues(id_left, id_right, -K_eq)
 
                 if not node_interpolation:
                     bmk = self._benchmark_1
@@ -373,51 +332,33 @@ class MpfaD3D:
                     p_J = bmk(x_J, y_J, z_J)[1]
                     x_K, y_K, z_K = self.mb.get_coords([K])
                     p_K = bmk(x_K, y_K, z_K)[1]
-
                     RHS = 0.5 * K_eq * (-D_JK * (p_J - p_I) +
                                         D_JI * (p_J - p_K))
 
                     # self.b[0][gid_left] += RHS
                     # self.b[0][gid_right] += -RHS
-
-                    self.b_prime[gid_left] += RHS
-                    self.b_prime[gid_right] += -RHS
-
                     # self.b[gid_left, 0] += RHS
                     # self.b[gid_right, 0] += -RHS
+                    self.b_prime[id_left] += RHS
+                    self.b_prime[id_right] += -RHS
 
                 if node_interpolation:
-                    self._node_treatment(I, gid_left, gid_right,
+                    self._node_treatment(I, id_left, id_right,
                                          v_ids, K_eq, D_JK=D_JK)
-                    self._node_treatment(K, gid_left, gid_right,
+                    self._node_treatment(K, id_left, id_right,
                                          v_ids, K_eq, D_JI=-D_JI)
-                    self._node_treatment(J, gid_left, gid_right,
+                    self._node_treatment(J, id_left, id_right,
                                          v_ids, K_eq, D_JI=D_JI,
                                          D_JK=-D_JK)
 
+        # p = np.linalg.solve(self.A, self.b[0])
         # self.A = self.A.tocsc()
         # self.b = self.b.tocsc()
-
         # p = spsolve(self.A, self.b)
-        # t0 = timeit.timeit()
-        # p = np.linalg.solve(self.A, self.b[0])
-        # t1 = timeit.timeit()
-
         self.A_prime.FillComplete()
         linearProblem = Epetra.LinearProblem(self.A_prime,
                                              self.x_prime,
                                              self.b_prime)
         solver = AztecOO.AztecOO(linearProblem)
-        ierr = solver.Iterate(1000, 1e-9)
-
-        # print('numpy', np.absolute(t1 - t0), 'trilinos', np.absolute(t2 - t1))
-
-        # self.mb.tag_set_data(self.pressure_tag, self.volumes, p)
+        solver.Iterate(1000, 1e-9)
         self.mb.tag_set_data(self.pressure_tag, self.volumes, self.x_prime)
-        # print(p, self.x_prime)
-
-    def record_data(self, file_name):
-        volumes = self.mb.get_entities_by_dimension(0, 3)
-        ms = self.mb.create_meshset()
-        self.mb.add_entities(ms, volumes)
-        self.mb.write_file(file_name, [ms])
