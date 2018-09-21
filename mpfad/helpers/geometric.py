@@ -11,6 +11,14 @@ def point_distance(coords_1, coords_2):
     distance = np.sqrt(np.dot(dist_vector, dist_vector))
     return distance
 
+#lru cache
+def cached_area(face, node):
+
+    # pega nos da face
+    # pega coords do node
+    # chama area vector
+    pass
+
 def _area_vector(nodes, ref_node=np.zeros(3), norma=False):
     ref_vect = nodes[0] - ref_node
     AB = nodes[1] - nodes[0]

@@ -34,6 +34,9 @@ class MeshManager:
         self.source_tag = self.mb.tag_get_handle(
             "Source term", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
 
+        self.node_cascade_tag = self.mb.tag_get_handle(
+            "Node cascade", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+
         # self.pressure_grad_tag = self.mb.tag_get_handle(
         #     "Pressure_Gradient", 3, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
 
@@ -131,7 +134,29 @@ class MeshManager:
 
         return non_boundary_volumes
 
-
+    def get_node_cascade_lpew3(self, tao):
+        for node in self.all_nodes:
+            vols_around_node = self.mtu.get_bridge_adjacencies(node, 0, 3)
+            for volume in vols_around_node:
+                aux_verts = self.mtu.get_bridge_adjacencies(volume, 3, 0)
+                aux_verts = list(set(aux_verts).difference({node}))
+                adj_volumes = self.mtu.get_bridge_adjacencies(volume, 3, 3)
+                adj_volumes = list(set(adj_volumes
+                                       ).intersection({vols_around_node}
+                                                      ))
+                for adj_vol in adj_volumes:
+                    adj_aux_verts = self.mtu.get_bridge_adjacencies(adj_vol,
+                                                                    3, 0)
+                    aux_verts = list(set(adj_aux_verts).difference({node}))
+                    adj_adj_volumes = self.mtu.get_bridge_adjacencies(adj_vol,
+                                                                      3, 3)
+                    adj_adj_volumes = list(set(adj_adj_volumes
+                                               ).intersection({vols_around_node
+                                                               }))
+                    aux_verts = [tao * np.array(self.mb.get_coords[node]) +
+                                 (1 - tao) * np.array(self.mb.get_coords(
+                                                      aux_vert)) for aux_vert
+                                 in aux_verts]
 
     def set_media_property(self, property_name, physicals_values,
                            dim_target=3, set_nodes=False):

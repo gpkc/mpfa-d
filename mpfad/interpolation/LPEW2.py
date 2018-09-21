@@ -13,7 +13,7 @@ class LPEW2(InterpolationMethodBase):
         aux_verts_bkp = list(set(self.mtu.get_bridge_adjacencies(volume,
                                  3, 0)).difference(set([node])))
         aux_faces = list(set(self.mtu.get_bridge_adjacencies(volume,
-                                 3, 2)))
+                                                             3, 2)))
         for face in aux_faces:
             nodes_in_aux_face = list(set(self.mtu.get_bridge_adjacencies(
                                          face, 2, 0)).difference(set([node])
@@ -65,8 +65,11 @@ class LPEW2(InterpolationMethodBase):
             adj_vols.append(side_volume)
         return adj_vols
 
-    def calc_neta(self):
-        pass
+    def _flux_term(self, vector_1st, permeab, vector_2nd, face_area=1.0):
+        aux_1 = np.dot(vector_1st, permeab)
+        aux_2 = np.dot(aux_1, vector_2nd)
+        flux_term = aux_2 / face_area
+        return flux_term
 
     def _r_range(sefl, j, r):
         size = ((j - r + 5) % 6) + 1
@@ -74,3 +77,27 @@ class LPEW2(InterpolationMethodBase):
 
         prod = [((last_val - k) % 6) + 1 for k in range(1, size+1)]
         return prod[::-1]
+
+    def _zeta_lpew2(self, args):
+        pass
+
+    def _delta_lpew2(self, args):
+        pass
+
+    def _phi_lpew2(self, args):
+        pass
+
+    def _A_lpew2(self, args):
+        pass
+
+    def _interpolate(self, args, neumann=False):
+        pass
+
+    def _get_sub_volume(self, args):
+        pass
+
+    def _neta_lpew2(self, args):
+        pass
+
+    def _csi_lpew2(self, args):
+        pass

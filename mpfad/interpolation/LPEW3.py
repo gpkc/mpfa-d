@@ -2,6 +2,8 @@ import numpy as np
 import mpfad.helpers.geometric as geo
 from .InterpolationMethod import InterpolationMethodBase
 import gc
+from functools import lru_cache
+
 
 # from mpfad.helpers.geometric import get_tetra_volume
 # from mpfad.helpers.geometric import _area_vector
@@ -9,85 +11,73 @@ import gc
 
 class LPEW3(InterpolationMethodBase):
 
-    def set_local_id_volumes_and_verts(self, node, vol):
-        adj_vols = self.mtu.get_bridge_adjacencies(vol, 2, 3)
-        node_adj_vols = self.mtu.get_bridge_adjacencies(node, 0, 3)
-        adj_vols = set(adj_vols).intersection(set(node_adj_vols))
-        vol_verts = set(self.mtu.get_bridge_adjacencies(vol, 3, 0))
-        I, J, K = vol_verts.difference({node})
-        I_crds = self.mb.get_coords([I])
-        J_crds = self.mb.get_coords([J])
-        K_crds = self.mb.get_coords([K])
-        test = geo._area_vector([I_crds, J_crds, K_crds], node)[1]
-        if test == -1:
-            I, K = K, I
-        aux_verts = [I, J, K]
-        vol_ids = {}
-        aux_verts_ids = {}
-        for adj_vol, aux_vert in zip(adj_vols, aux_verts):
-            adj_vol_verts = set(self.mtu.get_bridge_adjacencies(adj_vol, 3, 0)
-                                ).difference({node})
-            vert_only_in_adj_vol = adj_vol_verts.difference(set(aux_verts))
-            vert_only_in_face = set(aux_verts).difference(adj_vol_verts)
-            verts_not_in_common = vert_only_in_adj_vol.union(vert_only_in_face)
-            for vert in list(verts_not_in_common):
-                try:
-                    _id = aux_verts.index(vert)
-                    vol_ids[adj_vol] = _id
-                    aux_verts_ids[aux_vert] = _id
-                except:
-                    continue
-        return vol_ids, aux_verts_ids
+    # def set_local_id_volumes_and_verts(self, node, vol):
+    #     adj_vols = self.mtu.get_bridge_adjacencies(vol, 2, 3)
+    #     node_adj_vols = self.mtu.get_bridge_adjacencies(node, 0, 3)
+    #     adj_vols = set(adj_vols).intersection(set(node_adj_vols))
+    #     vol_verts = set(self.mtu.get_bridge_adjacencies(vol, 3, 0))
+    #     I, J, K = vol_verts.difference({node})
+    #     I_crds = self.mb.get_coords([I])
+    #     J_crds = self.mb.get_coords([J])
+    #     K_crds = self.mb.get_coords([K])
+    #     test = geo._area_vector([I_crds, J_crds, K_crds], node)[1]
+    #     if test == -1:
+    #         I, K = K, I
+    #     aux_verts = [I, J, K]
+    #     aux_verts_ids = {
+    #         vert: _id for vert, _id in zip(aux_verts, range(len(aux_verts)))}
+    #     vol_ids = {}
+    #     for adj_vol, aux_vert in zip(adj_vols, aux_verts):
+    #         adj_vol_verts = set(self.mtu.get_bridge_adjacencies(adj_vol, 3, 0)
+    #                             ).difference({node})
+    #         vert_only_in_face = set(aux_verts).difference(adj_vol_verts)
+    #         _id = aux_verts.index(vert_only_in_face.pop())
+    #         vol_ids[adj_vol] = _id
+    #     return vol_ids, aux_verts_ids
+    #
+    # def create_lambda_matrix(self, node, vol):
+    #     vols_around = self.mtu.get_bridge_adjacencies(node, 0, 3)
+    #     partial_weight = np.zeros([len(vols_around)])
+    #     map_id = {
+    #         vol: _id for vol, _id in zip(vols_around, range(len(vols_around)))}
+    #     A = np.zeros([3, 3])
+    #     csi_adj = []
+    #     csi_vol = []
+    #     neta = []
+    #     vol_ids, aux_verts_ids = self.set_local_id_volumes_and_verts(node, vol)
+    #     faces = set(self.mtu.get_bridge_adjacencies(node, 2, 2))
+    #     vol_faces = set(self.mtu.get_bridge_adjacencies(vol, 3, 2))
+    #     side_flux_faces = faces.intersection(vol_faces)
+    #     for face in side_flux_faces:
+    #         nodes = set(self.mtu.get_bridge_adjacencies(face, 2, 0))
+    #         aux_verts = nodes.difference({node})
+    #         vols = set(set(self.mtu.get_bridge_adjacencies(face, 2, 3)))
+    #         adj_vol = vols.difference({vol}).pop()
+    #         csi_adj.append(self._csi_lpew3(face, adj_vol))
+    #         csi_vol.append(self._csi_lpew3(face, vol))
+    #         neta.append(self._neta_lpew3(node, vol, face))
+    #         for nd in aux_verts:
+    #             lbd = self._lambda_lpew3(node, nd, face)
+    #             A[aux_verts_ids[nd]][vol_ids[adj_vol]] += lbd
+    #     inv_A = np.linalg.inv(A)
+    #     # partial_weight[map_id[vol]] += np.dot(neta, np.dot(inv_A, csi_vol))
+    #     v = []
+    #     for _id in range(3):
+    #         v.append(list(vol_ids.keys())[list(vol_ids.values()).index(_id)])
+    #     dot_term = neta * np.dot(inv_A, csi_adj)
+    #     for item, value in zip(v, dot_term):
+    #         # pass
+    #         partial_weight[map_id[item]] += value
+    #     return partial_weight
+    #
+    # def flux_term(self, vector_1st, permeab, vector_2nd, face_area=1.0):
+    #     aux_1 = np.dot(vector_1st, permeab)
+    #     aux_2 = np.dot(aux_1, vector_2nd)
+    #     flux_term = aux_2 / face_area
+    #     return flux_term
 
-    def create_lambda_matrix(self, node, vol):
-        vols_around = self.mtu.get_bridge_adjacencies(node, 0, 3)
-        partial_weight = np.zeros([len(vols_around)])
-        map_id = {
-            vol: _id for vol, _id in zip(vols_around, range(len(vols_around)))}
-        A = np.zeros([3, 3])
-        csi_adj = []
-        csi_vol = []
-        neta = []
-        vol_ids, aux_verts_ids = self.set_local_id_volumes_and_verts(node, vol)
-        faces = set(self.mtu.get_bridge_adjacencies(node, 2, 2))
-        vol_faces = set(self.mtu.get_bridge_adjacencies(vol, 3, 2))
-        side_flux_faces = faces.intersection(vol_faces)
-        for face in side_flux_faces:
-            nodes = set(self.mtu.get_bridge_adjacencies(face, 2, 0))
-            aux_verts = nodes.difference({node})
-            vols = set(set(self.mtu.get_bridge_adjacencies(face, 2, 3)))
-            adj_vol = vols.difference({vol}).pop()
-            csi_adj.append(self._csi_lpew3(face, adj_vol))
-            csi_vol.append(self._csi_lpew3(face, vol))
-            neta.append(self._neta_lpew3(node, vol, face))
-            for nd in aux_verts:
-                print(aux_verts_ids[nd], vol_ids[adj_vol])
-                lbd = self._lambda_lpew3(node, nd, face)
-                A[aux_verts_ids[nd]][vol_ids[adj_vol]] += lbd
-        print(self._sigma_lpew3(node, vol), np.linalg.det(A))
-        print(A)
-        inv_A = np.linalg.inv(A)
-        # print(A, inv_A)
-        partial_weight[map_id[vol]] += np.dot(neta, np.dot(inv_A, csi_vol))
-        # print(np.dot(neta, np.dot(inv_A, csi_vol)))
-        v = []
-        for _id in range(3):
-            v.append(list(vol_ids.keys())[list(vol_ids.values()).index(_id)])
-        dot_term = np.dot(inv_A, neta)
-        # print('asads', inv_A)
-        for item, value, csi in zip(v, dot_term, csi_adj):
-            partial_weight[map_id[item]] += value * csi
-        return partial_weight
-
-    # @profile(precision=10)
-    def _flux_term(self, vector_1st, permeab, vector_2nd, face_area=1.0):
-        aux_1 = np.dot(vector_1st, permeab)
-        aux_2 = np.dot(aux_1, vector_2nd)
-        flux_term = aux_2 / face_area
-        return flux_term
-
-    # @profile(precision=10)
-    def _lambda_lpew3(self, node, aux_node, face):
+    @lru_cache(maxsize=200)
+    def lambda_lpew3(self, node, aux_node, face):
         adj_vols = self.mtu.get_bridge_adjacencies(face, 2, 3)
         face_nodes = self.mtu.get_bridge_adjacencies(face, 2, 0)
         ref_node = list(set(face_nodes) - (set([node]) | set([aux_node])))
@@ -113,8 +103,8 @@ class LPEW3(InterpolationMethodBase):
             lambda_l += np.dot(np.dot(N_i, vol_perm), N_int) / tetra_vol
         return lambda_l
 
-    # @profile(precision=10)
-    def _neta_lpew3(self, node, vol, face):
+    @lru_cache(maxsize=200)
+    def neta_lpew3(self, node, vol, face):
         vol_perm = self.mb.tag_get_data(self.perm_tag, vol)
         vol_perm = np.reshape(vol_perm, (3, 3))
         vol_nodes = self.mb.get_adjacencies(vol, 0)
@@ -137,8 +127,8 @@ class LPEW3(InterpolationMethodBase):
         neta = np.dot(np.dot(N_out, vol_perm), N_i) / tetra_vol
         return neta
 
-    # @profile(precision=10)
-    def _csi_lpew3(self, face, vol):
+    @lru_cache(maxsize=200)
+    def csi_lpew3(self, face, vol):
         vol_perm = self.mb.tag_get_data(self.perm_tag, vol)
         vol_perm = np.reshape(vol_perm, (3, 3))
         vol_cent = self.mesh_data.get_centroid(vol)
@@ -153,8 +143,8 @@ class LPEW3(InterpolationMethodBase):
         csi = np.dot(np.dot(N_i, vol_perm), N_i) / tetra_vol
         return csi
 
-    # @profile(precision=10)
-    def _sigma_lpew3(self, node, vol):
+    @lru_cache(maxsize=200)
+    def sigma_lpew3(self, node, vol):
         node_crds = self.mb.get_coords([node])
         adj_faces = set(self.mtu.get_bridge_adjacencies(node, 0, 2))
         vol_faces = set(self.mtu.get_bridge_adjacencies(vol, 3, 2))
@@ -172,15 +162,15 @@ class LPEW3(InterpolationMethodBase):
             spin = geo._area_vector(aux_vect, vol_cent)[1]
             if spin < 0:
                 aux_nodes[0], aux_nodes[1] = aux_nodes[1], aux_nodes[0]
-            count = self._lambda_lpew3(node, aux_nodes[0], a_face)
+            count = self.lambda_lpew3(node, aux_nodes[0], a_face)
             counter_clockwise = counter_clockwise * count
-            clock = self._lambda_lpew3(node, aux_nodes[1], a_face)
+            clock = self.lambda_lpew3(node, aux_nodes[1], a_face)
             clockwise = clockwise * clock
         sigma = clockwise + counter_clockwise
         return sigma
 
-    # @profile(precision=10)
-    def _phi_lpew3(self, node, vol, face):
+    @lru_cache(maxsize=200)
+    def phi_lpew3(self, node, vol, face):
         if len(vol) == 0:
             return 0.0
         vol = vol[0]
@@ -195,16 +185,16 @@ class LPEW3(InterpolationMethodBase):
         faces = list(faces)
         lambda_mult = 1.0
         for a_face in faces:
-            lbd = self._lambda_lpew3(node, aux_node[0], a_face)
+            lbd = self.lambda_lpew3(node, aux_node[0], a_face)
             lambda_mult = lambda_mult * lbd
-        sigma = self._sigma_lpew3(node, vol)
-        neta = self._neta_lpew3(node, vol, face)
+        sigma = self.sigma_lpew3(node, vol)
+        neta = self.neta_lpew3(node, vol, face)
 
         phi = lambda_mult * neta / sigma
         return phi
 
-    # @profile(precision=10)
-    def _psi_sum_lpew3(self, node, vol, face):
+    @lru_cache(maxsize=200)
+    def psi_sum_lpew3(self, node, vol, face):
         if len(vol) == 0:
             return 0.0
         vol = vol[0]
@@ -223,17 +213,16 @@ class LPEW3(InterpolationMethodBase):
             a_face_nodes = self.mtu.get_bridge_adjacencies(faces[i], 2, 0)
             other_node = set(face_nodes) - set(a_face_nodes)
             other_node = list(other_node)
-            lbd_1 = self._lambda_lpew3(node, aux_node[0], faces[i])
-            lbd_2 = self._lambda_lpew3(node, other_node[0], faces[i-1])
-            neta = self._neta_lpew3(node, vol, faces[i])
+            lbd_1 = self.lambda_lpew3(node, aux_node[0], faces[i])
+            lbd_2 = self.lambda_lpew3(node, other_node[0], faces[i-1])
+            neta = self.neta_lpew3(node, vol, faces[i])
             psi = lbd_1 * lbd_2 * neta
             psi_sum += + psi
-        sigma = self._sigma_lpew3(node, vol)
+        sigma = self.sigma_lpew3(node, vol)
         psi_sum = psi_sum / sigma
         return psi_sum
 
-    # @profile(precision=10)
-    def _partial_weight_lpew3(self, node, vol):
+    def partial_weight_lpew3(self, node, vol):
         vol_faces = self.mtu.get_bridge_adjacencies(vol, 3, 2)
         adj_faces = self.mtu.get_bridge_adjacencies(node, 0, 2)
         vol_node_faces = set(vol_faces) & set(adj_faces)
@@ -243,12 +232,12 @@ class LPEW3(InterpolationMethodBase):
             a_neighs = self.mtu.get_bridge_adjacencies(a_face, 2, 3)
             a_neighs = np.asarray(a_neighs, dtype='uint64')
             a_neigh = a_neighs[a_neighs != vol]
-            csi = self._csi_lpew3(a_face, vol)
-            psi_sum_neigh = self._psi_sum_lpew3(node, a_neigh, a_face)
-            psi_sum_vol = self._psi_sum_lpew3(node, [vol], a_face)
+            csi = self.csi_lpew3(a_face, vol)
+            psi_sum_neigh = self.psi_sum_lpew3(node, tuple(a_neigh), a_face)
+            psi_sum_vol = self.psi_sum_lpew3(node, (vol,), a_face)
             zepta += (psi_sum_vol + psi_sum_neigh) * csi
-            phi_vol = self._phi_lpew3(node, [vol], a_face)
-            phi_neigh = self._phi_lpew3(node, a_neigh, a_face)
+            phi_vol = self.phi_lpew3(node, (vol,), a_face)
+            phi_neigh = self.phi_lpew3(node, tuple(a_neigh), a_face)
             delta += (phi_vol + phi_neigh) * csi
         p_weight = zepta - delta
         return p_weight
@@ -267,8 +256,8 @@ class LPEW3(InterpolationMethodBase):
             face_area = geo._area_vector(nodes_crds,
                                          np.array([0.0, 0.0, 0.0]), norma=True)
             vol_N = self.mtu.get_bridge_adjacencies(face, 2, 3)
-            psi_N = self._psi_sum_lpew3(node, vol_N, face)
-            phi_N = self._phi_lpew3(node, vol_N, face)
+            psi_N = self.psi_sum_lpew3(node, vol_N, face)
+            phi_N = self.phi_lpew3(node, vol_N, face)
             N_term = -3.0 * (1 + (psi_N - phi_N)) * face_flux * face_area
             N_term_sum += N_term
         return N_term_sum
@@ -276,13 +265,7 @@ class LPEW3(InterpolationMethodBase):
     # @profile(precision=10)
     def interpolate(self, node, neumann=False):
         vols_around = self.mtu.get_bridge_adjacencies(node, 0, 3)
-        weights = np.array([])
-        weight_sum = 0.0
-        # for a_vol in vols_around:
-        #     p_weight = self._partial_weight_lpew3(node, a_vol)
-        #     weights = np.append(weights, p_weight)
-        #     weight_sum += p_weight
-        weights = [self._partial_weight_lpew3(node, a_vol)
+        weights = [self.partial_weight_lpew3(node, a_vol)
                    for a_vol in vols_around]
         weight_sum = np.sum(weights)
         weights = weights / weight_sum
