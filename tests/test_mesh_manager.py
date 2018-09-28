@@ -18,10 +18,10 @@ class PressureSolverTest(unittest.TestCase):
                         0.0, 1.0, 0.0,
                         0.0, 0.0, 1.0])
 
-        self.mesh_1 = MeshManager('mesh_test_1.msh')
-        self.mesh_2 = MeshManager('mesh_test_2.msh', dim=3)
+        self.mesh_1 = MeshManager('meshes/mesh_test_1.msh')
+        self.mesh_2 = MeshManager('meshes/mesh_test_2.msh', dim=3)
         self.all_volumes_2 = self.mesh_2.mb.get_entities_by_dimension(0, 3)
-        self.mesh_2 = MeshManager('mesh_test_2.msh', dim=3)
+        self.mesh_2 = MeshManager('meshes/mesh_test_2.msh', dim=3)
         self.mesh_2.set_media_property('Permeability', {1: K_1}, dim_target=3)
         self.mesh_2.set_boundary_condition('Dirichlet', {102: 1.0, 101: 0.0},
                                            dim_target=2, set_nodes=True)
@@ -29,13 +29,16 @@ class PressureSolverTest(unittest.TestCase):
                                            dim_target=2, set_nodes=True)
         self.mpfad_2 = MpfaD3D(self.mesh_2)
 
-        self.mesh_3 = MeshManager('mesh_test_conservative.msh', dim=3)
+        self.mesh_3 = MeshManager('meshes/mesh_test_conservative.msh', dim=3)
         self.mesh_3.set_media_property('Permeability', {1: K_1}, dim_target=3)
         self.mesh_3.set_boundary_condition('Dirichlet', {102: 1.0, 101: 0.0},
                                            dim_target=2, set_nodes=True)
         self.mesh_3.set_boundary_condition('Neumann', {201: 0.0},
                                            dim_target=2, set_nodes=True)
         self.mpfad_3 = MpfaD3D(self.mesh_3)
+        self.mesh_4 = MeshManager('meshes/mesh_darlan.msh')
+        self.mesh_4.set_global_id()
+        self.mesh_4.get_redefine_centre()
 
     @unittest.skip('no need for testing')
     def test_if_method_has_all_dirichlet_nodes(self):
@@ -70,9 +73,8 @@ class PressureSolverTest(unittest.TestCase):
         vol_eval = self.mesh_1.get_tetra_volume(tetra_nodes_coords)
         self.assertAlmostEqual(vol_eval, 1/12.0, delta=1e-15)
 
+    @unittest.skip('skip')
     def test_if_node_weighted_calculation_yelds_analytical_solution(self):
-        self.mtu = self.mpfad_3.mtu
-        self.mb = self.mpfad_3.mb
         # inner_volumes = self.mesh_3.get_non_boundary_volumes(
         #                 self.mpfad_3.dirichlet_nodes,
         #                 self.mpfad_3.neumann_nodes)
@@ -87,3 +89,24 @@ class PressureSolverTest(unittest.TestCase):
                 p_vert += p_vol * wt
             self.assertAlmostEqual(p_vert, analytical_solution,
                                    delta=5e-15)
+
+    @unittest.skip('later')
+    def test_volume_centre_is_importing_geo_properly(self):
+        for volume in self.mesh_4.all_volumes:
+            vol_id = self.mesh_4.mb.tag_get_data(self.mesh_4.global_id_tag, volume)
+            vol_coords = self.mesh_4.mb.tag_get_data(self.mesh_4.volume_centre_tag, volume)
+            print(vol_id, vol_coords)
+
+    def test_get_vols_sharing_face_and_node(self):
+        for node in self.mesh_4.all_nodes:
+            vols_around_node = self.mesh_4.mtu.get_bridge_adjacencies(node, 0, 3)
+            # print(vols_around_node)
+            for vol in vols_around_node:
+                # adj_vols = self.mesh_4._get_volumes_sharing_face_and_node(node, vol)
+                self.mesh_4._get_auxiliary_verts(node, vol, 0.5)
+
+            for vol in vols_around_node:
+                T = self.mesh_4.mb.tag_get_data(self.mesh_4.auxiliary_variables_lpew2_tag, vol)
+                # print('after', T)
+                # T = dict(T[0].reshape([7, 2]))
+                # print(self.mesh_4.mtu.get_bridge_adjacencies(T[6], 2, 3))

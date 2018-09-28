@@ -6,6 +6,12 @@ from .InterpolationMethod import InterpolationMethodBase
 
 class LPEW2(InterpolationMethodBase):
 
+    def _get_volumes_sharing_face_and_node(self, node, volume):
+        vols_around_node = self.mtu.get_bridge_adjacencies(node, 0, 3)
+        adj_vols = self.mtu.get_bridge_adjacencies(volume, 2, 3)
+        volumes_sharing_face_and_node = set(vols_around_node).difference({adj_vols})
+        return list(volumes_sharing_face_and_node)
+
     def _arrange_auxiliary_verts(self, node, volume):
         T = {}
         adj_vols = self._get_volumes_sharing_face_and_node(node, volume)

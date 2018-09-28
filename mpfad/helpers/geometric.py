@@ -1,15 +1,17 @@
-from pymoab import core
-from pymoab import topo_util
+# from pymoab import core
+# from pymoab import topo_util
 import numpy as np
 
-mb = core.Core()
-root_set = mb.get_root_set()
-mtu = topo_util.MeshTopoUtil(mb)
+# mb = core.Core()
+# root_set = mb.get_root_set()
+# mtu = topo_util.MeshTopoUtil(mb)
 
 def point_distance(coords_1, coords_2):
     dist_vector = coords_1 - coords_2
     distance = np.sqrt(np.dot(dist_vector, dist_vector))
     return distance
+
+
 
 #lru cache
 def cached_area(face, node):

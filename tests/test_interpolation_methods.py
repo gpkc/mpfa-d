@@ -19,7 +19,7 @@ class InterpMethodTest(unittest.TestCase):
                         0.0, 2.0, 0.0,
                         0.0, 0.0, 2.0])
 
-        self.mesh_1 = MeshManager('mesh_test_1.msh', dim=3)
+        self.mesh_1 = MeshManager('meshes/mesh_test_1.msh', dim=3)
         self.mesh_1.set_media_property('Permeability', {1: K_1}, dim_target=3)
         self.mesh_1.set_boundary_condition('Dirichlet', {102: 1.0, 101: 0.0},
                                            dim_target=2, set_nodes=True)
@@ -27,7 +27,7 @@ class InterpMethodTest(unittest.TestCase):
                                            dim_target=2, set_nodes=True)
         self.mpfad_1 = MpfaD3D(self.mesh_1)
 
-        self.mesh_2 = MeshManager('mesh_test_2.msh', dim=3)
+        self.mesh_2 = MeshManager('meshes/mesh_test_2.msh', dim=3)
         self.mesh_2.set_media_property('Permeability', {1: K_1}, dim_target=3)
         self.mesh_2.set_boundary_condition('Dirichlet', {102: 1.0, 101: 0.0},
                                            dim_target=2, set_nodes=True)
@@ -35,7 +35,7 @@ class InterpMethodTest(unittest.TestCase):
                                            dim_target=2, set_nodes=True)
         self.mpfad_2 = MpfaD3D(self.mesh_2)
 
-        self.mesh_3 = MeshManager('mesh_test_3.msh', dim=3)
+        self.mesh_3 = MeshManager('meshes/mesh_test_3.msh', dim=3)
         self.mesh_3.set_media_property('Permeability', {1: K_1}, dim_target=3)
         self.mesh_3.set_boundary_condition('Dirichlet', {102: 1.0, 101: 0.0},
                                            dim_target=2, set_nodes=True)
@@ -43,7 +43,7 @@ class InterpMethodTest(unittest.TestCase):
                                            dim_target=2, set_nodes=True)
         self.mpfad_3 = MpfaD3D(self.mesh_3)
 
-        self.mesh_4 = MeshManager('mesh_test_7.msh', dim=3)
+        self.mesh_4 = MeshManager('meshes/mesh_test_7.msh', dim=3)
         self.mesh_4.set_media_property('Permeability', {1: K_1}, dim_target=3)
         self.mesh_4.set_boundary_condition('Dirichlet', {102: 1.0, 101: 0.0},
                                            dim_target=2, set_nodes=True)
@@ -51,7 +51,7 @@ class InterpMethodTest(unittest.TestCase):
                                            dim_target=2, set_nodes=True)
         self.mpfad_4 = MpfaD3D(self.mesh_4)
 
-        self.mesh_5 = MeshManager('geometry_two_regions_test.msh', dim=3)
+        self.mesh_5 = MeshManager('meshes/geometry_two_regions_test.msh', dim=3)
         self.mesh_5.set_media_property('Permeability', {1: K_2, 2: K_1}, dim_target=3)
         self.mesh_5.set_boundary_condition('Dirichlet', {102: 1.0, 101: 0.0},
                                            dim_target=2, set_nodes=True)
@@ -59,13 +59,19 @@ class InterpMethodTest(unittest.TestCase):
                                            dim_target=2, set_nodes=True)
         self.mpfad_5 = MpfaD3D(self.mesh_5)
 
-        self.mesh_6 = MeshManager('mesh_test_6.msh', dim=3)
+        self.mesh_6 = MeshManager('meshes/mesh_test_6.msh', dim=3)
         self.mesh_6.set_media_property('Permeability', {1: K_1}, dim_target=3)
         self.mesh_6.set_boundary_condition('Dirichlet', {102: 1.0},
                                            dim_target=2, set_nodes=True)
         self.mesh_6.set_boundary_condition('Neumann', {202: 1.0, 201: 0.0},
                                            dim_target=2, set_nodes=True)
         self.mpfad_6 = MpfaD3D(self.mesh_6)
+
+        self.mesh_fvca = MeshManager('meshes/mesh_tet1.h5m', dim=3)
+        self.mesh_fvca.set_media_property('Permeability', {1: K_1}, dim_target=3)
+        self.mesh_fvca.set_boundary_condition('Dirichlet', {101: 1.0},
+                                           dim_target=2, set_nodes=True)
+        self.mpfad_fvca = MpfaD3D(self.mesh_fvca)
 
     @unittest.skip("we'll see it later")
     def test_inverse_distance_yields_same_weight_for_equal_tetrahedra(self):
@@ -119,7 +125,7 @@ class InterpMethodTest(unittest.TestCase):
                 local_pressure[0][0], 1 - coord_x, delta=1e-15)
             # print(local_pressure, 1 - coord_x)
 
-    # @unittest.skip("we'll see it later")
+    @unittest.skip("we'll see it later")
     def test_linear_problem_with_neumann_lpew3_interpolation_mesh_4(self):
         self.mpfad_4.run_solver(LPEW3(self.mesh_4).interpolate)
         for a_volume in self.mesh_4.all_volumes:
@@ -141,7 +147,7 @@ class InterpMethodTest(unittest.TestCase):
                 count += 1
         self.assertEqual(count, 2)
 
-    # @unittest.skip("we'll see it later")
+    @unittest.skip("we'll see it later")
     def test_linear_problem_with_non_null_neumann_condition_lpew3(self):
         self.mpfad_6.run_solver(LPEW3(self.mesh_6).interpolate)
         for a_volume in self.mesh_6.all_volumes:
@@ -203,3 +209,24 @@ class InterpMethodTest(unittest.TestCase):
         vols_ws_by_lpew2 = self.imd_1.by_lpew2(intern_node)
         for vol, weight in vols_ws_by_lpew2.items():
             self.assertAlmostEqual(weight, 1.0/12.0, delta=1e-15)
+
+    def test_memory_consumption_fvca(self):
+        intern_nodes = self.mesh_fvca.all_nodes
+        K_1 = np.array([1.0, 0.0, 0.0,
+                        0.0, 1.0, 0.0,
+                        0.0, 0.0, 1.0])
+        for volume in self.mesh_fvca.all_volumes:
+            self.mesh_fvca.mb.tag_set_data(self.mesh_fvca.perm_tag, volume, K_1)
+        # for node in intern_nodes:
+        #     LPEW3(self.mesh_fvca).interpolate(node)
+        self.mpfad_fvca.run_solver(LPEW3(self.mesh_fvca).interpolate)
+
+
+    # def test_get_ids_from_mat_properly(self):
+    #     intern_node = self.mesh_1.all_nodes[-1]
+    #     all_volumes = self.mesh_1.all_volumes
+    #     wt = np.zeros([len(all_volumes)])
+    #     for vol in all_volumes:
+    #         wt += LPEW3(self.mesh_1).create_lambda_matrix(intern_node, vol)
+    #     _wt = LPEW3(self.mesh_1).interpolate(intern_node)
+    #     print(sum(wt))

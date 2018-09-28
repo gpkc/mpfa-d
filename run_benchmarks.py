@@ -4,15 +4,15 @@ from benchmark_fvca import BenchmarkFVCA
 
 # mesh_000 = BenchMeshGenerator('000').generate_mesh()
 # mesh_00 = BenchMeshGenerator('00').generate_mesh()
-# mesh_0 = BenchMeshGenerator('0').generate_mesh()
+mesh_0 = BenchMeshGenerator('0').generate_mesh()
 # mesh_1 = BenchMeshGenerator('1').generate_mesh()
 # mesh_2 = BenchMeshGenerator('2').generate_mesh()
 # mesh_3 = BenchMeshGenerator('3').generate_mesh()
 # mesh_4 = BenchMeshGenerator('4').generate_mesh()
 # mesh_5 = BenchMeshGenerator('5').generate_mesh()
-mesh_6 = BenchMeshGenerator('6').generate_mesh()
+# mesh_6 = BenchMeshGenerator('6').generate_mesh()
 
-meshes = [mesh_6]
+meshes = [mesh_0]
 
 for mesh in meshes:
     log_name_1 = 'Bench_1_' + mesh

@@ -70,11 +70,13 @@ class LPEW3(InterpolationMethodBase):
     #         partial_weight[map_id[item]] += value
     #     return partial_weight
     #
-    # def flux_term(self, vector_1st, permeab, vector_2nd, face_area=1.0):
-    #     aux_1 = np.dot(vector_1st, permeab)
-    #     aux_2 = np.dot(aux_1, vector_2nd)
-    #     flux_term = aux_2 / face_area
-    #     return flux_term
+    # @lru_cache(maxsize=200)
+    def flux_term(self, vector_1st, permeab, vector_2nd, face_area=1.0):
+        aux_1 = np.dot(vector_1st, permeab)
+        aux_2 = np.dot(aux_1, vector_2nd)
+        flux_term = aux_2 / face_area
+        return flux_term
+
 
     @lru_cache(maxsize=200)
     def lambda_lpew3(self, node, aux_node, face):
@@ -90,7 +92,7 @@ class LPEW3(InterpolationMethodBase):
         for a_vol in adj_vols:
             vol_perm = self.mb.tag_get_data(self.perm_tag, a_vol)
             vol_perm = np.reshape(vol_perm, (3, 3))
-            vol_cent = self.mesh_data.get_centroid(a_vol)
+            vol_cent = self.mesh_data.mb.tag_get_data(self.mesh_data.volume_centre_tag, a_vol)[0]
             vol_nodes = self.mb.get_adjacencies(a_vol, 0)
             sub_vol = np.append(face_nodes_crds, vol_cent)
             sub_vol = np.reshape(sub_vol, (4, 3))
@@ -100,6 +102,7 @@ class LPEW3(InterpolationMethodBase):
             ref_node_i = self.mb.get_coords(ref_node_i)
             N_int = geo._area_vector([node, aux_node, vol_cent], ref_node)[0]
             N_i = geo._area_vector(face_nodes_crds, ref_node_i)[0]
+            # lambda_l += self.flux_term(N_i, vol_perm, N_int) / tetra_vol
             lambda_l += np.dot(np.dot(N_i, vol_perm), N_int) / tetra_vol
         return lambda_l
 
@@ -124,6 +127,7 @@ class LPEW3(InterpolationMethodBase):
         node = self.mb.get_coords([node])
         N_out = geo._area_vector(face_nodes_i, node)[0]
         N_i = geo._area_vector(face_nodes_crds, ref_node)[0]
+        # neta = self.flux_term(N_out, vol_perm, N_i) / tetra_vol
         neta = np.dot(np.dot(N_out, vol_perm), N_i) / tetra_vol
         return neta
 
@@ -131,7 +135,7 @@ class LPEW3(InterpolationMethodBase):
     def csi_lpew3(self, face, vol):
         vol_perm = self.mb.tag_get_data(self.perm_tag, vol)
         vol_perm = np.reshape(vol_perm, (3, 3))
-        vol_cent = self.mesh_data.get_centroid(vol)
+        vol_cent = self.mesh_data.mb.tag_get_data(self.mesh_data.volume_centre_tag, vol)[0]
         face_nodes = self.mtu.get_bridge_adjacencies(face, 2, 0)
         face_nodes = self.mb.get_coords(face_nodes)
         face_nodes = np.reshape(face_nodes, (3, 3))
@@ -140,6 +144,7 @@ class LPEW3(InterpolationMethodBase):
         sub_vol = np.reshape(sub_vol, (4, 3))
         #  TODO: inherit from helpers
         tetra_vol = self.mesh_data.get_tetra_volume(sub_vol)
+        # csi = self.flux_term(N_i, vol_perm, N_i) / tetra_vol
         csi = np.dot(np.dot(N_i, vol_perm), N_i) / tetra_vol
         return csi
 
@@ -149,7 +154,7 @@ class LPEW3(InterpolationMethodBase):
         adj_faces = set(self.mtu.get_bridge_adjacencies(node, 0, 2))
         vol_faces = set(self.mtu.get_bridge_adjacencies(vol, 3, 2))
         in_faces = list(adj_faces & vol_faces)
-        vol_cent = self.mesh_data.get_centroid(vol)
+        vol_cent = self.mesh_data.mb.tag_get_data(self.mesh_data.volume_centre_tag, vol)[0]
         clockwise = 1.0
         counter_clockwise = 1.0
         for a_face in in_faces:
@@ -254,7 +259,7 @@ class LPEW3(InterpolationMethodBase):
             nodes_crds = self.mb.get_coords(face_nodes)
             nodes_crds = np.reshape(nodes_crds, (len(face_nodes), 3))
             face_area = geo._area_vector(nodes_crds,
-                                         np.array([0.0, 0.0, 0.0]), norma=True)
+                                         np.array([0.0, 0.0, 0.0]), norma=True) # store face_area
             vol_N = self.mtu.get_bridge_adjacencies(face, 2, 3)
             psi_N = self.psi_sum_lpew3(node, vol_N, face)
             phi_N = self.phi_lpew3(node, vol_N, face)
