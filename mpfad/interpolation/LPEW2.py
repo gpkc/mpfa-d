@@ -10,10 +10,13 @@ class LPEW2(InterpolationMethodBase):
     def _getVolumesSharingFaceAndNode(self, node, volume):
         vols_around_node = self.mtu.get_bridge_adjacencies(node, 0, 3)
         adj_vols = self.mtu.get_bridge_adjacencies(volume, 2, 3)
-        volumes_sharing_face_and_node = set(adj_vols).difference(
-                                        set(adj_vols).difference(
-                                            set(vols_around_node)))
-        return list(volumes_sharing_face_and_node)
+        volumesSharingFaceAndNode = list(set(adj_vols).difference(
+                                         set(adj_vols).difference(
+                                             set(vols_around_node))))
+        mapAuxVols = {i: auxVol for i, auxVol in zip(range(1, 4),
+                                                     volumesSharingFaceAndNode)
+                      }
+        return mapAuxVols
 
     def _getAuxiliaryVerts(self, node, volume):
         # create meshset for volume and node
@@ -55,7 +58,8 @@ class LPEW2(InterpolationMethodBase):
                                                           )
         for index in [2, 4, 6]:
             coords[index] = self.mtu.get_average_position([self.T[index]])
-        return coords
+
+        self.T_coords = coords
 
     def _getAuxiliaryVolumes(self, T, node):
         aux_vols = {}
@@ -83,60 +87,65 @@ class LPEW2(InterpolationMethodBase):
         fluxTerm = aux_2 / vol
         return fluxTerm
 
-    def _rRange(sefl, j, r):
+    def _rRange(sefl, r, j):
         size = ((j - r + 5) % 6) + 1
         last_val = ((j + 4) % 6) + 1
 
         prod = [((last_val - k) % 6) + 1 for k in range(1, size+1)]
         return prod[::-1]
 
-    def _phi(self, r, vol, adjVols, node):
-        TrCoords = self.T_coords[r]
-        TrPlusOneCoords = self.T_coords[r + 1]
+    def _phi(self, r, volume, adjVol, node):
+        volumeCentre = self.mb.tag_get_data(self.mesh_data.volume_centre_tag, volume)
+        volumePerm = self.mb.tag_get_data(self.mesh_data.perm_tag, volume)
+        adjVolCentre = self.mb.tag_get_data(self.mesh_data.volume_centre_tag, adjVol)
+        adjVolPerm = self.mb.tag_get_data(self.mesh_data.perm_tag, adjVol),
+        netaVolume_r = self._netaLpew2(r, volumePerm, volumeCentre, node)
+        netaVolume_r_plus_1 = self._netaLpew2(r + 1, volumePerm, volumeCentre,
+                                              node)
+        netaAdjVol_r = self._netaLpew2(r, adjVolPerm, adjVolCentre, node)
+        netaAdjVol_r_plus_1 = self._netaLpew2(r + 1, adjVolPerm, adjVolCentre,
+                                              node)
+        phi = (netaAdjVol_r - netaVolume_r) / (netaAdjVol_r_plus_1
+                                               - netaVolume_r_plus_1)
+        return phi
+
+    def _prodPhi(self, rStar, j, volume, adjVols, node):
+        rRange = self._rRange(rStar, j + 1)
+        phiProd = 1.
+        print(adjVols)
+        for r in rRange:
+            print(r, (r + 1)//2)
+            phi = self._phi(r, volume,
+                                  adjVols[(r + 1) // 2], node)
+        phiProd = phiProd * phi
+        pass
+
+    def _netaLpew2(self, r, perm, volumeCentre, node):
         nodeCoords = self.mb.get_coords([node])
-        rFace = np.asarray([TrCoods, TrPlusOneCoords, nodeCoords]).reshape([3,3])
-        # compute neta_vol_r
-        # compute neta_vol_r_plus_1
-        # compute neta_adj_vol_r
-        # compute neta_adj_vol_r_plus_1
-        # compute phi
-        pass
+        faceVerts = np.asarray([self.T_coords[r], self.T_coords[r + 1],
+                                nodeCoords])
+        volVerts = np.append(faceVerts, volumeCentre).reshape([4, 3])
+        tetraVolume = geo.get_tetra_volume(volVerts)
+        print(faceVerts, self.T_coords[r])
+        N_out = geo._area_vector(faceVerts[0], self.T_coords[r])[0]
+        N_centre = geo._area_vector(faceVerts[0], volumeCentre)[0]
+        neta = self._fluxTerm(N_out, perm, N_centre, tetraVolume)
+        return neta
 
-    def _prodPhi(self, r_star, j, vol_perm, adj_vol_perm,
-                  vol_centre, adj_vol_centre):
-        # call rRange
-        # phiProd = 1.
-        # for rStar in rRange:
-        #     phi = self._phi_lpew2(self, rStar, vol_perm,
-        #                           adj_vol_perm, vol_centre, adj_vol_centre)
-        # phiProd = phiProd * phi
-        pass
-
-    def _neta_lpew2(self, r, perm, volume_centre, node):
-        # construct face based on r. r is the auxiliary counter.
-        # The face must be formed by r, r + 1 and node auxiliary verts.
-        # sub_face_verts = np.asarray([T[r], T[r + 1], node])
-        # compute subvolume volume. coords are: sub_face_verts + volume_centre
-        # compute normal face vector opposite to volume centre
-        # compute normal opposite to auxiliary Tr
-        # compute neta
-
-        pass
-
-    def _csi_lpew2(self, vol_verts, aux_vert, perm):
+    def _csi_lpew2(self, volVerts, aux_vert, perm):
         vol_nodes_coords = np.asarray([self.mb.get_coords([vol])
-                                       for vol in vol_verts])
+                                       for vol in volVerts])
         aux_vert_coords = self.mb.get_coords([aux_vert])
         vol_nodes_coords.reshape([4, 3])
-        tetra_volume = geo.get_tetra_volume(vol_nodes_coords)
+        tetraVolume = geo.get_tetra_volume(vol_nodes_coords)
         N_node = geo._area_vector(vol_nodes_coords, vol_nodes_coords[3])[0]
-        verts_opposite_to_aux_vert = list(set(vol_verts).difference({aux_vert})
+        verts_opposite_to_aux_vert = list(set(volVerts).difference({aux_vert})
                                           )
         opposite_face_coords = np.asarray([self.mb.get_coords([vol])
                                            for vol in
                                            verts_opposite_to_aux_vert])
         N_Tj = geo._area_vector(opposite_face_coords, aux_vert_coords)[0]
-        csi = self._fluxTerm(N_node, perm, N_Tj, tetra_volume)
+        csi = self._fluxTerm(N_node, perm, N_Tj, tetraVolume)
         return csi
 
     def interpolate(self, node, tao=0.5):
@@ -147,13 +156,16 @@ class LPEW2(InterpolationMethodBase):
         A = np.zeros([len(volsAroundNode), 6])
         for count, volAroundNode in zip(range(len(volsAroundNode)),
                                         volsAroundNode):
-            perm = np.asarray(self.mb.tag_get_data(self.perm_tag,
+            adjVols = self._getVolumesSharingFaceAndNode(node, volAroundNode)
+            perm = np.asarray(self.mb.tag_get_data(self.mesh_data.perm_tag,
                                                    volAroundNode))
             perm = perm.reshape([3, 3])
             self._getAuxiliaryVerts(node, volAroundNode)
             self._getAuxiliaryVertsCoords(node, volAroundNode, tao)
-            aux_vols = self._getAuxiliaryVolumes(self.T, node)
+            auxVols = self._getAuxiliaryVolumes(self.T, node)
             for j in range(1, 7):
-                A = self._computeA(j, aux_vols, perm)
+                A = self._computeA(j, auxVols, perm)
                 adjVols = self._getVolumesSharingFaceAndNode(node,
                                                              volAroundNode)
+
+                phi = self._prodPhi(1, 6, volAroundNode, adjVols, node)
