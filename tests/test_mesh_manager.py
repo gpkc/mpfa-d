@@ -100,13 +100,6 @@ class PressureSolverTest(unittest.TestCase):
     def test_get_vols_sharing_face_and_node(self):
         for node in self.mesh_4.all_nodes:
             vols_around_node = self.mesh_4.mtu.get_bridge_adjacencies(node, 0, 3)
-            # print(vols_around_node)
             for vol in vols_around_node:
-                # adj_vols = self.mesh_4._get_volumes_sharing_face_and_node(node, vol)
-                self.mesh_4._get_auxiliary_verts(node, vol, 0.5)
-
-            for vol in vols_around_node:
-                T = self.mesh_4.mb.tag_get_data(self.mesh_4.auxiliary_variables_lpew2_tag, vol)
-                # print('after', T)
-                # T = dict(T[0].reshape([7, 2]))
-                # print(self.mesh_4.mtu.get_bridge_adjacencies(T[6], 2, 3))
+                T = self.mesh_4._get_auxiliary_verts(node, vol, 0.5)
+                

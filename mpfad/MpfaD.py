@@ -20,6 +20,7 @@ class MpfaD3D:
         self.source_tag = mesh_data.source_tag
         self.global_id_tag = mesh_data.global_id_tag
         self.volume_centre_tag = mesh_data.volume_centre_tag
+        # self.water_saturation = two_phase.water_saturation
 
         self.pressure_tag = self.mb.tag_get_handle(
             "Pressure", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
@@ -48,6 +49,9 @@ class MpfaD3D:
         self.A_prime = Epetra.CrsMatrix(Epetra.Copy, std_map, 0)
         self.b_prime = Epetra.Vector(std_map)
         self.x_prime = Epetra.Vector(std_map)
+
+    def calculate_relative_perm(self, parameters, water_saturation):
+        pass
 
     def record_data(self, file_name):
         volumes = self.mb.get_entities_by_dimension(0, 3)
@@ -107,7 +111,6 @@ class MpfaD3D:
                                                 [v_id, v_id], [-RHS * weight,
                                                                RHS * weight])
 
-
         if node in self.neumann_nodes:
             neu_term = self.nodes_nts[node]
 
@@ -128,9 +131,10 @@ class MpfaD3D:
         if node_interpolation:
             self.get_nodes_weights(interpolation_method)
 
-        try:
+        try:  # Do this in list comrpehension style
             for volume in self.volumes:
-                volume_id = self.mb.tag_get_data(self.global_id_tag, volume)[0][0]
+                volume_id = self.mb.tag_get_data(self.global_id_tag,
+                                                 volume)[0][0]
                 RHS = self.mb.tag_get_data(self.source_tag, volume)[0][0]
                 self.b_prime[volume_id] += RHS
         except:
@@ -142,7 +146,8 @@ class MpfaD3D:
                 face_flow = self.mb.tag_get_data(self.neumann_tag, face)[0][0]
                 volume = self.mtu.get_bridge_adjacencies(face, 2, 3)
                 volume = np.asarray(volume, dtype='uint64')
-                id_volume = self.mb.tag_get_data(self.global_id_tag, volume)[0][0]
+                id_volume = self.mb.tag_get_data(self.global_id_tag,
+                                                 volume)[0][0]
                 face_nodes = self.mtu.get_bridge_adjacencies(face, 0, 0)
                 node_crds = self.mb.get_coords(face_nodes).reshape([3, 3])
                 face_area = geo._area_vector(node_crds, norma=True)
@@ -154,10 +159,13 @@ class MpfaD3D:
                 I, J, K = self.mtu.get_bridge_adjacencies(face, 0, 0)
                 left_volume = np.asarray(self.mtu.get_bridge_adjacencies(
                                          face, 2, 3), dtype='uint64')
-                id_volume = self.mb.tag_get_data(self.global_id_tag, left_volume)[0][0]
+                id_volume = self.mb.tag_get_data(self.global_id_tag,
+                                                 left_volume)[0][0]
                 JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
                 JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
-                LJ = self.mb.get_coords([J]) - self.mesh_data.mb.tag_get_data(self.volume_centre_tag, left_volume)[0]
+                LJ = self.mb.get_coords([J]) - \
+                    self.mesh_data.mb.tag_get_data(self.volume_centre_tag,
+                                                   left_volume)[0]
                 N_IJK = np.cross(JI, JK) / 2.
                 test = np.dot(LJ, N_IJK)
                 if test < 0.:
@@ -203,22 +211,27 @@ class MpfaD3D:
             if face in self.intern_faces:
                 left_volume, right_volume = \
                     self.mtu.get_bridge_adjacencies(face, 2, 3)
-                L = self.mesh_data.mb.tag_get_data(self.volume_centre_tag, left_volume)[0]
-                R = self.mesh_data.mb.tag_get_data(self.volume_centre_tag, right_volume)[0]
+                L = self.mesh_data.mb.tag_get_data(self.volume_centre_tag,
+                                                   left_volume)[0]
+                R = self.mesh_data.mb.tag_get_data(self.volume_centre_tag,
+                                                   right_volume)[0]
                 dist_LR = R - L
                 I, J, K = self.mtu.get_bridge_adjacencies(face, 0, 0)
                 JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
                 JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
 
                 N_IJK = np.cross(JI, JK) / 2.
-                face_nodes = self.mb.get_coords(self.mtu.get_bridge_adjacencies(face, 0, 0))
+                face_nodes = self.mb.get_coords(
+                    self.mtu.get_bridge_adjacencies(face, 0, 0))
                 face_nodes = np.reshape(face_nodes, (3, 3))
                 test = np.dot(N_IJK, dist_LR)
 
                 if test < 0:
                     left_volume, right_volume = right_volume, left_volume
-                    L = self.mesh_data.mb.tag_get_data(self.volume_centre_tag, left_volume)[0]
-                    R = self.mesh_data.mb.tag_get_data(self.volume_centre_tag, right_volume)[0]
+                    L = self.mesh_data.mb.tag_get_data(self.volume_centre_tag,
+                                                       left_volume)[0]
+                    R = self.mesh_data.mb.tag_get_data(self.volume_centre_tag,
+                                                       right_volume)[0]
                     dist_LR = R - L
 
                 LJ = L - self.mb.get_coords([J])
@@ -254,7 +267,8 @@ class MpfaD3D:
                                                      K_R_JK, K_R_n)
                 K_eq = (K_R_n * K_L_n)/(K_R_n * h_L + K_L_n * h_R) * face_area
 
-                id_right = self.mb.tag_get_data(self.global_id_tag, right_volume)[0][0]
+                id_right = self.mb.tag_get_data(self.global_id_tag,
+                                                right_volume)[0][0]
                 id_left = self.mb.tag_get_data(self.global_id_tag, left_volume)
                 col_ids = [id_right, id_right, id_left, id_left]
                 row_ids = [id_right, id_left, id_left, id_right]

@@ -5,20 +5,19 @@ from mesh_generator import GenerateMesh
 class MeshGeneratorTest(unittest.TestCase):
 
     def setUp(self):
-        path = 'mesh_bench/meshB_tetra/tet_5.msh'
+        path = 'mesh_bench/meshB_tetra/tet_00.msh'
         self.mesh_tetra00 = GenerateMesh(path)
 
     def tearDown(self):
         self.mesh_tetra00 = None
 
-    """
     def test_mesh_reading_tool(self):
         information_set = self.mesh_tetra00.locate_information()
         self.assertEqual(information_set, [10, 12, 18, 45, 90, 135, 248])
 
     def test_method_reads_values_properly(self):
         information_set = [10, 12, 18, 45, 90, 135, 248]
-        f = open('tet.00.msh')
+        f = open('mesh_bench/meshB_tetra/tet_00.msh')
         lines = f.readlines()
         self.assertEqual(lines[information_set[0] - 1].strip('          \n'),
                          '26')
@@ -54,5 +53,3 @@ class MeshGeneratorTest(unittest.TestCase):
         self.mesh_tetra00.get_all_vertices()
         self.mesh_tetra00.create_volumes()
         self.mesh_tetra00.create_dirichlet_boundary_conditions()
-
-    """
