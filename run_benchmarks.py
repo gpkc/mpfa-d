@@ -1,22 +1,29 @@
 from benchmark_mesh_generator import BenchMeshGenerator
 from benchmark_fvca import BenchmarkFVCA
+from oblique_drain import ObliqueDrain
 
+benchmark_fvca_cases = [None]
 
-# mesh_000 = BenchMeshGenerator('000').generate_mesh()
-# mesh_00 = BenchMeshGenerator('00').generate_mesh()
-mesh_0 = BenchMeshGenerator('0').generate_mesh()
-# mesh_1 = BenchMeshGenerator('1').generate_mesh()
-# mesh_2 = BenchMeshGenerator('2').generate_mesh()
-# mesh_3 = BenchMeshGenerator('3').generate_mesh()
-# mesh_4 = BenchMeshGenerator('4').generate_mesh()
-# mesh_5 = BenchMeshGenerator('5').generate_mesh()
-# mesh_6 = BenchMeshGenerator('6').generate_mesh()
+try:
 
-meshes = [mesh_0]
+    fvcaMeshesB = [BenchMeshGenerator(str(case)).generate_mesh()
+                   for case in benchmark_fvca_cases]
 
-for mesh in meshes:
-    log_name_1 = 'Bench_1_' + mesh
-    # log_name_2 = 'Bench_2_' + mesh
+    for mesh in fvcaMeshesB:
+        log_name_1 = ('Report_benchmark_FVCA_test_case_1_'
+                      + mesh).strip('.h5m')
+        log_name_2 = ('Report_benchmark_FVCA_test_case_2_'
+                      + mesh).strip('.h5m')
+        BenchmarkFVCA(mesh).benchmark_case_1(log_name_1)
+        BenchmarkFVCA(mesh).benchmark_case_2(log_name_2)
+except:
+    pass
 
-    BenchmarkFVCA(mesh).benchmark_case_1(log_name_1)
-    # BenchmarkFVCA(mesh).benchmark_case_2(log_name_2)
+path = 'paper3D-resultados/linear_preserving/pp-data-files'
+
+obliqueDrainMeshes = [path + '/oblique-drain-'
+                      + str(i) + '.msh' for i in range(1, 2)]
+
+for idx, mesh in zip(range(1, 4), obliqueDrainMeshes):
+    log_name = 'Results_Oblique_drain_' + str(idx)
+    ObliqueDrain(mesh, 0.2).run(log_name)
