@@ -23,7 +23,7 @@ path = 'paper3D-resultados/linear_preserving/pp-data-files'
 
 obliqueDrainMeshes = [path + '/oblique-drain-'
                       + str(i) + '.msh' for i in range(1, 2)]
-
-for idx, mesh in zip(range(1, 4), obliqueDrainMeshes):
-    log_name = 'Results_Oblique_drain_' + str(idx)
-    ObliqueDrain(mesh, 0.2).run(log_name)
+ObliqueDrain('paper3D-resultados/linear_preserving/pp-data-files/oblique-drain.msh', 0.2).run('log_name')
+# for idx, mesh in zip(range(1, 4), obliqueDrainMeshes):
+#     log_name = 'Results_Oblique_drain_' + str(idx)
+#     ObliqueDrain(mesh, 0.2).run(log_name)

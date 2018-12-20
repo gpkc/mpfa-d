@@ -177,7 +177,6 @@ class MpfaD3D:
                 tan_JI = np.cross(N_IJK, JI)
                 tan_JK = np.cross(N_IJK, JK)
                 face_area = np.sqrt(np.dot(N_IJK, N_IJK))
-
                 K_L = self.mb.tag_get_data(self.perm_tag,
                                            left_volume).reshape([3, 3])
                 h_L = geo.get_height(N_IJK, LJ)
@@ -277,28 +276,24 @@ class MpfaD3D:
                 self.A_prime.InsertGlobalValues(col_ids, row_ids, values)
 
                 # TODO: eliminate if block after debugging
-                if not node_interpolation:
-                    bmk = self._benchmark_1
-                    x_I, y_I, z_I = self.mb.get_coords([I])
-                    p_I = bmk(x_I, y_I, z_I)[1]
-                    x_J, y_J, z_J = self.mb.get_coords([J])
-                    p_J = bmk(x_J, y_J, z_J)[1]
-                    x_K, y_K, z_K = self.mb.get_coords([K])
-                    p_K = bmk(x_K, y_K, z_K)[1]
-                    RHS = 0.5 * K_eq * (-D_JK * (p_J - p_I) +
-                                        D_JI * (p_J - p_K))
+                # if not node_interpolation:
+                #     bmk = self._benchmark_1
+                #     x_I, y_I, z_I = self.mb.get_coords([I])
+                #     p_I = bmk(x_I, y_I, z_I)[1]
+                #     x_J, y_J, z_J = self.mb.get_coords([J])
+                #     p_J = bmk(x_J, y_J, z_J)[1]
+                #     x_K, y_K, z_K = self.mb.get_coords([K])
+                #     p_K = bmk(x_K, y_K, z_K)[1]
+                #     RHS = 0.5 * K_eq * (-D_JK * (p_J - p_I) +
+                #                         D_JI * (p_J - p_K))
+                #
+                #     self.b_prime[id_left] += RHS
+                #     self.b_prime[id_right] += -RHS
 
-                    self.b_prime[id_left] += RHS
-                    self.b_prime[id_right] += -RHS
-
-                # TODO: eliminate if cond after debugging
-                if node_interpolation:
-                    self._node_treatment(I, id_left, id_right, K_eq,
-                                         D_JK=D_JK)
-                    self._node_treatment(J, id_left, id_right, K_eq,
-                                         D_JI=D_JI, D_JK=-D_JK)
-                    self._node_treatment(K, id_left, id_right, K_eq,
-                                         D_JI=-D_JI)
+                self._node_treatment(I, id_left, id_right, K_eq, D_JK=D_JK)
+                self._node_treatment(J, id_left, id_right, K_eq,
+                                     D_JI=D_JI, D_JK=-D_JK)
+                self._node_treatment(K, id_left, id_right, K_eq, D_JI=-D_JI)
 
         self.A_prime.FillComplete()
         linearProblem = Epetra.LinearProblem(self.A_prime,
@@ -307,3 +302,4 @@ class MpfaD3D:
         solver = AztecOO.AztecOO(linearProblem)
         solver.Iterate(1000, 1e-9)
         self.mb.tag_set_data(self.pressure_tag, self.volumes, self.x_prime)
+        self.record_data('tentativa_01.vtk')
