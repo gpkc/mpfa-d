@@ -12,6 +12,8 @@ class BenchmarkFVCA:
         self.mesh = MeshManager(filename, dim=3)
         self.mesh.set_boundary_condition('Dirichlet', {101: 0.0},
                                          dim_target=2, set_nodes=True)
+        self.mesh.set_global_id()
+        self.mesh.get_redefine_centre()
         self.mpfad = MpfaD3D(self.mesh)
         self.lpew3 = LPEW3(self.mesh)
 
@@ -80,9 +82,6 @@ class BenchmarkFVCA:
         K = [k_xx, k_xy, k_xz,
              k_yx, k_yy, k_yz,
              k_zx, k_zy, k_zz]
-        # K = [x + 1, 0.0, 0.0,
-        #      0.0, y + 1, 0.0,
-        #      0.0, 0.0, z + 1]
         u2 = ((x ** 3 * y ** 2 * z) + x * np.sin(2 * pi * x * z)
                                         * np.sin(2 * pi * x * y)
                                         * np.sin(2 * pi * z))
@@ -97,25 +96,6 @@ class BenchmarkFVCA:
 
         return K, u3
 
-    def memory_test(self, log_name):
-        info_set = ['iterating over verts',
-                    'iterating over edges',
-                    'iterating over faces',
-                    'iterating over volumes']
-        for info, dim in zip(info_set, range(0, 4)):
-            print(info)
-            entities = self.mesh.mb.get_entities_by_dimension(
-                self.mesh.root_set, dim)
-            for entity in entities:
-                for d in range(2, 3):
-                    stuff = self.mesh.mtu.get_bridge_adjacencies(entity, dim, d)
-                    print(stuff)
-
-
-        # for elem in in self.mb.get_entities_by_dimension:
-        #     all_faces = self.mesh.mtu.get_bridge_adjacencies(vert, 0, 2)
-        #     all_volumes = self.mesh.mtu.get_bridge_adjacencies(vert, 0, 3)
-
     def benchmark_case_1(self, log_name):
         for node in self.mesh.get_boundary_nodes():
             x, y, z = self.mesh.mb.get_coords([node])
@@ -124,7 +104,7 @@ class BenchmarkFVCA:
         volumes = self.mesh.all_volumes
         vols = []
         for volume in volumes:
-            x, y, z = self.mesh.get_centroid(volume)
+            x, y, z = self.mesh.mb.tag_get_data(self.mesh.volume_centre_tag, volume)[0]
             self.mesh.mb.tag_set_data(self.mesh.perm_tag, volume,
                                       self._benchmark_1(x, y, z)[0])
             vol_nodes = self.mesh.mb.get_adjacencies(volume, 0)
@@ -139,7 +119,7 @@ class BenchmarkFVCA:
         err = []
         u = []
         for volume in volumes:
-            x_c, y_c, z_c = self.mesh.get_centroid(volume)
+            x_c, y_c, z_c = self.mesh.mb.tag_get_data(self.mesh.volume_centre_tag, volume)[0]
             analytical_solution = self._benchmark_1(x_c, y_c, z_c)[1]
             calculated_solution = self.mpfad.mb.tag_get_data(
                                   self.mpfad.pressure_tag, volume)[0][0]
@@ -174,7 +154,7 @@ class BenchmarkFVCA:
         volumes = self.mesh.all_volumes
         vols = []
         for volume in volumes:
-            x, y, z = self.mesh.get_centroid(volume)
+            x, y, z = self.mesh.mb.tag_get_data(self.mesh.volume_centre_tag, volume)[0]
             self.mesh.mb.tag_set_data(self.mesh.perm_tag, volume,
                                       self._benchmark_2(x, y, z)[0])
             vol_nodes = self.mesh.mb.get_adjacencies(volume, 0)
@@ -189,7 +169,7 @@ class BenchmarkFVCA:
         err = []
         u = []
         for volume in volumes:
-            x_c, y_c, z_c = self.mesh.get_centroid(volume)
+            x_c, y_c, z_c = self.mesh.mb.tag_get_data(self.mesh.volume_centre_tag, volume)[0]
             analytical_solution = self._benchmark_2(x_c, y_c, z_c)[1]
             calculated_solution = self.mpfad.mb.tag_get_data(
                                   self.mpfad.pressure_tag, volume)[0][0]
@@ -229,7 +209,7 @@ class BenchmarkFVCA:
         vols = []
         u = []
         for volume in volumes:
-            x_c, y_c, z_c = self.mesh.get_centroid(volume)
+            x_c, y_c, z_c = self.mesh.mb.tag_get_data(self.mesh.volume_centre_tag, volume)
             analytical_solution = self._benchmark_3(x_c, y_c, z_c)[1]
             calculated_solution = self.mpfad.mb.tag_get_data(
                                   self.mpfad.pressure_tag, volume)[0][0]

@@ -1,9 +1,12 @@
 import numpy as np
+import mpfad.helpers.geometric as geo
+# import mpfad.helpers.cgeom as cgeo
 from math import pi
 from math import sqrt
 from pymoab import core
 from pymoab import types
 from pymoab import topo_util
+from itertools import cycle
 
 
 class MeshManager:
@@ -37,29 +40,16 @@ class MeshManager:
         self.node_cascade_tag = self.mb.tag_get_handle(
             "Node cascade", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
 
-        # self.pressure_grad_tag = self.mb.tag_get_handle(
-        #     "Pressure_Gradient", 3, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+        self.volume_centre_tag = self.mb.tag_get_handle(
+            "Volume centre", 3, types.MB_TYPE_DOUBLE,
+            types.MB_TAG_SPARSE, True)
 
-        # self.pressure_well_tag = self.mb.tag_get_handle(
-        #     "Pressure_Well_Condition", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+        self.global_id_tag = self.mb.tag_get_handle(
+            "Volume id", 1, types.MB_TYPE_INTEGER, types.MB_TAG_DENSE, True)
 
-        # self.flow_rate_well_tag = self.mb.tag_get_handle(
-        #     "Flow_Rate_Well_Condition", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-
-        # self.error_tag = self.mb.tag_get_handle(
-        #     "error", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-
-        # self.node_pressure_tag = self.mb.tag_get_handle(
-        #     "node_pressure", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-
-        # self.ref_degree_tag = self.mb.tag_get_handle(
-        #     "ref_degree", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
-
-        # self.hanging_nodes_tag = self.mb.tag_get_handle(
-        #     "hanging_nodes", 1, types.MB_TYPE_HANDLE, types.MB_TAG_SPARSE, True)
-
-        # self.full_edges_tag = self.mb.tag_get_handle(
-        #     "full_edges", 1, types.MB_TYPE_HANDLE, types.MB_TAG_SPARSE, True)
+        self.auxiliary_variables_lpew2_tag = self.mb.tag_get_handle(
+            "aux variables for lpew2", 1, types.MB_TYPE_INTEGER,
+            types.MB_TAG_DENSE, True)
 
         self.all_volumes = self.mb.get_entities_by_dimension(0, self.dimension)
 
@@ -71,9 +61,6 @@ class MeshManager:
         self.dirichlet_faces = set()
         self.neumann_faces = set()
 
-        # self.all_pressure_well_vols = np.asarray([], dtype='uint64')
-        # self.all_flow_rate_well_vols = np.asarray([], dtype='uint64')
-
     def create_vertices(self, coords):
         new_vertices = self.mb.create_vertices(coords)
         self.all_nodes.append(new_vertices)
@@ -83,6 +70,13 @@ class MeshManager:
         new_volume = self.mb.create_element(poly_type, vertices)
         self.all_volumes.append(new_volume)
         return new_volume
+
+    def set_global_id(self):
+        vol_ids = []
+        range_of_ids = range(len(self.all_volumes))
+        for id_, volume in zip(range_of_ids, self.all_volumes):
+            vol_ids.append(id_)
+        self.mb.tag_set_data(self.global_id_tag, self.all_volumes, vol_ids)
 
     def set_information(self, information_name, physicals_values,
                         dim_target, set_connect=False):
@@ -134,6 +128,117 @@ class MeshManager:
 
         return non_boundary_volumes
 
+    def get_redefine_centre(self):
+        vol_centroids = []
+        for volume in self.all_volumes:
+            volume_centroid = self.mtu.get_average_position([volume])
+            vol_centroids.append(volume_centroid)
+        self.mb.tag_set_data(self.volume_centre_tag,
+                             self.all_volumes, vol_centroids)
+
+
+        # all_volumes_centroid_list = []
+        # for volume in self.all_volumes:
+        #     centre_change = False
+        #     volume_Centroid = self.mtu.get_average_position([volume])
+        #     adj_faces = self.mtu.get_bridge_adjacencies(volume, 3, 2)
+        #     adjacencies = []
+        #     ray = []
+        #     for adj_face in adj_faces:
+        #         try:
+        #             adj_vol = set(self.mtu.get_bridge_adjacencies(adj_face,
+        #                                                           2, 3)
+        #                           ).difference({volume}).pop()
+        #             adj_vol_centroid = self.mtu.get_average_position([adj_vol])
+        #             adj_face_centroid = self.mtu.get_average_position([adj_face
+        #                                                                ])
+        #             adjacencies.append([adj_face_centroid, adj_vol_centroid])
+        #             ray.append(geo.point_distance(volume_Centroid,
+        #                                           adj_face_centroid))
+        #         except:
+        #             adj_face_centroid = self.mtu.get_average_position([adj_face
+        #                                                                ])
+        #             adjacencies.append([adj_face_centroid, None])
+        #             ray.append(geo.point_distance(volume_Centroid,
+        #                                           adj_face_centroid))
+        #     ray = min(ray)
+        #     i = 0
+        #     iscolinear = [True, True, True, True]
+        #     volume_centroid = volume_Centroid
+        #     while any(determinant is True for determinant in iscolinear):
+        #         adj_face_centroid, adj_vol_centroid = adjacencies[i %
+        #                                                           len(adj_faces
+        #                                                               )]
+        #         volume_centroid = (volume_Centroid + ray / 2 *
+        #                            np.array([np.random.rand(),
+        #                                      np.random.rand(),
+        #                                      np.random.rand()]
+        #                                     )
+        #                            )
+        #         try:
+        #             mat = np.asarray([adj_face_centroid,
+        #                               adj_vol_centroid,
+        #                               volume_centroid]).reshape([3, 3])
+        #
+        #             if np.linalg.det(mat) == 0:
+        #                 centre_change = True
+        #
+        #                 iscolinear[i % len(adj_faces)] = True
+        #
+        #             else:
+        #                 iscolinear[i % len(adj_faces)] = False
+        #         except:
+        #             iscolinear[i % len(adj_faces)] = False
+        #         i += 1
+        #         if i > 1000:
+        #             break
+        #     all_volumes_centroid_list.append(volume_centroid)
+        # self.mb.tag_set_data(self.volume_centre_tag,
+        #                      self.all_volumes, all_volumes_centroid_list)
+        # if centre_change:
+        #     print('centre change')
+        # else:
+        #     print("no centre change")
+
+    def _get_volumes_sharing_face_and_node(self, node, volume):
+        vols_around_node = self.mtu.get_bridge_adjacencies(node, 0, 3)
+        adj_vols = self.mtu.get_bridge_adjacencies(volume, 2, 3)
+        volumes_sharing_face_and_node = set(adj_vols).difference(
+                                        set(adj_vols).difference(
+                                            set(vols_around_node)))
+        return list(volumes_sharing_face_and_node)
+
+    def _get_auxiliary_verts(self, node, volume, tao):
+        # create meshset for volume and node
+        pass
+
+    def get_lpew2_support_region(self, tao):
+        for node in self.all_nodes:
+            self.volumes_around_node_ms = self.mb.create_meshset()
+            volumes_around_node = self.mtu.get_bridge_adjacencies(node, 0, 3)
+            self.mb.add_entities(self.volumes_around_node_ms,
+                                 volumes_around_node)
+            for volume in volumes_around_node:
+                self.adj_volumes_ms = self.mb.create_meshset()
+                self.aux_variables_ms = self.mb.create_meshset()
+                adj_vols = self.mtu.get_bridge_adjacencies(volume, 2, 3)
+                volumes_sharing_face_and_node = set(adj_vols).difference(
+                                                set(adj_vols).difference(
+                                                    set(volumes_around_node)))
+                self.add_entities(self.adj_volumes_ms,
+                                  volumes_sharing_face_and_node)
+                aux_verts = list(set(self.mtu.get_bridge_adjacencies(volume,
+                                     3, 0)).difference(set([node])))
+                aux_var_edge = [tao * self.mb.get_coords(node) +
+                                (1 - tao) * self.mb.get_coords(aux_vert)
+                                for aux_vert in aux_verts]
+
+
+
+
+
+        pass
+
     def get_node_cascade_lpew3(self, tao):
         for node in self.all_nodes:
             vols_around_node = self.mtu.get_bridge_adjacencies(node, 0, 3)
@@ -160,236 +265,27 @@ class MeshManager:
 
     def set_media_property(self, property_name, physicals_values,
                            dim_target=3, set_nodes=False):
-
         self.set_information(property_name, physicals_values,
                              dim_target, set_connect=set_nodes)
 
     def set_boundary_condition(self, boundary_condition, physicals_values,
                                dim_target=3, set_nodes=False):
-
         self.set_information(boundary_condition, physicals_values,
                              dim_target, set_connect=set_nodes)
 
-    # @staticmethod
-    # def norma(vector):
-    #     vector = np.array(vector)
-    #     dot_product = np.dot(vector, vector)
-    #     mag = sqrt(dot_product)
-    #     return mag
-    #
-    #
-    # def ang_vectors(self, u, v):
-    #     u = np.array(u)
-    #     v = np.array(v)
-    #     dot_product = np.dot(u,v)
-    #     norms = self.norma(u)*self.norma(v)
-    #     try:
-    #         arc = dot_product/norms
-    #         if np.fabs(arc) > 1:
-    #             raise ValueError('Arco maior que 1 !!!')
-    #     except ValueError:
-    #         arc = np.around(arc)
-    #     ang = np.arccos(arc)
-    #     #print ang, arc, dot_product, norms, u, v
-    #     return ang
-
-
+    # TODO: This should calculate any generic polyhedral centroid
     def get_centroid(self, entity):
-
         verts = self.mb.get_adjacencies(entity, 0)
         coords = np.array([self.mb.get_coords([vert]) for vert in verts])
-
         qtd_pts = len(verts)
-        #print qtd_pts, 'qtd_pts'
         coords = np.reshape(coords, (qtd_pts, 3))
         pseudo_cent = sum(coords)/qtd_pts
-
-        # vectors = np.array([coord - pseudo_cent for coord in coords])
-        # vectors = vectors.flatten()
-        # vectors = np.reshape(vectors, (len(verts), 3))
-        # directions = np.zeros(len(vectors))
-        # for j in range(len(vectors)):
-        #     direction = self.ang_vectors(vectors[j], [1,0,0])
-        #     if vectors[j, 1] <= 0:
-        #         directions[j] = directions[j] + 2.0*pi - direction
-        #     else:
-        #         directions[j] = directions[j] + direction
-        # indices = np.argsort(directions)
-        # vect_std = vectors[indices]
-        # total_area = 0
-        # wgtd_cent = 0
-        # for i in range(len(vect_std)):
-        #     norma1 = self.norma(vect_std[i])
-        #     norma2 = self.norma(vect_std[i-1])
-        #     ang_vect = self.ang_vectors(vect_std[i], vect_std[i-1])
-        #     area_tri = (0.5)*norma1*norma2*np.sin(ang_vect)
-        #     cent_tri = pseudo_cent + (1/3.0)*(vect_std[i] + vect_std[i-1])
-        #     wgtd_cent = wgtd_cent + area_tri*cent_tri
-        #     total_area = total_area + area_tri
-        #
-        # centroide = wgtd_cent/total_area
         return pseudo_cent
 
+    # TODO: Should go on geometric
     def get_tetra_volume(self, tet_nodes):
         vect_1 = tet_nodes[1] - tet_nodes[0]
         vect_2 = tet_nodes[2] - tet_nodes[0]
         vect_3 = tet_nodes[3] - tet_nodes[0]
         vol_eval = abs(np.dot(np.cross(vect_1, vect_2), vect_3))/6.0
         return vol_eval
-
-    @staticmethod
-    def point_distance(coords_1, coords_2):
-        dist_vector = coords_1 - coords_2
-        distance = sqrt(np.dot(dist_vector, dist_vector))
-        return distance
-    #
-    #
-    # def counterclock_sort(self, coords):
-    #     inner_coord = sum(coords)/(len(coords))
-    #     vectors = np.array(
-    #         [crd_node - inner_coord for crd_node in coords])
-    #
-    #     directions = np.zeros(len(vectors))
-    #     for j in range(len(vectors)):
-    #         direction = self.ang_vectors(vectors[j], [1, 0, 0])
-    #         if vectors[j, 1] <= 0:
-    #             directions[j] = directions[j] + 2.0*pi - direction
-    #         else:
-    #             directions[j] = directions[j] + direction
-    #     indices = np.argsort(directions)
-    #     return indices
-    #
-    #
-    # @staticmethod
-    # def contains(test_point, vol_sorted_coords):
-    #     vects = np.array(
-    #         [crd_node - test_point for crd_node in vol_sorted_coords])
-    #     for i in range(len(vects)):
-    #
-    #         if np.dot(vects[i], vects[i]) < 1e-16:
-    #             return [0, i]
-    #         if np.dot(vects[i-1], vects[i-1]) < 1e-16:
-    #             return [0, i-1]
-    #
-    #         cross_prod_test = np.cross(vects[i-1, 0:2], vects[i, 0:2])
-    #         if cross_prod_test < 0:
-    #             return [-1]
-    #     return [1]
-    #
-    # def get_area(self, element):
-    #     nodes = self.mb.get_adjacencies(element, 0)
-    #     coords = self.mb.get_coords(nodes)
-    #     coords = np.reshape(coords, (len(nodes), 3))
-    #     indices = self.counterclock_sort(coords)
-    #     coords = coords[indices]
-    #     inter_coord = sum(coords)/len(coords)
-    #     vectors_inside = [inter_coord - a_coord for a_coord in coords]
-    #     print("VECTORS SORT: ", vectors_inside, indices)
-    #     total_area = 0
-    #     for i in range(len(vectors_inside)):
-    #         cross_product = np.cross(vectors_inside[i-1], vectors_inside[i])
-    #         area_tri = sqrt(np.dot(cross_product, cross_product))/2.0
-    #         total_area = total_area + area_tri
-    #     return total_area
-    #
-    # def well_condition(self, wells_infos, well_values):
-    #
-    #     for well_infos, well_value in zip(wells_infos, well_values):
-    #         well_type = list(well_infos.keys())[0]
-    #         well_coords = list(well_infos.values())[0]
-    #         for volume in self.all_volumes:
-    #             connect_nodes = self.mb.get_adjacencies(volume, 0)
-    #             connect_nodes_crds = self.mb.get_coords(connect_nodes)
-    #             connect_nodes_crds = np.reshape(
-    #                 connect_nodes_crds, (len(connect_nodes), 3))
-    #             # print("coords: ", connect_nodes_crds)
-    #             indices = self.counterclock_sort(connect_nodes_crds)
-    #             # print("indices: ", indices)
-    #             connect_nodes_crds = connect_nodes_crds[indices]
-    #             connect_nodes = np.asarray(connect_nodes, dtype='uint64')
-    #             connect_nodes = connect_nodes[indices]
-    #             print("CONNECT_NODES: ", connect_nodes_crds, well_coords)
-    #             if self.contains(well_coords, connect_nodes_crds)[0] == -1:
-    #                 continue
-    #
-    #             if self.contains(well_coords, connect_nodes_crds)[0] == 1:
-    #
-    #                 if well_type == "Pressure_Well":
-    #                     self.all_pressure_well_vols = np.append(
-    #                         self.all_pressure_well_vols, volume)
-    #                     print("IN VOLUME: ", well_value)
-    #                     self.mb.tag_set_data(
-    #                         self.pressure_well_tag, volume, np.asarray(well_value))
-    #                     break
-    #
-    #                 if well_type == "Flow_Rate_Well":
-    #                     self.all_flow_rate_well_vols = np.append(
-    #                         self.all_flow_rate_well_vols, volume)
-    #                     print("IN VOLUME: ", well_value)
-    #                     self.mb.tag_set_data(
-    #                         self.flow_rate_well_tag, volume, np.asarray(well_value))
-    #                     break
-    #
-    #             if self.contains(well_coords, connect_nodes_crds)[0] == 0:
-    #                 indice = self.contains(well_coords, connect_nodes_crds)[1]
-    #                 node = connect_nodes[indice]
-    #                 node_coords = self.mb.get_coords([node])
-    #                 adjacent_vols = self.mb.get_adjacencies(node, 2)
-    #                 adjacent_vols = np.asarray(adjacent_vols, dtype='uint64')
-    #
-    #                 if len(adjacent_vols) > 1:
-    #
-    #                     if well_type == "Pressure_Well":
-    #                         self.all_pressure_well_vols = np.append(
-    #                             self.all_pressure_well_vols, adjacent_vols)
-    #                         self.mb.tag_set_data(
-    #                             self.pressure_well_tag, adjacent_vols, np.repeat(well_value, len(adjacent_vols)))
-    #                         break
-    #
-    #                     well_weight_sum = 0
-    #                     well_weights = []
-    #                     for volume in adjacent_vols:
-    #                         volume_area = self.get_area(volume)
-    #                         print("AREAS: ", volume_area)
-    #                         well_weight_sum += volume_area
-    #                         well_weights.append(volume_area)
-    #                     well_weights = np.asarray(well_weights, dtype='f8')
-    #                     well_weights = (well_weights / well_weight_sum) * well_value
-    #                     print("IN NODE: ", len(adjacent_vols))
-    #
-    #                     if well_type == "Flow_Rate_Well":
-    #                         self.all_flow_rate_well_vols = np.append(
-    #                             self.all_flow_rate_well_vols, adjacent_vols)
-    #                         self.mb.tag_set_data(self.flow_rate_well_tag, adjacent_vols, well_weights)
-    #                         break
-    #
-    #                 else:
-    #
-    #                     if well_type == "Pressure_Well":
-    #                         self.all_pressure_well_vols = np.append(
-    #                             self.all_pressure_well_vols, adjacent_vols)
-    #                         self.mb.tag_set_data(
-    #                             self.pressure_well_tag, adjacent_vols, np.asarray(well_value))
-    #                         print("IN NODE bla: ", well_value)
-    #                         break
-    #
-    #                     if well_type == "Flow_Rate_Well":
-    #                         self.all_flow_rate_well_vols = np.append(
-    #                             self.all_flow_rate_well_vols, adjacent_vols)
-    #                         self.mb.tag_set_data(
-    #                             self.flow_rate_well_tag, adjacent_vols, np.asarray(well_value))
-    #                         print("IN NODE bla: ", well_value)
-    #                         break
-    #
-    #
-    #
-
-    #
-    # def all_hanging_nodes_full_edges(self):
-    #
-    #     for ent in self.all_volumes:
-    #
-    #         full_edges = self.mb.get_adjacencies(ent, 1, True)
-    #         full_edge_meshset = self.mb.create_meshset()
-    #         self.mb.add_entities(full_edge_meshset, full_edges)
-    #         self.mb.tag_set_data(self.full_edges_tag, ent, full_edge_meshset)

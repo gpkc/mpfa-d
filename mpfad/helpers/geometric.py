@@ -38,5 +38,9 @@ def get_height(normal_vector, distance_vector):
     return np.absolute(np.dot(normal_vector, distance_vector) /
                        np.sqrt(np.dot(normal_vector, normal_vector)))
 
-def get_tetra_volume(verts):
-    pass
+def get_tetra_volume(tet_nodes):
+    vect_1 = tet_nodes[1] - tet_nodes[0]
+    vect_2 = tet_nodes[2] - tet_nodes[0]
+    vect_3 = tet_nodes[3] - tet_nodes[0]
+    vol_eval = abs(np.dot(np.cross(vect_1, vect_2), vect_3))/6.0
+    return vol_eval
