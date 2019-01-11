@@ -76,38 +76,45 @@ class ObliqueDrain:
         u = -x - self.delta * y
         phi1 = self._phi1(x, y)
         phi2 = self._phi2(x, y)
-        if phi1 < 0:
-            print('region 1')
+        # print(phi1, phi2)
+        if phi1 <= 0.:
+            # print('region 1')
+            zone = 1.
             alfa = 1
             beta = .1
             perm = [alfa, 0., 0.,
                     0., beta, 0.,
                     0., 0., 1.]
 
-        if phi2 > 0:
-            print('region 3')
-            alfa = 1
-            beta = .1
-            perm = [alfa, 0., 0.,
-                    0., beta, 0.,
-                    0., 0., 1.]
-
-        else:
-            print('region 2')
+        if phi1 >= 0. and phi2 <= 0.:
+            # print('region 2')
+            zone = 2.
             alfa = 100
             beta = 10
             perm = [alfa, 0., 0.,
                     0., beta, 0.,
+                    0., 0., 1]
+
+        if phi2 > 0.:
+            # print('region 3')
+            zone = 3.
+            alfa = 1
+            beta = .1
+            perm = [alfa, 0., 0.,
+                    0., beta, 0.,
                     0., 0., 1.]
         try:
-            # perm = np.dot(np.dot(R, np.array(perm).reshape([3, 3])),
-            #               np.linalg.inv(R)).reshape([1, 9])
+            perm = np.dot(np.dot(R, np.array(perm).reshape([3, 3])),
+                          np.linalg.inv(R)).reshape([1, 9])
             perm = (R * np.array(perm).reshape([3, 3]) * np.linalg.inv(R)).reshape([1, 9])
         except:
-            return None, u
-        return perm, u
+            return None, u, zone
+        # perm = [1.0, 0.0, 0.0,
+        #         0.0, 1.0, 0.0,
+        #         0.0, 0.0, 1.0]
+        return perm, u, zone
 
-    def run(self, log_name):
+    def runCase(self, log_name):
         R = np.array(self._rotationMatrix()).reshape([3, 3])
         for node in self.mesh.get_boundary_nodes():
             x, y, z = self.mesh.mb.get_coords([node])
@@ -118,16 +125,18 @@ class ObliqueDrain:
         for volume in volumes:
             x, y, z = self.mesh.mb.tag_get_data(self.mesh.volume_centre_tag,
                                                 volume)[0]
-
-            perm = self._obliqueDrain(x, y, R)[0][0]
+            perm = self._obliqueDrain(x, y, R)[0]
+            zone = self._obliqueDrain(x, y, R)[2]
+            # print('zone', zone)
             self.mesh.mb.tag_set_data(self.mesh.perm_tag, volume, perm)
-
+            self.mesh.mb.tag_set_data(self.mesh.regions_validation_tag, volume,
+                                      zone)
             vol_nodes = self.mesh.mb.get_adjacencies(volume, 0)
             vol_nodes_crds = self.mesh.mb.get_coords(vol_nodes)
             vol_nodes_crds = np.reshape(vol_nodes_crds, (4, 3))
             tetra_vol = self.mesh.get_tetra_volume(vol_nodes_crds)
             vols.append(tetra_vol)
-            source_term = self.calculate_divergent(x, y, R, self._obliqueDrain)
+            source_term = 0.
             self.mesh.mb.tag_set_data(self.mesh.source_tag, volume,
                                       source_term * tetra_vol)
         self.mpfad.run_solver(LPEW3(self.mesh).interpolate)
@@ -138,34 +147,39 @@ class ObliqueDrain:
             analytical_solution = self._obliqueDrain(x, y)[1]
             calculated_solution = self.mpfad.mb.tag_get_data(
                                   self.mpfad.pressure_tag, volume)[0][0]
-            print(analytical_solution, calculated_solution, np.abs(analytical_solution - calculated_solution))
+            print(analytical_solution, calculated_solution,
+                  np.abs(analytical_solution - calculated_solution))
 
-        # err = []
-        # u = []
-        # for volume in volumes:
-        #     x_c, y_c, z_c = self.mesh.mb.tag_get_data(self.mesh.volume_centre_tag, volume)[0]
-        #     analytical_solution = self._benchmark_1(x_c, y_c, z_c)[1]
-        #     calculated_solution = self.mpfad.mb.tag_get_data(
-        #                           self.mpfad.pressure_tag, volume)[0][0]
-        #     err.append(np.absolute((analytical_solution - calculated_solution)))
-        #     u.append(analytical_solution)
-        # u_max = max(self.mpfad.mb.tag_get_data(
-        #                       self.mpfad.pressure_tag, volumes))
-        # u_min = min(self.mpfad.mb.tag_get_data(
-        #                       self.mpfad.pressure_tag, volumes))
-        # results = self.norms_calculator(err, vols, u)
-        # non_zero_mat = np.nonzero(self.mpfad.A_prime)[0]
-        # with open(log_name, 'w') as f:
-        #     f.write('TEST CASE 1\n\nUnknowns:\t %.6f\n' % (len(volumes)))
-        #     f.write('Non-zero matrix:\t %.6f\n' % (len(non_zero_mat)))
-        #     f.write('Umin:\t %.6f\n' % (u_min))
-        #     f.write('Umax:\t %.6f\n' % (u_max))
-        #     f.write('L2 norm:\t %.6f\n' % (results[0]))
-        #     f.write('l2 norm volume weighted:\t %.6f\n' % (results[1]))
-        #     f.write('Relative L2 norm:\t %.6f\n' % (results[2]))
-        #     f.write('average error:\t %.6f\n' % (results[3]))
-        #     f.write('maximum error:\t %.6f\n' % (results[4]))
-        #     f.write('minimum error:\t %.6f\n' % (results[5]))
-        #
-        # print('END OF ' + log_name + '!!!\n')
-        # self.mpfad.record_data('benchmark_1' + log_name + '.vtk')
+        err = []
+        u = []
+        for volume in volumes:
+            x_c, y_c, z_c = self.mesh.mb.tag_get_data(
+                            self.mesh.volume_centre_tag, volume)[0]
+            analytical_solution = self._obliqueDrain(x_c, y_c)[1]
+            calculated_solution = self.mpfad.mb.tag_get_data(
+                                  self.mpfad.pressure_tag, volume)[0][0]
+            err.append(np.absolute((analytical_solution - calculated_solution))
+                       )
+            u.append(analytical_solution)
+        u_max = max(self.mpfad.mb.tag_get_data(
+                              self.mpfad.pressure_tag, volumes))
+        u_min = min(self.mpfad.mb.tag_get_data(
+                              self.mpfad.pressure_tag, volumes))
+        results = self.norms_calculator(err, vols, u)
+        non_zero_mat = np.nonzero(self.mpfad.A_prime)[0]
+        with open(log_name, 'w') as f:
+            f.write('TEST CASE 1\n\nUnknowns:\t %.6f\n' % (len(volumes)))
+            f.write('Non-zero matrix:\t %.6f\n' % (len(non_zero_mat)))
+            f.write('Umin:\t %.6f\n' % (u_min))
+            f.write('Umax:\t %.6f\n' % (u_max))
+            f.write('L2 norm:\t %.6f\n' % (results[0]))
+            f.write('l2 norm volume weighted:\t %.6f\n' % (results[1]))
+            f.write('Relat ive L2 norm:\t %.6f\n' % (results[2]))
+            f.write('average error:\t %.6f\n' % (results[3]))
+            f.write('maximum error:\t %.6f\n' % (results[4]))
+            f.write('minimum error:\t %.6f\n' % (results[5]))
+
+        print('erro maximo', max(err))
+
+        print('END OF ' + log_name + '!!!\n')
+        self.mpfad.record_data('oblique_drain' + log_name + '.vtk')

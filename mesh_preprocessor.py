@@ -37,6 +37,9 @@ class MeshManager:
         self.source_tag = self.mb.tag_get_handle(
             "Source term", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
 
+        self.regions_validation_tag = self.mb.tag_get_handle(
+            "regions", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+
         self.node_cascade_tag = self.mb.tag_get_handle(
             "Node cascade", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
 

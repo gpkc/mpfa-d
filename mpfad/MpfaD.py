@@ -302,4 +302,4 @@ class MpfaD3D:
         solver = AztecOO.AztecOO(linearProblem)
         solver.Iterate(1000, 1e-9)
         self.mb.tag_set_data(self.pressure_tag, self.volumes, self.x_prime)
-        self.record_data('tentativa_01.vtk')
+        self.record_data('zones_validation.vtk')
