@@ -135,6 +135,7 @@ class InterpMethodTest(unittest.TestCase):
             local_pressure = self.mesh_5.mb.tag_get_data(
                              self.mpfad_5.pressure_tag, a_volume)
             coord_x = self.mesh_5.get_centroid(a_volume)[0]
+
             if coord_x < 0.5:
                 self.assertAlmostEqual(
                     local_pressure[0][0], (-2/3.0)*coord_x + 1, delta=1e-14)

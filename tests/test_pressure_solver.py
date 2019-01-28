@@ -19,12 +19,14 @@ class PressureSolverTest(unittest.TestCase):
                         0.0, 1.0, 0.0,
                         0.0, 0.0, 1.0])
 
-        self.mesh = MeshManager('mesh_test_conservative.msh', dim=3)
+        self.mesh = MeshManager('meshes/mesh_test_conservative.msh', dim=3)
         self.mesh.set_media_property('Permeability', {1: K_1}, dim_target=3)
         self.mesh.set_boundary_condition('Dirichlet', {102: 1.0, 101: 0.0},
                                          dim_target=2, set_nodes=True)
         self.mesh.set_boundary_condition('Dirichlet', {201: 0.0},
                                          dim_target=2, set_nodes=True)
+        self.mesh.get_redefine_centre()
+        self.mesh.set_global_id()
         self.mpfad = MpfaD3D(self.mesh)
 
     # @unittest.skip('later')

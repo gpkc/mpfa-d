@@ -12,6 +12,7 @@ class BenchmarkFVCA:
         self.mesh = MeshManager(filename, dim=3)
         self.mesh.set_boundary_condition('Dirichlet', {101: 0.0},
                                          dim_target=2, set_nodes=True)
+
         self.mesh.set_global_id()
         self.mesh.get_redefine_centre()
         self.mpfad = MpfaD3D(self.mesh)
@@ -33,6 +34,7 @@ class BenchmarkFVCA:
         min_error = min(error_vector)
         results = [l2_norm, l2_volume_norm, erl2,
                    avr_error, max_error, min_error]
+        # Include grdient norm for results
         return results
 
     def calculate_gradient(self, x, y, z, benchmark, delta=0.00001):
@@ -60,9 +62,9 @@ class BenchmarkFVCA:
         return -np.sum(k_grad_x + k_grad_y + k_grad_z)
 
     def _benchmark_1(self, x, y, z):
-        K = [1.0, 0.5, 0.0,
-             0.5, 1.0, 0.5,
-             0.0, 0.5, 1.0]
+        K =  [1.0, 0.5, 0.0,
+              0.5, 1.0, 0.5,
+              0.0, 0.5, 1.0]
         y = y + 1/2.
         z = z + 1/3.
         u1 = 1 + np.sin(pi * x) * np.sin(pi * y) * np.sin(pi * z)
@@ -130,10 +132,10 @@ class BenchmarkFVCA:
         u_min = min(self.mpfad.mb.tag_get_data(
                               self.mpfad.pressure_tag, volumes))
         results = self.norms_calculator(err, vols, u)
-        non_zero_mat = np.nonzero(self.mpfad.A_prime)[0]
+        non_zero_mat = self.mpfad.A_prime.NumGlobalNonzeros()
         with open(log_name, 'w') as f:
             f.write('TEST CASE 1\n\nUnknowns:\t %.6f\n' % (len(volumes)))
-            f.write('Non-zero matrix:\t %.6f\n' % (len(non_zero_mat)))
+            f.write('Non-zero matrix:\t %.6f\n' % (non_zero_mat))
             f.write('Umin:\t %.6f\n' % (u_min))
             f.write('Umax:\t %.6f\n' % (u_max))
             f.write('L2 norm:\t %.6f\n' % (results[0]))
@@ -180,10 +182,10 @@ class BenchmarkFVCA:
         u_min = min(self.mpfad.mb.tag_get_data(
                               self.mpfad.pressure_tag, volumes))
         results = self.norms_calculator(err, vols, u)
-        non_zero_mat = np.nonzero(self.mpfad.A)[0]
+        non_zero_mat = self.mpfad.A_prime.NumGlobalNonzeros()
         with open(log_name, 'w') as f:
-            f.write('TEST CASE 1\n\nUnknowns:\t %.6f\n' % (len(volumes)))
-            f.write('Non-zero matrix:\t %.6f\n' % (len(non_zero_mat)))
+            f.write('TEST CASE 2\n\nUnknowns:\t %.6f\n' % (len(volumes)))
+            f.write('Non-zero matrix:\t %.6f\n' % (non_zero_mat))
             f.write('Umin:\t %.6f\n' % (u_min))
             f.write('Umax:\t %.6f\n' % (u_max))
             f.write('L2 norm:\t %.6f\n' % (results[0]))

@@ -22,8 +22,8 @@ class MeshManager:
 
         self.physical_tag = self.mb.tag_get_handle("MATERIAL_SET")
         self.physical_sets = self.mb.get_entities_by_type_and_tag(
-            0, types.MBENTITYSET, np.array(
-            (self.physical_tag,)), np.array((None,)))
+            0, types.MBENTITYSET, np.array((self.physical_tag,)),
+            np.array((None, )))
 
         self.dirichlet_tag = self.mb.tag_get_handle(
             "Dirichlet", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
@@ -89,17 +89,17 @@ class MeshManager:
             for a_set in self.physical_sets:
                 physical_group = self.mb.tag_get_data(self.physical_tag,
                                                       a_set, flat=True)
+                print(physicals_values)  # Debugging
 
                 if physical_group == physical:
-                    group_elements = self.mb.get_entities_by_dimension(a_set, dim_target)
+                    group_elements = self.mb.get_entities_by_dimension(a_set,
+                                                                       dim_target)
 
                     if information_name == 'Dirichlet':
-                        # print('DIR GROUP', len(group_elements), group_elements)
                         self.dirichlet_faces = self.dirichlet_faces | set(
                                                     group_elements)
 
                     if information_name == 'Neumann':
-                        # print('NEU GROUP', len(group_elements), group_elements)
                         self.neumann_faces = self.neumann_faces | set(
                                                   group_elements)
 
@@ -112,6 +112,16 @@ class MeshManager:
                             self.mb.tag_set_data(
                                 information_tag, connectivities,
                                 np.repeat(value, len(connectivities)))
+
+    def set_media_property(self, property_name, physicals_values,
+                           dim_target=3, set_nodes=False):
+        self.set_information(property_name, physicals_values,
+                             dim_target, set_connect=set_nodes)
+
+    def set_boundary_condition(self, boundary_condition, physicals_values,
+                               dim_target=3, set_nodes=False):
+        self.set_information(boundary_condition, physicals_values,
+                             dim_target, set_connect=set_nodes)
 
     def get_boundary_nodes(self):
         all_faces = self.dirichlet_faces | self.neumann_faces
@@ -236,12 +246,6 @@ class MeshManager:
                                 (1 - tao) * self.mb.get_coords(aux_vert)
                                 for aux_vert in aux_verts]
 
-
-
-
-
-        pass
-
     def get_node_cascade_lpew3(self, tao):
         for node in self.all_nodes:
             vols_around_node = self.mtu.get_bridge_adjacencies(node, 0, 3)
@@ -265,16 +269,6 @@ class MeshManager:
                                  (1 - tao) * np.array(self.mb.get_coords(
                                                       aux_vert)) for aux_vert
                                  in aux_verts]
-
-    def set_media_property(self, property_name, physicals_values,
-                           dim_target=3, set_nodes=False):
-        self.set_information(property_name, physicals_values,
-                             dim_target, set_connect=set_nodes)
-
-    def set_boundary_condition(self, boundary_condition, physicals_values,
-                               dim_target=3, set_nodes=False):
-        self.set_information(boundary_condition, physicals_values,
-                             dim_target, set_connect=set_nodes)
 
     # TODO: This should calculate any generic polyhedral centroid
     def get_centroid(self, entity):

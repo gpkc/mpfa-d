@@ -40,7 +40,6 @@ class MpfaD3D:
 
         self.all_faces = mesh_data.all_faces
         boundary_faces = (self.dirichlet_faces | self.neumann_faces)
-        # print('ALL FACES', all_faces, len(all_faces))
         self.intern_faces = set(self.all_faces) - boundary_faces
 
         self.volumes = self.mesh_data.all_volumes
@@ -49,6 +48,10 @@ class MpfaD3D:
         self.A_prime = Epetra.CrsMatrix(Epetra.Copy, std_map, 0)
         self.b_prime = Epetra.Vector(std_map)
         self.x_prime = Epetra.Vector(std_map)
+
+    # def psol1(self, coords):
+    #     x, y, z = coords
+    #     return x  # -x - 0.2 * y
 
     def calculate_relative_perm(self, parameters, water_saturation):
         pass
@@ -131,8 +134,9 @@ class MpfaD3D:
         if node_interpolation:
             self.get_nodes_weights(interpolation_method)
 
-        try:  # Do this in list comrpehension style
+        try:
             for volume in self.volumes:
+
                 volume_id = self.mb.tag_get_data(self.global_id_tag,
                                                  volume)[0][0]
                 RHS = self.mb.tag_get_data(self.source_tag, volume)[0][0]
@@ -277,13 +281,14 @@ class MpfaD3D:
 
                 # TODO: eliminate if block after debugging
                 # if not node_interpolation:
-                #     bmk = self._benchmark_1
-                #     x_I, y_I, z_I = self.mb.get_coords([I])
-                #     p_I = bmk(x_I, y_I, z_I)[1]
+                #     pslo1 = self.psol1
+                #     coords_I = self.mb.get_coords([I])
+                #     p_I = pslo1(coords_I)
                 #     x_J, y_J, z_J = self.mb.get_coords([J])
-                #     p_J = bmk(x_J, y_J, z_J)[1]
-                #     x_K, y_K, z_K = self.mb.get_coords([K])
-                #     p_K = bmk(x_K, y_K, z_K)[1]
+                #     coords_J = self.mb.get_coords([J])
+                #     p_J = pslo1(coords_J)
+                #     coords_K = self.mb.get_coords([K])
+                #     p_K = pslo1(coords_K)
                 #     RHS = 0.5 * K_eq * (-D_JK * (p_J - p_I) +
                 #                         D_JI * (p_J - p_K))
                 #
@@ -300,6 +305,7 @@ class MpfaD3D:
                                              self.x_prime,
                                              self.b_prime)
         solver = AztecOO.AztecOO(linearProblem)
-        solver.Iterate(1000, 1e-9)
+        solver.Iterate(1000, 1e-14)
+        
         self.mb.tag_set_data(self.pressure_tag, self.volumes, self.x_prime)
-        self.record_data('zones_validation.vtk')
+        self.record_data('debugging.vtk')
