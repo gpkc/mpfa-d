@@ -51,7 +51,7 @@ class MpfaD3D:
 
     # def psol1(self, coords):
     #     x, y, z = coords
-    #     return x  # -x - 0.2 * y
+    #     return -x - 0.2 * y
 
     def calculate_relative_perm(self, parameters, water_saturation):
         pass
@@ -305,7 +305,8 @@ class MpfaD3D:
                                              self.x_prime,
                                              self.b_prime)
         solver = AztecOO.AztecOO(linearProblem)
+        solver.SetAztecOption(AztecOO.AZ_output, AztecOO.AZ_none)
         solver.Iterate(1000, 1e-14)
-        
+
         self.mb.tag_set_data(self.pressure_tag, self.volumes, self.x_prime)
         self.record_data('debugging.vtk')

@@ -89,7 +89,6 @@ class MeshManager:
             for a_set in self.physical_sets:
                 physical_group = self.mb.tag_get_data(self.physical_tag,
                                                       a_set, flat=True)
-                print(physicals_values)  # Debugging
 
                 if physical_group == physical:
                     group_elements = self.mb.get_entities_by_dimension(a_set,

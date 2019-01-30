@@ -12,6 +12,23 @@ class ObliqueDrain:
         self.mesh = MeshManager(filename, dim=3)
         self.mesh.set_boundary_condition('Dirichlet', {101: 0.0},
                                          dim_target=2, set_nodes=True)
+        self.mesh.set_boundary_condition('Neumann', {201: 0.0},
+                                         dim_target=2, set_nodes=True)
+        # perm1 = [1., 0., 0.,
+        #          0., .1, 0.,
+        #          0., 0., 1.]
+        # perm2 = [100., 0., 0.,
+        #          0., 10., 0.,
+        #          0., 0., 1.]
+        perm1 = [0.92825444, -0.0066568, 0.,
+                 -0.0066568, 0.12943787, 0.,
+                 0., 0., 1.]
+        perm2 = [92.82544379, -0.66568047, 0.,
+                 -0.66568047, 12.94378698, 0.,
+                 0., 0., 1.]
+        self.mesh.set_media_property('Permeability', {1: perm1}, dim_target=3)
+        self.mesh.set_media_property('Permeability', {2: perm2}, dim_target=3)
+        self.mesh.set_media_property('Permeability', {3: perm1}, dim_target=3)
         self.delta = delta
         self.mesh.set_global_id()
         self.mesh.get_redefine_centre()
@@ -109,9 +126,6 @@ class ObliqueDrain:
             perm = (R * np.array(perm).reshape([3, 3]) * np.linalg.inv(R)).reshape([1, 9])
         except:
             return None, u, zone
-        # perm = [1.0, 0.0, 0.0,
-        #         0.0, 1.0, 0.0,
-        #         0.0, 0.0, 1.0]
         return perm, u, zone
 
     def runCase(self, log_name):
@@ -128,17 +142,19 @@ class ObliqueDrain:
             perm = self._obliqueDrain(x, y, R)[0]
             zone = self._obliqueDrain(x, y, R)[2]
             # print('zone', zone)
-            self.mesh.mb.tag_set_data(self.mesh.perm_tag, volume, perm)
-            self.mesh.mb.tag_set_data(self.mesh.regions_validation_tag, volume,
-                                      zone)
+            # print(perm)
+            # self.mesh.mb.tag_set_data(self.mesh.perm_tag, volume, perm)
+            # self.mesh.mb.tag_set_data(self.mesh.regions_validation_tag, volume,
+            #                           zone)
             vol_nodes = self.mesh.mb.get_adjacencies(volume, 0)
             vol_nodes_crds = self.mesh.mb.get_coords(vol_nodes)
             vol_nodes_crds = np.reshape(vol_nodes_crds, (4, 3))
             tetra_vol = self.mesh.get_tetra_volume(vol_nodes_crds)
             vols.append(tetra_vol)
-            source_term = 0.
-            self.mesh.mb.tag_set_data(self.mesh.source_tag, volume,
-                                      source_term * tetra_vol)
+            # source_term = 0.
+            # self.mesh.mb.tag_set_data(self.mesh.source_tag, volume,
+            #                           source_term * tetra_vol)
+
         self.mpfad.run_solver(LPEW3(self.mesh).interpolate)
 
         for volume in volumes:
@@ -147,8 +163,8 @@ class ObliqueDrain:
             analytical_solution = self._obliqueDrain(x, y)[1]
             calculated_solution = self.mpfad.mb.tag_get_data(
                                   self.mpfad.pressure_tag, volume)[0][0]
-            print(analytical_solution, calculated_solution,
-                  np.abs(analytical_solution - calculated_solution))
+            # print(analytical_solution, calculated_solution,
+            #       np.abs(analytical_solution - calculated_solution))
 
         err = []
         u = []
