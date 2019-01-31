@@ -49,9 +49,9 @@ class MpfaD3D:
         self.b_prime = Epetra.Vector(std_map)
         self.x_prime = Epetra.Vector(std_map)
 
-    # def psol1(self, coords):
-    #     x, y, z = coords
-    #     return -x - 0.2 * y
+    def psol1(self, coords):
+        x, y, z = coords
+        return -x - 0.2 * y
 
     def calculate_relative_perm(self, parameters, water_saturation):
         pass
@@ -92,12 +92,16 @@ class MpfaD3D:
         self.nodes_nts = {}
         count = 1
         for node in self.intern_nodes:
-            print("{0} / {1}".format(count, len(self.intern_nodes)))
+            print("{0} / {1}".format(count, len(set(self.mesh_data.all_nodes)
+                                                - self.dirichlet_nodes)))
             count += 1
             self.nodes_ws[node] = method(node)
         for node in self.neumann_nodes:
+            print("{0} / {1}".format(count, len(set(self.mesh_data.all_nodes)
+                                                - self.dirichlet_nodes)))
             self.nodes_ws[node] = method(node, neumann=True)
             self.nodes_nts[node] = self.nodes_ws[node].pop(node)
+            count += 1
 
     def _node_treatment(self, node, id_left, id_right, K_eq, D_JK=0, D_JI=0.0):
         RHS = 0.5 * K_eq * (D_JK + D_JI)
@@ -115,6 +119,7 @@ class MpfaD3D:
                                                                RHS * weight])
 
         if node in self.neumann_nodes:
+
             neu_term = self.nodes_nts[node]
 
             self.b_prime[id_right] += -RHS * neu_term
@@ -130,18 +135,18 @@ class MpfaD3D:
     def run_solver(self, interpolation_method):
 
         # TODO: eliminate if cond after debugging
-        node_interpolation = True
+        node_interpolation = False
         if node_interpolation:
             self.get_nodes_weights(interpolation_method)
 
         try:
             for volume in self.volumes:
-
                 volume_id = self.mb.tag_get_data(self.global_id_tag,
                                                  volume)[0][0]
                 RHS = self.mb.tag_get_data(self.source_tag, volume)[0][0]
                 self.b_prime[volume_id] += RHS
         except:
+            print('no source term')
             pass
 
         for face in self.all_faces:
@@ -203,6 +208,9 @@ class MpfaD3D:
                 D_JI = self.get_cross_diffusion_term(tan_JI, LJ, face_area,
                                                      h_L, K_n_L, K_L_JI,
                                                      boundary=True)
+                print('D_JK', tan_JK, LJ, face_area, h_L, K_n_L, K_L_JK)
+                print('D_JI', tan_JI, LJ, face_area, h_L, K_n_L, K_L_JI)
+
                 K_eq = (1 / h_L)*(face_area * K_n_L)
 
                 RHS = (D_JK * (g_I - g_J) - K_eq * g_J + D_JI * (g_J - g_K))
@@ -280,25 +288,25 @@ class MpfaD3D:
                 self.A_prime.InsertGlobalValues(col_ids, row_ids, values)
 
                 # TODO: eliminate if block after debugging
-                # if not node_interpolation:
-                #     pslo1 = self.psol1
-                #     coords_I = self.mb.get_coords([I])
-                #     p_I = pslo1(coords_I)
-                #     x_J, y_J, z_J = self.mb.get_coords([J])
-                #     coords_J = self.mb.get_coords([J])
-                #     p_J = pslo1(coords_J)
-                #     coords_K = self.mb.get_coords([K])
-                #     p_K = pslo1(coords_K)
-                #     RHS = 0.5 * K_eq * (-D_JK * (p_J - p_I) +
-                #                         D_JI * (p_J - p_K))
-                #
-                #     self.b_prime[id_left] += RHS
-                #     self.b_prime[id_right] += -RHS
+                if not node_interpolation:
+                    pslo1 = self.psol1
+                    coords_I = self.mb.get_coords([I])
+                    p_I = pslo1(coords_I)
+                    x_J, y_J, z_J = self.mb.get_coords([J])
+                    coords_J = self.mb.get_coords([J])
+                    p_J = pslo1(coords_J)
+                    coords_K = self.mb.get_coords([K])
+                    p_K = pslo1(coords_K)
+                    RHS = 0.5 * K_eq * (-D_JK * (p_J - p_I) +
+                                        D_JI * (p_J - p_K))
 
-                self._node_treatment(I, id_left, id_right, K_eq, D_JK=D_JK)
-                self._node_treatment(J, id_left, id_right, K_eq,
-                                     D_JI=D_JI, D_JK=-D_JK)
-                self._node_treatment(K, id_left, id_right, K_eq, D_JI=-D_JI)
+                    self.b_prime[id_left] += RHS
+                    self.b_prime[id_right] += -RHS
+
+                # self._node_treatment(I, id_left, id_right, K_eq, D_JK=D_JK)
+                # self._node_treatment(J, id_left, id_right, K_eq,
+                #                      D_JI=D_JI, D_JK=-D_JK)
+                # self._node_treatment(K, id_left, id_right, K_eq, D_JI=-D_JI)
 
         self.A_prime.FillComplete()
         linearProblem = Epetra.LinearProblem(self.A_prime,

@@ -10,16 +10,16 @@ class ObliqueDrain:
 
     def __init__(self, filename, delta):
         self.mesh = MeshManager(filename, dim=3)
-        self.mesh.set_boundary_condition('Dirichlet', {101: 0.0},
+        self.mesh.set_boundary_condition('Dirichlet', {101: None},
                                          dim_target=2, set_nodes=True)
         self.mesh.set_boundary_condition('Neumann', {201: 0.0},
                                          dim_target=2, set_nodes=True)
         # perm1 = [1., 0., 0.,
-        #          0., .1, 0.,
+        #          0., 1., 0.,
         #          0., 0., 1.]
-        # perm2 = [100., 0., 0.,
-        #          0., 10., 0.,
-        #          0., 0., 1.]
+        # perm2 = [2., 0., 0.,
+        #          0., 2., 0.,
+        #          0., 0., 2.]
         perm1 = [0.92825444, -0.0066568, 0.,
                  -0.0066568, 0.12943787, 0.,
                  0., 0., 1.]
@@ -90,7 +90,7 @@ class ObliqueDrain:
                 0, 0, 1]
 
     def _obliqueDrain(self, x, y, R=None):
-        u = -x - self.delta * y
+        u = - x - self.delta * y
         phi1 = self._phi1(x, y)
         phi2 = self._phi2(x, y)
         # print(phi1, phi2)
@@ -123,7 +123,8 @@ class ObliqueDrain:
         try:
             perm = np.dot(np.dot(R, np.array(perm).reshape([3, 3])),
                           np.linalg.inv(R)).reshape([1, 9])
-            perm = (R * np.array(perm).reshape([3, 3]) * np.linalg.inv(R)).reshape([1, 9])
+            perm = (R * np.array(perm).reshape([3, 3]) *
+                    np.linalg.inv(R)).reshape([1, 9])
         except:
             return None, u, zone
         return perm, u, zone
@@ -190,7 +191,7 @@ class ObliqueDrain:
             f.write('Umax:\t %.6f\n' % (u_max))
             f.write('L2 norm:\t %.6f\n' % (results[0]))
             f.write('l2 norm volume weighted:\t %.6f\n' % (results[1]))
-            f.write('Relat ive L2 norm:\t %.6f\n' % (results[2]))
+            f.write('Relative L2 norm:\t %.6f\n' % (results[2]))
             f.write('average error:\t %.6f\n' % (results[3]))
             f.write('maximum error:\t %.6f\n' % (results[4]))
             f.write('minimum error:\t %.6f\n' % (results[5]))
