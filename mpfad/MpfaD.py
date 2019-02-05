@@ -2,6 +2,7 @@ from pymoab import types
 from PyTrilinos import Epetra, AztecOO
 import mpfad.helpers.geometric as geo
 import numpy as np
+import time
 
 
 class MpfaD3D:
@@ -49,9 +50,9 @@ class MpfaD3D:
         self.b_prime = Epetra.Vector(std_map)
         self.x_prime = Epetra.Vector(std_map)
 
-    def psol1(self, coords):
-        x, y, z = coords
-        return -x - 0.2 * y
+    # def psol1(self, coords):
+    #     x, y, z = coords
+    #     return -x - 0.2 * y
 
     def calculate_relative_perm(self, parameters, water_saturation):
         pass
@@ -74,8 +75,8 @@ class MpfaD3D:
     def get_cross_diffusion_term(self, tan, vec, S, h1,
                                  Kn1, Kt1, h2=0, Kt2=0,
                                  Kn2=0, boundary=False):
-        mesh_anisotropy_term = (np.dot(tan, vec)/(S ** 2))
         if not boundary:
+            mesh_anisotropy_term = (np.dot(tan, vec)/(S ** 2))
             physical_anisotropy_term = -((1 / S) * (h1 * (Kt1 / Kn1)
                                          + h2 * (Kt2 / Kn2)))
             cross_diffusion_term = (mesh_anisotropy_term +
@@ -91,17 +92,21 @@ class MpfaD3D:
         self.nodes_ws = {}
         self.nodes_nts = {}
         count = 1
+        n_vertex = len(set(self.mesh_data.all_nodes) - self.dirichlet_nodes)
+        print('interpolation runing...')
+        t0 = time.time()
         for node in self.intern_nodes:
-            print("{0} / {1}".format(count, len(set(self.mesh_data.all_nodes)
-                                                - self.dirichlet_nodes)))
-            count += 1
+            print("{0} / {1}".format(count, n_vertex))
             self.nodes_ws[node] = method(node)
+            count += 1
         for node in self.neumann_nodes:
-            print("{0} / {1}".format(count, len(set(self.mesh_data.all_nodes)
-                                                - self.dirichlet_nodes)))
+            print("{0} / {1}".format(count, n_vertex))
             self.nodes_ws[node] = method(node, neumann=True)
             self.nodes_nts[node] = self.nodes_ws[node].pop(node)
             count += 1
+        print('done interpolation...',
+              'took {0} seconds to interpolate {1} verts'.format(time.time() -
+                                                                 t0, n_vertex))
 
     def _node_treatment(self, node, id_left, id_right, K_eq, D_JK=0, D_JI=0.0):
         RHS = 0.5 * K_eq * (D_JK + D_JI)
@@ -133,9 +138,10 @@ class MpfaD3D:
                                                                RHS * weight_N])
 
     def run_solver(self, interpolation_method):
-
+        print('filling the transmissibility matrix...')
+        t0_solver = time.time()
         # TODO: eliminate if cond after debugging
-        node_interpolation = False
+        node_interpolation = True
         if node_interpolation:
             self.get_nodes_weights(interpolation_method)
 
@@ -146,7 +152,6 @@ class MpfaD3D:
                 RHS = self.mb.tag_get_data(self.source_tag, volume)[0][0]
                 self.b_prime[volume_id] += RHS
         except:
-            print('no source term')
             pass
 
         for face in self.all_faces:
@@ -161,11 +166,11 @@ class MpfaD3D:
                 node_crds = self.mb.get_coords(face_nodes).reshape([3, 3])
                 face_area = geo._area_vector(node_crds, norma=True)
                 RHS = face_flow * face_area
-
                 self.b_prime[id_volume] += - RHS
 
             if face in self.dirichlet_faces:
-                I, J, K = self.mtu.get_bridge_adjacencies(face, 0, 0)
+                # '2' argument was initially '0' but it's incorrect
+                I, J, K = self.mtu.get_bridge_adjacencies(face, 2, 0)
                 left_volume = np.asarray(self.mtu.get_bridge_adjacencies(
                                          face, 2, 3), dtype='uint64')
                 id_volume = self.mb.tag_get_data(self.global_id_tag,
@@ -208,8 +213,6 @@ class MpfaD3D:
                 D_JI = self.get_cross_diffusion_term(tan_JI, LJ, face_area,
                                                      h_L, K_n_L, K_L_JI,
                                                      boundary=True)
-                print('D_JK', tan_JK, LJ, face_area, h_L, K_n_L, K_L_JK)
-                print('D_JI', tan_JI, LJ, face_area, h_L, K_n_L, K_L_JI)
 
                 K_eq = (1 / h_L)*(face_area * K_n_L)
 
@@ -234,7 +237,7 @@ class MpfaD3D:
                 N_IJK = np.cross(JI, JK) / 2.
                 face_nodes = self.mb.get_coords(
                     self.mtu.get_bridge_adjacencies(face, 0, 0))
-                face_nodes = np.reshape(face_nodes, (3, 3))
+                # face_nodes = np.reshape(face_nodes, (3, 3))
                 test = np.dot(N_IJK, dist_LR)
 
                 if test < 0:
@@ -245,8 +248,6 @@ class MpfaD3D:
                                                        right_volume)[0]
                     dist_LR = R - L
 
-                LJ = L - self.mb.get_coords([J])
-                RJ = R - self.mb.get_coords([J])
                 face_area = np.sqrt(np.dot(N_IJK, N_IJK))
                 tan_JI = np.cross(N_IJK, JI)
                 tan_JK = np.cross(N_IJK, JK)
@@ -254,6 +255,7 @@ class MpfaD3D:
                 K_R = self.mb.tag_get_data(self.perm_tag,
                                            right_volume).reshape([3, 3])
 
+                RJ = (R - self.mb.get_coords([J]))
                 h_R = geo.get_height(N_IJK, RJ)
 
                 K_R_n = self.vmv_multiply(N_IJK, K_R, N_IJK)
@@ -262,6 +264,8 @@ class MpfaD3D:
 
                 K_L = self.mb.tag_get_data(self.perm_tag,
                                            left_volume).reshape([3, 3])
+
+                LJ = (L - self.mb.get_coords([J]))
                 h_L = geo.get_height(N_IJK, LJ)
 
                 K_L_n = self.vmv_multiply(N_IJK, K_L, N_IJK)
@@ -276,11 +280,13 @@ class MpfaD3D:
                                                      face_area, h_L, K_L_n,
                                                      K_L_JK, h_R,
                                                      K_R_JK, K_R_n)
+
                 K_eq = (K_R_n * K_L_n)/(K_R_n * h_L + K_L_n * h_R) * face_area
 
                 id_right = self.mb.tag_get_data(self.global_id_tag,
-                                                right_volume)[0][0]
+                                                right_volume)
                 id_left = self.mb.tag_get_data(self.global_id_tag, left_volume)
+
                 col_ids = [id_right, id_right, id_left, id_left]
                 row_ids = [id_right, id_left, id_left, id_right]
                 values = [K_eq, -K_eq, K_eq, -K_eq]
@@ -288,33 +294,37 @@ class MpfaD3D:
                 self.A_prime.InsertGlobalValues(col_ids, row_ids, values)
 
                 # TODO: eliminate if block after debugging
-                if not node_interpolation:
-                    pslo1 = self.psol1
-                    coords_I = self.mb.get_coords([I])
-                    p_I = pslo1(coords_I)
-                    x_J, y_J, z_J = self.mb.get_coords([J])
-                    coords_J = self.mb.get_coords([J])
-                    p_J = pslo1(coords_J)
-                    coords_K = self.mb.get_coords([K])
-                    p_K = pslo1(coords_K)
-                    RHS = 0.5 * K_eq * (-D_JK * (p_J - p_I) +
-                                        D_JI * (p_J - p_K))
+                # if not node_interpolation:
+                # pslo1 = self.psol1
+                # coords_I = self.mb.get_coords([I])
+                # p_I = pslo1(coords_I)
+                # x_J, y_J, z_J = self.mb.get_coords([J])
+                # coords_J = self.mb.get_coords([J])
+                # p_J = pslo1(coords_J)
+                # coords_K = self.mb.get_coords([K])
+                # p_K = pslo1(coords_K)
+                # RHS = 0.5 * K_eq * (-D_JK * (p_J - p_I) +
+                #                     D_JI * (p_J - p_K))
+                #
+                # self.b_prime[id_left] += RHS
+                # self.b_prime[id_right] += -RHS
 
-                    self.b_prime[id_left] += RHS
-                    self.b_prime[id_right] += -RHS
-
-                # self._node_treatment(I, id_left, id_right, K_eq, D_JK=D_JK)
-                # self._node_treatment(J, id_left, id_right, K_eq,
-                #                      D_JI=D_JI, D_JK=-D_JK)
-                # self._node_treatment(K, id_left, id_right, K_eq, D_JI=-D_JI)
-
+                self._node_treatment(I, id_left, id_right, K_eq, D_JK=D_JK)
+                self._node_treatment(J, id_left, id_right, K_eq,
+                                     D_JI=D_JI, D_JK=-D_JK)
+                self._node_treatment(K, id_left, id_right, K_eq, D_JI=-D_JI)
         self.A_prime.FillComplete()
+        print('matrix fill took {0} seconds...'.format(time.time() -
+                                                       t0_solver))
+        print('running solver...')
+        t0_solver = time.time()
         linearProblem = Epetra.LinearProblem(self.A_prime,
                                              self.x_prime,
                                              self.b_prime)
         solver = AztecOO.AztecOO(linearProblem)
         solver.SetAztecOption(AztecOO.AZ_output, AztecOO.AZ_none)
-        solver.Iterate(1000, 1e-14)
-
+        solver.SetAztecOption(AztecOO.AZ_precond, AztecOO.AZ_dom_decomp)
+        solver.Iterate(1000, 1e-16)
+        print('solver took {0} seconds'.format(time.time() - t0_solver))
         self.mb.tag_set_data(self.pressure_tag, self.volumes, self.x_prime)
-        self.record_data('debugging.vtk')
+        self.record_data('mesh_test_conservative.vtk')

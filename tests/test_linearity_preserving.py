@@ -1,10 +1,7 @@
 import unittest
 import numpy as np
 from mpfad.MpfaD import MpfaD3D
-# from mpfad.interpolation.IDW import IDW
-# from mpfad.interpolation.LSW import LSW
 from mpfad.interpolation.LPEW3 import LPEW3
-# from mpfad.interpolation.LPEW2 import LPEW2
 from mesh_preprocessor import MeshManager
 
 
@@ -25,6 +22,13 @@ class LinearityPreservingTests(unittest.TestCase):
                              0.0, 1E3, 0.0,
                              0.0, 0.0, 1.0])
 
+        bed_perm_isotropic = [0.965384615384615, 0.173076923076923, 0.,
+                              0.173076923076923, 0.134615384615385, 0.,
+                              0., 0., 1.]
+        fracture_perm_isotropic = [96.538461538461530, 17.307692307692307, 0.,
+                                   17.307692307692307, 13.461538461538462, 0.,
+                                   0., 0., 1.]
+
         self.mesh_homogeneous = MeshManager('test_mesh_5_vols.h5m', dim=3)
         self.mesh_homogeneous.set_boundary_condition('Dirichlet',
                                                      {101: 0.0},
@@ -35,28 +39,39 @@ class LinearityPreservingTests(unittest.TestCase):
         self.mesh_homogeneous.get_redefine_centre()
         self.mesh_homogeneous.set_global_id()
 
-
         self.mesh_heterogeneous = MeshManager(
             'meshes/geometry_two_regions_lp_test.msh', dim=3)
         self.mesh_heterogeneous.set_boundary_condition('Dirichlet',
                                                        {101: 0.0},
                                                        dim_target=2,
                                                        set_nodes=True)
-        # self.mesh_heterogeneous.set_boundary_condition('Neumann',
-        #                                                {201: 0.0},
-        #                                                dim_target=2,
-        #                                                set_nodes=True)
         self.mesh_heterogeneous.get_redefine_centre()
         self.mesh_heterogeneous.set_global_id()
         self.mpfad_heterogeneous = MpfaD3D(self.mesh_heterogeneous)
         self.hvolumes = self.mesh_heterogeneous.all_volumes
 
-        # create Slanted Mesh
+        self.slanted_mesh = MeshManager('meshes/mesh_slanted_mesh.h5m', dim=3)
+        self.slanted_mesh.set_boundary_condition('Dirichlet',
+                                                 {101: None},
+                                                 dim_target=2,
+                                                 set_nodes=True)
+        self.slanted_mesh.set_boundary_condition('Neumann',
+                                                 {201: 0.0},
+                                                 dim_target=2,
+                                                 set_nodes=True)
+
+        self.slanted_mesh.set_media_property('Permeability',
+                                             {1: bed_perm_isotropic,
+                                              2: fracture_perm_isotropic},
+                                             dim_target=3)
+        self.slanted_mesh.get_redefine_centre()
+        self.slanted_mesh.set_global_id()
+        self.mpfad_slanted_mesh = MpfaD3D(self.slanted_mesh)
 
     def psol1(self, coords):
         x, y, z = coords
 
-        return -x - 0.2 * y + z
+        return - x - 0.2 * y
 
     def lp_schneider_2018(self, coords, p_max, p_min,
                           x_max, x_min, y_max, y_min, z_max, z_min):
@@ -69,17 +84,15 @@ class LinearityPreservingTests(unittest.TestCase):
                           ((z - z_min)/(z_max - z_min))) * p_min
         return _max + _min
 
-
-
-
+    # @unittest.skip('debugging other tests')
     def test_case_1(self):
         mb = self.mesh_homogeneous.mb
         """
         Test if mesh_homogeneous with tensor K_1 and solution 1
         """
         for volume in self.volumes:
-            self.mesh_homogeneous.mb.tag_set_data(self.mesh_homogeneous.perm_tag,
-                                                  volume, self.K_1)
+            self.mb.tag_set_data(self.mesh_homogeneous.perm_tag,
+                                 volume, self.K_1)
         allVolumes = self.mesh_homogeneous.all_volumes
         bcVerts = self.mesh_homogeneous.get_boundary_nodes()
         for bcVert in bcVerts:
@@ -91,17 +104,19 @@ class LinearityPreservingTests(unittest.TestCase):
         for volume in allVolumes:
             coords = mb.get_coords([volume])
             u = self.psol1(coords)
-            u_calc = mb.tag_get_data(self.mpfad_homogeneous.pressure_tag, volume)
+            u_calc = mb.tag_get_data(self.mpfad_homogeneous.pressure_tag,
+                                     volume)
             self.assertAlmostEqual(u_calc, u, delta=1e-15)
 
+    # @unittest.skip('debugging other tests')
     def test_case_2(self):
         """
         Test if mesh_homogeneous with tensor K_2 and solution 1
         """
         mb = self.mesh_homogeneous.mb
         for volume in self.volumes:
-            self.mesh_homogeneous.mb.tag_set_data(self.mesh_homogeneous.perm_tag,
-                                                  volume, self.K_2)
+            self.mb.tag_set_data(self.mesh_homogeneous.perm_tag,
+                                 volume, self.K_2)
         allVolumes = self.mesh_homogeneous.all_volumes
         bcVerts = self.mesh_homogeneous.get_boundary_nodes()
         for bcVert in bcVerts:
@@ -113,17 +128,19 @@ class LinearityPreservingTests(unittest.TestCase):
         for volume in allVolumes:
             coords = mb.get_coords([volume])
             u = self.psol1(coords)
-            u_calc = mb.tag_get_data(self.mpfad_homogeneous.pressure_tag, volume)
+            u_calc = mb.tag_get_data(self.mpfad_homogeneous.pressure_tag,
+                                     volume)
             self.assertAlmostEqual(u_calc, u, delta=1e-15)
 
+    # @unittest.skip('debugging other tests')
     def test_case_3(self):
         """
         Test if mesh_homogeneous with tensor K_3 and solution 1
         """
         mb = self.mesh_homogeneous.mb
         for volume in self.volumes:
-            self.mesh_homogeneous.mb.tag_set_data(self.mesh_homogeneous.perm_tag,
-                                                  volume, self.K_3)
+            self.mb.tag_set_data(self.mesh_homogeneous.perm_tag,
+                                 volume, self.K_3)
         allVolumes = self.mesh_homogeneous.all_volumes
         bcVerts = self.mesh_homogeneous.get_boundary_nodes()
         for bcVert in bcVerts:
@@ -135,9 +152,11 @@ class LinearityPreservingTests(unittest.TestCase):
         for volume in allVolumes:
             coords = mb.get_coords([volume])
             u = self.psol1(coords)
-            u_calc = mb.tag_get_data(self.mpfad_homogeneous.pressure_tag, volume)
+            u_calc = mb.tag_get_data(self.mpfad_homogeneous.pressure_tag,
+                                     volume)
             self.assertAlmostEqual(u_calc, u, delta=1e-15)
 
+    # @unittest.skip('debugging other tests')
     def test_case_4(self):
         """
         Test if mesh_heterogeneous with tensor K_1/K_2 and solution 1
@@ -147,11 +166,11 @@ class LinearityPreservingTests(unittest.TestCase):
         for volume in self.hvolumes:
             x, _, _ = mtu.get_average_position([volume])
             if x < 0.5:
-                self.mesh_heterogeneous.mb.tag_set_data(self.mesh_heterogeneous.perm_tag,
-                                                        volume, self.K_3)
+                self.mb.tag_set_data(self.mesh_heterogeneous.perm_tag,
+                                     volume, self.K_3)
             else:
-                self.mesh_heterogeneous.mb.tag_set_data(self.mesh_heterogeneous.perm_tag,
-                                                        volume, self.K_4)
+                self.mb.tag_set_data(self.mesh_heterogeneous.perm_tag,
+                                     volume, self.K_4)
         bcVerts = self.mesh_heterogeneous.get_boundary_nodes()
         for bcVert in bcVerts:
             vertCoords = mb.get_coords([bcVert])
@@ -160,37 +179,82 @@ class LinearityPreservingTests(unittest.TestCase):
                             bcVert, bcVal)
 
         self.mpfad_heterogeneous.run_solver(LPEW3(self.mesh_heterogeneous).interpolate)
-        error = []
+
         for volume in self.hvolumes:
             coords = mb.get_coords([volume])
             u = self.psol1(coords)
             u_calc = mb.tag_get_data(self.mpfad_heterogeneous.pressure_tag,
                                      volume)
-            # error.append(abs((u-u_calc)/u))
-        # print('max error', max(error))
 
             self.assertAlmostEqual(u_calc, u, delta=1e-15)
 
+    # @unittest.skip('debugging other tests')
     def test_schneider_linear_preserving(self):
         """
         Test if mesh_homogeneous with tensor K_3 and solution 1
         """
         mb = self.mesh_homogeneous.mb
         for volume in self.volumes:
-            self.mesh_homogeneous.mb.tag_set_data(self.mesh_homogeneous.perm_tag,
-                                                  volume, self.K_3)
+            self.mb.tag_set_data(self.mesh_homogeneous.perm_tag,
+                                 volume, self.K_3)
         allVolumes = self.mesh_homogeneous.all_volumes
         bcVerts = self.mesh_homogeneous.get_boundary_nodes()
         for bcVert in bcVerts:
             vertCoords = mb.get_coords([bcVert])
             bcVal = self.lp_schneider_2018(vertCoords, 2E5, 1E5,
-                                  1., 0., 1.0, 0., 1., 0.)
+                                           1., 0., 1.0, 0., 1., 0.)
             mb.tag_set_data(self.mesh_homogeneous.dirichlet_tag, bcVert, bcVal)
         self.mpfad_homogeneous.run_solver(LPEW3(self.mesh_homogeneous).interpolate)
 
         for volume in allVolumes:
             coords = mb.get_coords([volume])
             u = self.lp_schneider_2018(coords, 2E5, 1E5,
-                                  1., 0., 1.0, 0., 1., 0.)
-            u_calc = mb.tag_get_data(self.mpfad_homogeneous.pressure_tag, volume)
+                                       1., 0., 1.0, 0., 1., 0.)
+            u_calc = mb.tag_get_data(self.mpfad_homogeneous.pressure_tag,
+                                     volume)
             self.assertAlmostEqual(u_calc[0][0], u, delta=1e-10)
+
+    # @unittest.skip('debugging other tests')
+    def test_oblique_drain_contains_all_faces(self):
+        all_faces = self.slanted_mesh.all_faces
+        self.assertEqual(len(all_faces), 44)
+
+    # @unittest.skip('debugging other tests')
+    def test_if_mehs_contains_all_dirichlet_faces(self):
+        dirichlet_faces = self.slanted_mesh.dirichlet_faces
+        self.assertEqual(len(dirichlet_faces), 16)
+
+    # @unittest.skip('debugging other tests')
+    def test_if_mehs_contains_all_neumann_faces(self):
+        neumann_faces = self.slanted_mesh.neumann_faces
+        self.assertEqual(len(neumann_faces), 12)
+
+    # @unittest.skip('debugging other tests')
+    def test_if_neumann_bc_is_appplied(self):
+        for face in self.slanted_mesh.neumann_faces:
+            face_flow = self.slanted_mesh.mb.tag_get_data(
+                self.slanted_mesh.neumann_tag, face)[0][0]
+            self.assertEqual(face_flow, 0.0)
+
+    # @unittest.skip('debugging other tests')
+    def test_oblique_drain(self):
+        """
+        Test if slanted_mesh
+        """
+        mb = self.slanted_mesh.mb
+        allVolumes = self.slanted_mesh.all_volumes
+        bcVerts = self.slanted_mesh.get_boundary_nodes()
+        for bcVert in bcVerts:
+            vertCoords = mb.get_coords([bcVert])
+            bcVal = self.psol1(vertCoords)
+            mb.tag_set_data(self.slanted_mesh.dirichlet_tag, bcVert, bcVal)
+
+        self.mpfad_slanted_mesh.run_solver(LPEW3(
+            self.slanted_mesh).interpolate)
+
+        for volume in allVolumes:
+            coords = mb.get_coords([volume])
+            u = self.psol1(coords)
+            u_calc = mb.tag_get_data(self.mpfad_slanted_mesh.pressure_tag,
+                                     volume)
+            self.assertAlmostEqual(u_calc[0][0], u, delta=1e-13)

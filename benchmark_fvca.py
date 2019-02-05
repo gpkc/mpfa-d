@@ -37,6 +37,10 @@ class BenchmarkFVCA:
         # Include grdient norm for results
         return results
 
+    def calculate_gradient_mpfad(self, volume):
+        I, J, K, L = self.mesh.mtu.get_bridge_adjacencies(volume, 3, 0)
+        print(I, J, K, L)
+
     def calculate_gradient(self, x, y, z, benchmark, delta=0.00001):
         grad_x = (benchmark(x + delta, y, z)[1] -
                   benchmark(x, y, z)[1]) / delta
@@ -127,6 +131,7 @@ class BenchmarkFVCA:
                                   self.mpfad.pressure_tag, volume)[0][0]
             err.append(np.absolute((analytical_solution - calculated_solution)))
             u.append(analytical_solution)
+            self.calculate_gradient_mpfad(volume)
         u_max = max(self.mpfad.mb.tag_get_data(
                               self.mpfad.pressure_tag, volumes))
         u_min = min(self.mpfad.mb.tag_get_data(
@@ -134,16 +139,16 @@ class BenchmarkFVCA:
         results = self.norms_calculator(err, vols, u)
         non_zero_mat = self.mpfad.A_prime.NumGlobalNonzeros()
         with open(log_name, 'w') as f:
-            f.write('TEST CASE 1\n\nUnknowns:\t %.6f\n' % (len(volumes)))
-            f.write('Non-zero matrix:\t %.6f\n' % (non_zero_mat))
+            f.write('TEST CASE 1\n\nUnknowns:\t %.0f\n' % (len(volumes)))
+            f.write('Non-zero matrix:\t %.0f\n' % (non_zero_mat))
             f.write('Umin:\t %.6f\n' % (u_min))
             f.write('Umax:\t %.6f\n' % (u_max))
-            f.write('L2 norm:\t %.6f\n' % (results[0]))
-            f.write('l2 norm volume weighted:\t %.6f\n' % (results[1]))
-            f.write('Relative L2 norm:\t %.6f\n' % (results[2]))
-            f.write('average error:\t %.6f\n' % (results[3]))
-            f.write('maximum error:\t %.6f\n' % (results[4]))
-            f.write('minimum error:\t %.6f\n' % (results[5]))
+            f.write('L2 norm:\t %.6g\n' % (results[0]))
+            f.write('l2 norm volume weighted:\t %.6g\n' % (results[1]))
+            f.write('Relative L2 norm:\t %.6g\n' % (results[2]))
+            f.write('average error:\t %.6g\n' % (results[3]))
+            f.write('maximum error:\t %.6g\n' % (results[4]))
+            f.write('minimum error:\t %.6g\n' % (results[5]))
 
         print('END OF ' + log_name + '!!!\n')
         self.mpfad.record_data('benchmark_1' + log_name + '.vtk')

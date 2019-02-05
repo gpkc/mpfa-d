@@ -35,7 +35,6 @@ class LPEW3(InterpolationMethodBase):
             vol_nodes = self.mb.get_adjacencies(a_vol, 0)
             sub_vol = np.append(face_nodes_crds, vol_cent)
             sub_vol = np.reshape(sub_vol, (4, 3))
-            # TODO: inherit from helpers
             tetra_vol = self.mesh_data.get_tetra_volume(sub_vol)
             ref_node_i = list(set(vol_nodes) - set(face_nodes))
             ref_node_i = self.mb.get_coords(ref_node_i)
@@ -56,7 +55,6 @@ class LPEW3(InterpolationMethodBase):
         ref_node = self.mb.get_coords(ref_node)
         vol_nodes_crds = self.mb.get_coords(list(vol_nodes))
         vol_nodes_crds = np.reshape(vol_nodes_crds, (4, 3))
-        #  TODO: tetra_vol inherit from helpers
         tetra_vol = self.mesh_data.get_tetra_volume(vol_nodes_crds)
         vol_nodes = set(vol_nodes)
         vol_nodes.remove(node)
@@ -80,7 +78,6 @@ class LPEW3(InterpolationMethodBase):
         N_i = geo._area_vector(face_nodes, vol_cent)[0]
         sub_vol = np.append(face_nodes, vol_cent)
         sub_vol = np.reshape(sub_vol, (4, 3))
-        #  TODO: inherit from helpers
         tetra_vol = self.mesh_data.get_tetra_volume(sub_vol)
         csi = self.flux_term(N_i, vol_perm, N_i) / tetra_vol
         return csi
@@ -132,14 +129,12 @@ class LPEW3(InterpolationMethodBase):
             lambda_mult = lambda_mult * lbd
         sigma = self.sigma_lpew3(node, vol)
         neta = self.neta_lpew3(node, vol, face)
-
         phi = lambda_mult * neta / sigma
         return phi
 
     @lru_cache(maxsize=200)
     def psi_sum_lpew3(self, node, vol, face):
-        # Should include tao parameter in order to change interpolation region
-        if len(vol) == 0:  # change to try except block
+        if len(vol) == 0:
             return 0.0
         vol = vol[0]
         face_nodes = self.mtu.get_bridge_adjacencies(face, 2, 0)
@@ -210,7 +205,6 @@ class LPEW3(InterpolationMethodBase):
         vols_around = self.mtu.get_bridge_adjacencies(node, 0, 3)
         weights = [self.partial_weight_lpew3(node, a_vol)
                    for a_vol in vols_around]
-        # print(weights)
         weight_sum = np.sum(weights)
         weights = weights / weight_sum
         node_weights = {
