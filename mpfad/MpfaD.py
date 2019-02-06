@@ -24,8 +24,8 @@ class MpfaD3D:
         self.pressure_tag = mesh_data.pressure_tag
         # self.sw = two_phase.water_saturation
 
-        # self.pressure_tag = self.mb.tag_get_handle(
-        #     "Pressure", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+        self.flux_info_tag = self.mb.tag_get_handle(
+            "flux info", 7, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
 
         self.dirichlet_nodes = set(self.mb.get_entities_by_type_and_tag(
             0, types.MBVERTEX, self.dirichlet_tag, np.array((None,))))
@@ -184,11 +184,6 @@ class MpfaD3D:
                 K_L = self.mb.tag_get_data(self.perm_tag,
                                            left_volume).reshape([3, 3])
                 h_L = geo.get_height(N_IJK, LJ)
-
-                g_I = self.get_boundary_node_pressure(I)
-                g_J = self.get_boundary_node_pressure(J)
-                g_K = self.get_boundary_node_pressure(K)
-
                 K_n_L = self.vmv_multiply(N_IJK, K_L, N_IJK)
                 K_L_JI = self.vmv_multiply(N_IJK, K_L, tan_JI)
                 K_L_JK = self.vmv_multiply(N_IJK, K_L, tan_JK)
@@ -199,14 +194,19 @@ class MpfaD3D:
                 D_JI = self.get_cross_diffusion_term(tan_JI, LJ, face_area,
                                                      h_L, K_n_L, K_L_JI,
                                                      boundary=True)
-
                 K_eq = (1 / h_L)*(face_area * K_n_L)
+
+                g_I = self.get_boundary_node_pressure(I)
+                g_J = self.get_boundary_node_pressure(J)
+                g_K = self.get_boundary_node_pressure(K)
 
                 RHS = (D_JK * (g_I - g_J) - K_eq * g_J + D_JI * (g_J - g_K))
                 LHS = K_eq
 
                 self.T.InsertGlobalValues(id_volume, id_volume, LHS)
                 self.Q[id_volume] += -RHS
+                self.mb.tag_set_data(self.flux_info_tag, face,
+                                     [D_JK, D_JI, K_eq, I, J, K, face_area])
 
             if face in self.intern_faces:
                 left_volume, right_volume = \
@@ -221,8 +221,6 @@ class MpfaD3D:
                 JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
 
                 N_IJK = np.cross(JI, JK) / 2.
-                face_nodes = self.mb.get_coords(
-                    self.mtu.get_bridge_adjacencies(face, 0, 0))
                 test = np.dot(N_IJK, dist_LR)
 
                 if test < 0:
@@ -281,6 +279,8 @@ class MpfaD3D:
                 self._node_treatment(J, id_left, id_right, K_eq,
                                      D_JI=D_JI, D_JK=-D_JK)
                 self._node_treatment(K, id_left, id_right, K_eq, D_JI=-D_JI)
+                self.mb.tag_set_data(self.flux_info_tag, face,
+                                     [D_JK, D_JI, K_eq, I, J, K, face_area])
 
         self.T.FillComplete()
         print('matrix fill took {0} seconds...'.format(time.time() -
@@ -294,4 +294,3 @@ class MpfaD3D:
         solver.Iterate(1000, 1e-16)
         print('solver took {0} seconds'.format(time.time() - t0_solver))
         self.mb.tag_set_data(self.pressure_tag, self.volumes, self.x)
-        self.record_data('mesh_test_conservative.vtk')
