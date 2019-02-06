@@ -34,6 +34,9 @@ class MeshManager:
         self.perm_tag = self.mb.tag_get_handle(
             "Permeability", 9, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
 
+        self.pressure_tag = self.mb.tag_get_handle(
+            "Pressure", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+
         self.source_tag = self.mb.tag_get_handle(
             "Source term", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
 
@@ -135,7 +138,8 @@ class MeshManager:
         non_boundary_volumes = []
         for volume in volumes:
             volume_nodes = set(self.mtu.get_bridge_adjacencies(volume, 0, 0))
-            if (volume_nodes.intersection(dirichlet_nodes | neumann_nodes)) == set():
+            if (volume_nodes.intersection(dirichlet_nodes |
+                                          neumann_nodes)) == set():
                 non_boundary_volumes.append(volume)
 
         return non_boundary_volumes
@@ -147,70 +151,6 @@ class MeshManager:
             vol_centroids.append(volume_centroid)
         self.mb.tag_set_data(self.volume_centre_tag,
                              self.all_volumes, vol_centroids)
-
-
-        # all_volumes_centroid_list = []
-        # for volume in self.all_volumes:
-        #     centre_change = False
-        #     volume_Centroid = self.mtu.get_average_position([volume])
-        #     adj_faces = self.mtu.get_bridge_adjacencies(volume, 3, 2)
-        #     adjacencies = []
-        #     ray = []
-        #     for adj_face in adj_faces:
-        #         try:
-        #             adj_vol = set(self.mtu.get_bridge_adjacencies(adj_face,
-        #                                                           2, 3)
-        #                           ).difference({volume}).pop()
-        #             adj_vol_centroid = self.mtu.get_average_position([adj_vol])
-        #             adj_face_centroid = self.mtu.get_average_position([adj_face
-        #                                                                ])
-        #             adjacencies.append([adj_face_centroid, adj_vol_centroid])
-        #             ray.append(geo.point_distance(volume_Centroid,
-        #                                           adj_face_centroid))
-        #         except:
-        #             adj_face_centroid = self.mtu.get_average_position([adj_face
-        #                                                                ])
-        #             adjacencies.append([adj_face_centroid, None])
-        #             ray.append(geo.point_distance(volume_Centroid,
-        #                                           adj_face_centroid))
-        #     ray = min(ray)
-        #     i = 0
-        #     iscolinear = [True, True, True, True]
-        #     volume_centroid = volume_Centroid
-        #     while any(determinant is True for determinant in iscolinear):
-        #         adj_face_centroid, adj_vol_centroid = adjacencies[i %
-        #                                                           len(adj_faces
-        #                                                               )]
-        #         volume_centroid = (volume_Centroid + ray / 2 *
-        #                            np.array([np.random.rand(),
-        #                                      np.random.rand(),
-        #                                      np.random.rand()]
-        #                                     )
-        #                            )
-        #         try:
-        #             mat = np.asarray([adj_face_centroid,
-        #                               adj_vol_centroid,
-        #                               volume_centroid]).reshape([3, 3])
-        #
-        #             if np.linalg.det(mat) == 0:
-        #                 centre_change = True
-        #
-        #                 iscolinear[i % len(adj_faces)] = True
-        #
-        #             else:
-        #                 iscolinear[i % len(adj_faces)] = False
-        #         except:
-        #             iscolinear[i % len(adj_faces)] = False
-        #         i += 1
-        #         if i > 1000:
-        #             break
-        #     all_volumes_centroid_list.append(volume_centroid)
-        # self.mb.tag_set_data(self.volume_centre_tag,
-        #                      self.all_volumes, all_volumes_centroid_list)
-        # if centre_change:
-        #     print('centre change')
-        # else:
-        #     print("no centre change")
 
     def _get_volumes_sharing_face_and_node(self, node, volume):
         vols_around_node = self.mtu.get_bridge_adjacencies(node, 0, 3)
