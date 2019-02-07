@@ -91,7 +91,7 @@ class LinearityPreservingTests(unittest.TestCase):
         Test if mesh_homogeneous with tensor K_1 and solution 1
         """
         for volume in self.volumes:
-            self.mb.tag_set_data(self.mesh_homogeneous.perm_tag,
+            mb.tag_set_data(self.mesh_homogeneous.perm_tag,
                                  volume, self.K_1)
         allVolumes = self.mesh_homogeneous.all_volumes
         bcVerts = self.mesh_homogeneous.get_boundary_nodes()
@@ -115,7 +115,7 @@ class LinearityPreservingTests(unittest.TestCase):
         """
         mb = self.mesh_homogeneous.mb
         for volume in self.volumes:
-            self.mb.tag_set_data(self.mesh_homogeneous.perm_tag,
+            mb.tag_set_data(self.mesh_homogeneous.perm_tag,
                                  volume, self.K_2)
         allVolumes = self.mesh_homogeneous.all_volumes
         bcVerts = self.mesh_homogeneous.get_boundary_nodes()
@@ -139,7 +139,7 @@ class LinearityPreservingTests(unittest.TestCase):
         """
         mb = self.mesh_homogeneous.mb
         for volume in self.volumes:
-            self.mb.tag_set_data(self.mesh_homogeneous.perm_tag,
+            mb.tag_set_data(self.mesh_homogeneous.perm_tag,
                                  volume, self.K_3)
         allVolumes = self.mesh_homogeneous.all_volumes
         bcVerts = self.mesh_homogeneous.get_boundary_nodes()
@@ -166,10 +166,10 @@ class LinearityPreservingTests(unittest.TestCase):
         for volume in self.hvolumes:
             x, _, _ = mtu.get_average_position([volume])
             if x < 0.5:
-                self.mb.tag_set_data(self.mesh_heterogeneous.perm_tag,
+                mb.tag_set_data(self.mesh_heterogeneous.perm_tag,
                                      volume, self.K_3)
             else:
-                self.mb.tag_set_data(self.mesh_heterogeneous.perm_tag,
+                mb.tag_set_data(self.mesh_heterogeneous.perm_tag,
                                      volume, self.K_4)
         bcVerts = self.mesh_heterogeneous.get_boundary_nodes()
         for bcVert in bcVerts:
@@ -195,7 +195,7 @@ class LinearityPreservingTests(unittest.TestCase):
         """
         mb = self.mesh_homogeneous.mb
         for volume in self.volumes:
-            self.mb.tag_set_data(self.mesh_homogeneous.perm_tag,
+            mb.tag_set_data(self.mesh_homogeneous.perm_tag,
                                  volume, self.K_3)
         allVolumes = self.mesh_homogeneous.all_volumes
         bcVerts = self.mesh_homogeneous.get_boundary_nodes()

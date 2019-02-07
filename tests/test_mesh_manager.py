@@ -40,31 +40,31 @@ class PressureSolverTest(unittest.TestCase):
         self.mesh_4.set_global_id()
         self.mesh_4.get_redefine_centre()
 
-    @unittest.skip('no need for testing')
+    # @unittest.skip('no need for testing')
     def test_if_method_has_all_dirichlet_nodes(self):
         self.assertEqual(len(self.mpfad_2.dirichlet_nodes), 10)
 
-    @unittest.skip('no need for testing')
+    # @unittest.skip('no need for testing')
     def test_if_method_has_all_neumann_nodes(self):
         self.assertEqual(len(self.mpfad_2.neumann_nodes), 12)
 
-    @unittest.skip('no need for testing')
+    # @unittest.skip('no need for testing')
     def test_if_method_has_all_intern_nodes(self):
         self.assertEqual(len(self.mpfad_2.intern_nodes), 1)
 
-    @unittest.skip('no need for testing')
+    # @unittest.skip('no need for testing')
     def test_if_method_has_all_dirichlet_faces(self):
         self.assertEqual(len(self.mpfad_2.dirichlet_faces), 8)
 
-    @unittest.skip('no need for testing')
+    # @unittest.skip('no need for testing')
     def test_if_method_has_all_neumann_faces(self):
         self.assertEqual(len(self.mpfad_2.neumann_faces), 32)
 
-    @unittest.skip('no need for testing')
+    # @unittest.skip('no need for testing')
     def test_if_method_has_all_intern_faces(self):
         self.assertEqual(len(self.mpfad_2.intern_faces), 76)
 
-    @unittest.skip('no need for testing')
+    # @unittest.skip('no need for testing')
     def test_get_tetra_volume(self):
         a_tetra = self.mesh_1.all_volumes[0]
         tetra_nodes = self.mesh_1.mb.get_adjacencies(a_tetra, 0)
@@ -73,7 +73,7 @@ class PressureSolverTest(unittest.TestCase):
         vol_eval = self.mesh_1.get_tetra_volume(tetra_nodes_coords)
         self.assertAlmostEqual(vol_eval, 1/12.0, delta=1e-15)
 
-    @unittest.skip('skip')
+    # @unittest.skip('skip')
     def test_if_node_weighted_calculation_yelds_analytical_solution(self):
         # inner_volumes = self.mesh_3.get_non_boundary_volumes(
         #                 self.mpfad_3.dirichlet_nodes,
@@ -90,7 +90,7 @@ class PressureSolverTest(unittest.TestCase):
             self.assertAlmostEqual(p_vert, analytical_solution,
                                    delta=5e-15)
 
-    @unittest.skip('later')
+    # @unittest.skip('later')
     def test_volume_centre_is_importing_geo_properly(self):
         for volume in self.mesh_4.all_volumes:
             vol_id = self.mesh_4.mb.tag_get_data(self.mesh_4.global_id_tag, volume)
@@ -102,4 +102,3 @@ class PressureSolverTest(unittest.TestCase):
             vols_around_node = self.mesh_4.mtu.get_bridge_adjacencies(node, 0, 3)
             for vol in vols_around_node:
                 T = self.mesh_4._get_auxiliary_verts(node, vol, 0.5)
-                

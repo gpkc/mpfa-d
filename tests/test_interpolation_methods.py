@@ -142,6 +142,3 @@ class InterpMethodTest(unittest.TestCase):
             else:
                 self.assertAlmostEqual(
                     local_pressure[0][0], (4/3.0)*(1 - coord_x), delta=1e-14)
-
-    def test_changing_tao_parameter_lpew3_yields_equal_weights(self):
-        pass
