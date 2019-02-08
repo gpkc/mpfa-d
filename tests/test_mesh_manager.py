@@ -97,6 +97,7 @@ class PressureSolverTest(unittest.TestCase):
             vol_coords = self.mesh_4.mb.tag_get_data(self.mesh_4.volume_centre_tag, volume)
             print(vol_id, vol_coords)
 
+    # @unittest.skip('later')
     def test_get_vols_sharing_face_and_node(self):
         for node in self.mesh_4.all_nodes:
             vols_around_node = self.mesh_4.mtu.get_bridge_adjacencies(node, 0, 3)

@@ -44,20 +44,34 @@ class PressureSolverTest(unittest.TestCase):
                                                  dim_target=2,
                                                  set_nodes=True)
 
-        self.od.set_media_property('Permeability',
-                                             {1: bed_perm_isotropic,
-                                              2: fracture_perm_isotropic},
-                                             dim_target=3)
+        self.od.set_media_property('Permeability', {1: bed_perm_isotropic,
+                                                    2: fracture_perm_isotropic},
+                                                    dim_target=3)
         self.od.get_redefine_centre()
         self.od.set_global_id()
         self.od_mpfad = MpfaD3D(self.od)
+
+        self.perm = np.array([2.0, 1.0, 0.0,
+                              1.0, 2.0, 1.0,
+                              0.0, 1.0, 2.0])
+        self.m = MeshManager('test_mesh_5_vols.h5m', dim=3)
+        self.m.set_boundary_condition('Dirichlet', {101: None}, dim_target=2,
+                                      set_nodes=True)
+        self.m.get_redefine_centre()
+        self.m.set_global_id()
+        self.m_mpfad = MpfaD3D(self.m)
 
     def psol1(self, coords):
         x, y, z = coords
 
         return - x - 0.2 * y
 
-    @unittest.skip('later')
+    def psol2(self, coords):
+        x, y, z = coords
+
+        return y ** 2
+
+    # @unittest.skip('later')
     def test_if_method_yields_exact_solution(self):
         self.mtu = self.mesh.mtu
         self.mb = self.mesh.mb
@@ -67,7 +81,7 @@ class PressureSolverTest(unittest.TestCase):
             a_solution = 1 - self.mb.get_coords([volume])[0]
             self.assertAlmostEqual(c_solution, a_solution, delta=5e-15)
 
-    @unittest.skip('later')
+    # @unittest.skip('later')
     def test_if_inner_verts_weighted_calculation_yelds_exact_solution(self):
         self.mtu = self.mpfad.mtu
         self.mb = self.mpfad.mb
@@ -83,7 +97,7 @@ class PressureSolverTest(unittest.TestCase):
             self.assertAlmostEqual(p_vert, analytical_solution,
                                    delta=5e-15)
 
-    @unittest.skip('later')
+    # @unittest.skip('later')
     def test_if_gradient_yields_correct_values(self):
         self.node_pressure_tag = self.mpfad.mb.tag_get_handle(
             "Node Pressure", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
@@ -154,7 +168,6 @@ class PressureSolverTest(unittest.TestCase):
 
     # @unittest.skip('later')
     def test_if_flux_is_conservative_for_all_volumes(self):
-
         mb = self.od.mb
         bcVerts = self.od.get_boundary_nodes()
         for bcVert in bcVerts:
@@ -214,3 +227,28 @@ class PressureSolverTest(unittest.TestCase):
                 fluxes.append(flux)
             fluxes_sum = abs(sum(fluxes))
             self.assertAlmostEqual(fluxes_sum, 0.0, delta=1e-9)
+
+    # @unittest.skip('later')
+    def test_if_method_yields_correct_T_matrix(self):
+        """
+        This is not quite a test. It's design just to certify if the method
+        will yield known values for an expected case compared to a matlab run
+        by other programmer
+        """
+        for node in self.m.get_boundary_nodes():
+            coords = self.m.mb.get_coords([node])
+            g_D = coords[1] ** 2
+            self.m.mb.tag_set_data(self.m.dirichlet_tag, node, g_D)
+        volumes = self.m.all_volumes
+        vols = []
+        source = [-0.666666721827, -0.666666721827, -0.666667091901,
+                  -0.666667091901, -1.33333307358]
+        c = 0
+        for volume in volumes:
+            self.m.mb.tag_set_data(self.m.perm_tag, volume,
+                                      self.perm)
+            self.m.mb.tag_set_data(self.m.source_tag, volume,
+                                      source[c])
+            c += 1
+        self.m_mpfad.run_solver(LPEW3(self.m).interpolate)
+        print(self.m_mpfad.T, self.m_mpfad.x, self.m_mpfad.Q)

@@ -17,33 +17,33 @@ class BenchmarkFVCA:
         self.mpfad = MpfaD3D(self.mesh)
         self.im = interpolation_method(self.mesh)
 
-    def get_node_pressure(self, node):
-        try:
-            p_vert = self.mpfad.mb.tag_get_data(self.mpfad.dirichlet_tag, node)
-        except:
-            p_vert = 0.0
-            p_tag = self.mpfad.pressure_tag
-            nd_weights = self.mpfad.nodes_ws[node]
-            for volume, wt in nd_weights.items():
-                p_vol = self.mpfad.mb.tag_get_data(p_tag, volume)
-                p_vert += p_vol * wt
-        return p_vert
-
-    def get_velocity(self, face):
-        if face in self.mpfad.dirichlet_faces:
-            D_JK, D_JI, K_eq, I, J, K, face_area \
-             = self.mpfad.mb.tag_get_data(self.mpfad.flux_info_tag, face)[0]
-            adj_vol = self.mesh.mtu.get_bridge_adjacencies(face, 2, 3)
-            p_L = self.mesh.mb.tag_get_data(self.mesh.pressure_tag, adj_vol)
-            p_I = self.get_node_pressure(int(I))
-            p_J = self.get_node_pressure(int(J))
-            p_K = self.get_node_pressure(int(K))
-            v = - (D_JK * (p_I - p_J)
-                   - K_eq * (p_J - p_L)
-                   + D_JI * (p_J - p_K)) * face_area
-            # TODO: Implementation of analitical velocity calculation
-        else:
-            return None
+    # def get_node_pressure(self, node):
+    #     try:
+    #         p_vert = self.mpfad.mb.tag_get_data(self.mpfad.dirichlet_tag, node)
+    #     except:
+    #         p_vert = 0.0
+    #         p_tag = self.mpfad.pressure_tag
+    #         nd_weights = self.mpfad.nodes_ws[node]
+    #         for volume, wt in nd_weights.items():
+    #             p_vol = self.mpfad.mb.tag_get_data(p_tag, volume)
+    #             p_vert += p_vol * wt
+    #     return p_vert
+    #
+    # def get_velocity(self, face):
+    #     if face in self.mpfad.dirichlet_faces:
+    #         D_JK, D_JI, K_eq, I, J, K, face_area \
+    #          = self.mpfad.mb.tag_get_data(self.mpfad.flux_info_tag, face)[0]
+    #         adj_vol = self.mesh.mtu.get_bridge_adjacencies(face, 2, 3)
+    #         p_L = self.mesh.mb.tag_get_data(self.mesh.pressure_tag, adj_vol)
+    #         p_I = self.get_node_pressure(int(I))
+    #         p_J = self.get_node_pressure(int(J))
+    #         p_K = self.get_node_pressure(int(K))
+    #         v = - (D_JK * (p_I - p_J)
+    #                - K_eq * (p_J - p_L)
+    #                + D_JI * (p_J - p_K)) * face_area
+    #         # TODO: Implementation of analitical velocity calculation
+    #     else:
+    #         return None
         # if face in self.mpfad.intern_faces:
         #     D_JK, D_JI, K_eq, I, J, K, face_area \
         #      = self.mpfad.mb.tag_get_data(self.mpfad.flux_info_tag, face)[0]
@@ -72,7 +72,7 @@ class BenchmarkFVCA:
         #     v = -K_eq * face_area * (2 * (p_R - p_L)
         #                              - D_JK * (p_J - p_I)
         #                              + D_JI * (p_J - p_K))
-        return v
+        # return v
 
     def norms_calculator(self, error_vector, volumes_vector, u_vector):
         error_vector = np.array(error_vector)

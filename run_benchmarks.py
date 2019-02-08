@@ -5,10 +5,8 @@ from mpfad.interpolation.LSW import LSW
 from benchmark_fvca import BenchmarkFVCA
 from oblique_drain import ObliqueDrain
 
-
 benchmark_fvca_cases = ['1', '2', '3', '4', '5', '6', '7', '8']
 interpolations = [LPEW3, IDW, LSW]
-
 fvcaMeshesB = [BenchMeshGenerator(str(case)).generate_mesh()
                for case in benchmark_fvca_cases]
 for mesh in fvcaMeshesB:
