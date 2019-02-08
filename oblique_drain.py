@@ -86,7 +86,7 @@ class ObliqueDrain:
         u_min = min(self.mpfad.mb.tag_get_data(
                               self.mpfad.pressure_tag, volumes))
         results = self.norms_calculator(err, vols, u)
-        non_zero_mat = self.mpfad.A_prime.NumGlobalNonzeros()
+        non_zero_mat = self.mpfad.T.NumGlobalNonzeros()
         path = 'paper_mpfad_tests/oblique_drain_tests/' + log_name + '_log'
         with open(path, 'w') as f:
             f.write('TEST CASE 1\n\nUnknowns:\t %.0f\n' % (len(volumes)))

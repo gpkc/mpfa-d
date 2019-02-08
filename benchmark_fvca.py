@@ -120,7 +120,7 @@ class BenchmarkFVCA:
         y = y + 1/2.
         z = z + 1/3.
         u1 = 1 + np.sin(pi * x) * np.sin(pi * y) * np.sin(pi * z)
-        return K, x, # u1
+        return K, u1
 
     def _benchmark_2(self, x, y, z):
         k_xx = y ** 2 + z ** 2 + 1
@@ -204,9 +204,9 @@ class BenchmarkFVCA:
             f.write('maximum error:\t %.6g\n' % (results[4]))
             f.write('minimum error:\t %.6g\n' % (results[5]))
 
-        for face in faces:
-            v = self.get_velocity(face)
-            print(v)
+        # for face in faces:
+        #     v = self.get_velocity(face)
+        #     print(v)
 
         print('max error: ', max(u_err), 'l-2 relative norm: ', results[2])
         path = 'paper_mpfad_tests/benchmark_fvca_cases/benchmark_case_1/'

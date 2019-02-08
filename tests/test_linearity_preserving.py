@@ -3,6 +3,8 @@ import numpy as np
 from mpfad.MpfaD import MpfaD3D
 from mpfad.interpolation.LPEW3 import LPEW3
 from mesh_preprocessor import MeshManager
+from pymoab import types
+import mpfad.helpers.geometric as geo
 
 
 class LinearityPreservingTests(unittest.TestCase):
@@ -84,7 +86,7 @@ class LinearityPreservingTests(unittest.TestCase):
                           ((z - z_min)/(z_max - z_min))) * p_min
         return _max + _min
 
-    # @unittest.skip('debugging other tests')
+    @unittest.skip('debugging other tests')
     def test_case_1(self):
         mb = self.mesh_homogeneous.mb
         """
@@ -108,7 +110,7 @@ class LinearityPreservingTests(unittest.TestCase):
                                      volume)
             self.assertAlmostEqual(u_calc, u, delta=1e-15)
 
-    # @unittest.skip('debugging other tests')
+    @unittest.skip('debugging other tests')
     def test_case_2(self):
         """
         Test if mesh_homogeneous with tensor K_2 and solution 1
@@ -132,7 +134,7 @@ class LinearityPreservingTests(unittest.TestCase):
                                      volume)
             self.assertAlmostEqual(u_calc, u, delta=1e-15)
 
-    # @unittest.skip('debugging other tests')
+    @unittest.skip('debugging other tests')
     def test_case_3(self):
         """
         Test if mesh_homogeneous with tensor K_3 and solution 1
@@ -156,7 +158,7 @@ class LinearityPreservingTests(unittest.TestCase):
                                      volume)
             self.assertAlmostEqual(u_calc, u, delta=1e-15)
 
-    # @unittest.skip('debugging other tests')
+    @unittest.skip('debugging other tests')
     def test_case_4(self):
         """
         Test if mesh_heterogeneous with tensor K_1/K_2 and solution 1
@@ -188,7 +190,7 @@ class LinearityPreservingTests(unittest.TestCase):
 
             self.assertAlmostEqual(u_calc, u, delta=1e-15)
 
-    # @unittest.skip('debugging other tests')
+    @unittest.skip('debugging other tests')
     def test_schneider_linear_preserving(self):
         """
         Test if mesh_homogeneous with tensor K_3 and solution 1
@@ -214,29 +216,29 @@ class LinearityPreservingTests(unittest.TestCase):
                                      volume)
             self.assertAlmostEqual(u_calc[0][0], u, delta=1e-10)
 
-    # @unittest.skip('debugging other tests')
+    @unittest.skip('debugging other tests')
     def test_oblique_drain_contains_all_faces(self):
         all_faces = self.slanted_mesh.all_faces
         self.assertEqual(len(all_faces), 44)
 
-    # @unittest.skip('debugging other tests')
+    @unittest.skip('debugging other tests')
     def test_if_mehs_contains_all_dirichlet_faces(self):
         dirichlet_faces = self.slanted_mesh.dirichlet_faces
         self.assertEqual(len(dirichlet_faces), 16)
 
-    # @unittest.skip('debugging other tests')
+    @unittest.skip('debugging other tests')
     def test_if_mehs_contains_all_neumann_faces(self):
         neumann_faces = self.slanted_mesh.neumann_faces
         self.assertEqual(len(neumann_faces), 12)
 
-    # @unittest.skip('debugging other tests')
+    @unittest.skip('debugging other tests')
     def test_if_neumann_bc_is_appplied(self):
         for face in self.slanted_mesh.neumann_faces:
             face_flow = self.slanted_mesh.mb.tag_get_data(
                 self.slanted_mesh.neumann_tag, face)[0][0]
             self.assertEqual(face_flow, 0.0)
 
-    # @unittest.skip('debugging other tests')
+    @unittest.skip('debugging other tests')
     def test_oblique_drain(self):
         """
         Test if slanted_mesh
