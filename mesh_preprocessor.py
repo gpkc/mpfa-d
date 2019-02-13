@@ -1,8 +1,6 @@
 import numpy as np
 import mpfad.helpers.geometric as geo
 # import mpfad.helpers.cgeom as cgeo
-from math import pi
-from math import sqrt
 from pymoab import core
 from pymoab import types
 from pymoab import topo_util
@@ -67,6 +65,7 @@ class MeshManager:
         self.dirichlet_faces = set()
         self.neumann_faces = set()
 
+
     def create_vertices(self, coords):
         new_vertices = self.mb.create_vertices(coords)
         self.all_nodes.append(new_vertices)
@@ -126,12 +125,16 @@ class MeshManager:
                              dim_target, set_connect=set_nodes)
 
     def get_boundary_nodes(self):
-        all_faces = self.dirichlet_faces | self.neumann_faces
+        all_boundary_faces = self.dirichlet_faces | self.neumann_faces
         boundary_nodes = set()
-        for face in all_faces:
+        for face in all_boundary_faces:
             nodes = self.mtu.get_bridge_adjacencies(face, 2, 0)
             boundary_nodes.update(nodes)
         return boundary_nodes
+
+    def intern_faces(self):
+        return set(self.all_faces).difference(self.dirichlet_faces
+                                              | self.neumann_faces)
 
     def get_non_boundary_volumes(self, dirichlet_nodes, neumann_nodes):
         volumes = self.all_volumes
@@ -143,6 +146,34 @@ class MeshManager:
                 non_boundary_volumes.append(volume)
 
         return non_boundary_volumes
+
+    def get_bfaces_info(self):
+        verts = []
+        for face in self.dirichlet_faces:
+            I, J, K = self.mtu.get_bridge_adjacencies(face, 2, 0)
+            print(I, J, K)
+            left_volume = np.asarray(self.mtu.get_bridge_adjacencies(
+                                     face, 2, 3), dtype='uint64')
+            id_volume = self.mb.tag_get_data(self.global_id_tag,
+                                             left_volume)[0][0]
+
+            JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
+            JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
+            LJ = self.mb.get_coords([J]) - \
+                self.mb.tag_get_data(self.volume_centre_tag, left_volume)[0]
+            N_IJK = np.cross(JI, JK) / 2.
+            test = np.dot(LJ, N_IJK)
+            if test < 0.:
+                I, K = K, I
+                JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
+                JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
+                N_IJK = np.cross(JI, JK) / 2.
+            tan_JI = np.cross(N_IJK, JI)
+            tan_JK = np.cross(N_IJK, JK)
+
+            face_area = np.sqrt(np.dot(N_IJK, N_IJK))
+            h_L = geo.get_height(N_IJK, LJ)
+            verts.append(I, J, K)
 
     def get_redefine_centre(self):
         vol_centroids = []

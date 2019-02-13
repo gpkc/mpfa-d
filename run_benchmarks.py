@@ -18,8 +18,8 @@ for mesh in fvcaMeshesB:
         BenchmarkFVCA(mesh, interpolation_method).benchmark_case_1(log_name_1)
         BenchmarkFVCA(mesh, interpolation_method).benchmark_case_2(log_name_2)
 
-meshes = {'meshes/mesh_slanted_mesh.h5m': 'coarse_mesh',
-          'meshes/oblique-drain-new.msh': 'fine_mesh'}
-for setCase, logName in meshes.items():
-    print(setCase, logName)
-    ObliqueDrain(setCase).runCase(logName)
+# meshes = {'meshes/mesh_slanted_mesh.h5m': 'coarse_mesh',
+#           'meshes/oblique-drain-new.msh': 'fine_mesh'}
+# for setCase, logName in meshes.items():
+#     print(setCase, logName)
+#     ObliqueDrain(setCase).runCase(logName)

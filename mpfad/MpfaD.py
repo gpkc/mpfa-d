@@ -39,11 +39,7 @@ class MpfaD3D:
 
         self.dirichlet_faces = mesh_data.dirichlet_faces
         self.neumann_faces = mesh_data.neumann_faces
-        # self.intern_faces = mesh_data.intern_faces
-
-        self.all_faces = mesh_data.all_faces
-        boundary_faces = (self.dirichlet_faces | self.neumann_faces)
-        self.intern_faces = set(self.all_faces) - boundary_faces
+        self.intern_faces = mesh_data.intern_faces()
 
         self.volumes = self.mesh_data.all_volumes
 
@@ -109,9 +105,6 @@ class MpfaD3D:
                 v_id = self.mb.tag_get_data(self.global_id_tag, volume)[0][0]
                 self.v_ids.append([v_id, v_id])
                 self.ivalues.append([-RHS * weight, RHS * weight])
-                # self.T.InsertGlobalValues([id_left, id_right],
-                #                           [v_id, v_id], [-RHS * weight,
-                #                                          RHS * weight])
         if node in self.neumann_nodes:
             neu_term = self.nodes_nts[node]
             self.Q[id_right] += -RHS * neu_term
@@ -122,10 +115,6 @@ class MpfaD3D:
                 v_id = self.mb.tag_get_data(self.global_id_tag, volume)[0][0]
                 self.v_ids.append([v_id, v_id])
                 self.ivalues.append([-RHS * weight_N, RHS * weight_N])
-                # self.T.InsertGlobalValues([id_left, id_right],
-                #                           [v_id, v_id], [-RHS * weight_N,
-                #                                          RHS * weight_N])
-        # self.T.InsertGlobalValues(ids, v_ids, values)
 
     def run_solver(self, interpolation_method):
         t0 = time.time()
@@ -133,7 +122,7 @@ class MpfaD3D:
         print('interpolation runing...')
         self.get_nodes_weights(interpolation_method)
         print('done interpolation...',
-              'took {0} seconds to interpolate over {1} verts'. \
+              'took {0} seconds to interpolate over {1} verts'.
               format(time.time() - t0, n_vertex))
         print('filling the transmissibility matrix...')
         begin = time.time()
@@ -163,31 +152,39 @@ class MpfaD3D:
         all_LHS = []
         for face in self.dirichlet_faces:
             # '2' argument was initially '0' but it's incorrect
+            # TODO: Do list comprehension
             I, J, K = self.mtu.get_bridge_adjacencies(face, 2, 0)
+
             left_volume = np.asarray(self.mtu.get_bridge_adjacencies(
                                      face, 2, 3), dtype='uint64')
             id_volume = self.mb.tag_get_data(self.global_id_tag,
                                              left_volume)[0][0]
             id_volumes.append(id_volume)
+
             JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
             JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
             LJ = self.mb.get_coords([J]) - \
                 self.mesh_data.mb.tag_get_data(self.volume_centre_tag,
                                                left_volume)[0]
             N_IJK = np.cross(JI, JK) / 2.
-            test = np.dot(LJ, N_IJK)
-            if test < 0.:
+            _test = np.dot(LJ, N_IJK)
+            if _test < 0.:
                 I, K = K, I
                 JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
                 JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
                 N_IJK = np.cross(JI, JK) / 2.
-
             tan_JI = np.cross(N_IJK, JI)
             tan_JK = np.cross(N_IJK, JK)
+
             face_area = np.sqrt(np.dot(N_IJK, N_IJK))
+            h_L = geo.get_height(N_IJK, LJ)
+
+            g_I = self.get_boundary_node_pressure(I)
+            g_J = self.get_boundary_node_pressure(J)
+            g_K = self.get_boundary_node_pressure(K)
+
             K_L = self.mb.tag_get_data(self.perm_tag,
                                        left_volume).reshape([3, 3])
-            h_L = geo.get_height(N_IJK, LJ)
             K_n_L = self.vmv_multiply(N_IJK, K_L, N_IJK)
             K_L_JI = self.vmv_multiply(N_IJK, K_L, tan_JI)
             K_L_JK = self.vmv_multiply(N_IJK, K_L, tan_JK)
@@ -200,15 +197,10 @@ class MpfaD3D:
                                                  boundary=True)
             K_eq = (1 / h_L)*(face_area * K_n_L)
 
-            g_I = self.get_boundary_node_pressure(I)
-            g_J = self.get_boundary_node_pressure(J)
-            g_K = self.get_boundary_node_pressure(K)
-
             RHS = (D_JK * (g_I - g_J) - K_eq * g_J + D_JI * (g_J - g_K))
             LHS = K_eq
             all_LHS.append(LHS)
 
-            # self.T.InsertGlobalValues(id_volume, id_volume, LHS)
             self.Q[id_volume] += -RHS
             self.mb.tag_set_data(self.flux_info_tag, face,
                                  [D_JK, D_JI, K_eq, I, J, K, face_area])
@@ -287,8 +279,6 @@ class MpfaD3D:
             all_cols.append(col_ids)
             all_rows.append(row_ids)
             all_values.append(values)
-            # TODO: try to append to insert global values only once
-            # self.T.InsertGlobalValues(col_ids, row_ids, values)
 
             self._node_treatment(I, id_left, id_right, K_eq, D_JK=D_JK)
             self._node_treatment(J, id_left, id_right, K_eq,

@@ -39,14 +39,6 @@ class InterpMethodTest(unittest.TestCase):
         self.mesh_2.get_redefine_centre()
         self.mpfad_2 = MpfaD3D(self.mesh_2)
 
-        self.mesh_3 = MeshManager('meshes/mesh_test_3.msh', dim=3)
-        self.mesh_3.set_media_property('Permeability', {1: K_1}, dim_target=3)
-        self.mesh_3.set_boundary_condition('Dirichlet', {102: 1.0, 101: 0.0},
-                                           dim_target=2, set_nodes=True)
-        self.mesh_3.set_boundary_condition('Neumann', {201: 0.0},
-                                           dim_target=2, set_nodes=True)
-        self.mpfad_3 = MpfaD3D(self.mesh_3)
-
         self.mesh_4 = MeshManager('meshes/mesh_test_7.msh', dim=3)
         self.mesh_4.set_media_property('Permeability', {1: K_1}, dim_target=3)
         self.mesh_4.set_boundary_condition('Dirichlet', {102: 1.0, 101: 0.0},
@@ -107,6 +99,21 @@ class InterpMethodTest(unittest.TestCase):
                 local_pressure[0][0], 1 - coord_x, delta=1e-15)
 
     # @unittest.skip('skip')
+    def test_lin_prob_heterog_mesh_lpew3_neumann_intern_nodes_mesh_5(self):
+        self.mpfad_5.run_solver(LPEW3(self.mesh_5).interpolate)
+        for a_volume in self.mesh_5.all_volumes:
+            local_pressure = self.mesh_5.mb.tag_get_data(
+                             self.mpfad_5.pressure_tag, a_volume)
+            coord_x = self.mesh_5.get_centroid(a_volume)[0]
+
+            if coord_x < 0.5:
+                self.assertAlmostEqual(
+                    local_pressure[0][0], (-2/3.0)*coord_x + 1, delta=1e-14)
+            else:
+                self.assertAlmostEqual(
+                    local_pressure[0][0], (4/3.0)*(1 - coord_x), delta=1e-14)
+
+    # @unittest.skip('skip')
     def test_number_of_non_null_neumann_faces(self):
         neumann_faces = self.mpfad_6.neumann_faces
         count = 0
@@ -127,18 +134,3 @@ class InterpMethodTest(unittest.TestCase):
             coord_x = self.mesh_6.get_centroid(a_volume)[0]
             self.assertAlmostEqual(
                 local_pressure[0][0], 1 - coord_x, delta=1e-15)
-
-    # @unittest.skip('skip')
-    def test_lin_prob_heterog_mesh_lpew3_neumann_intern_nodes_mesh_5(self):
-        self.mpfad_5.run_solver(LPEW3(self.mesh_5).interpolate)
-        for a_volume in self.mesh_5.all_volumes:
-            local_pressure = self.mesh_5.mb.tag_get_data(
-                             self.mpfad_5.pressure_tag, a_volume)
-            coord_x = self.mesh_5.get_centroid(a_volume)[0]
-
-            if coord_x < 0.5:
-                self.assertAlmostEqual(
-                    local_pressure[0][0], (-2/3.0)*coord_x + 1, delta=1e-14)
-            else:
-                self.assertAlmostEqual(
-                    local_pressure[0][0], (4/3.0)*(1 - coord_x), delta=1e-14)

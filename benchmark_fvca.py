@@ -1,6 +1,6 @@
 import numpy as np
 from math import pi
-# import mpfad.helpers.geometric as geo
+import mpfad.helpers.geometric as geo
 from mpfad.MpfaD import MpfaD3D
 from mesh_preprocessor import MeshManager
 from pymoab import types
@@ -17,62 +17,98 @@ class BenchmarkFVCA:
         self.mpfad = MpfaD3D(self.mesh)
         self.im = interpolation_method(self.mesh)
 
-    # def get_node_pressure(self, node):
-    #     try:
-    #         p_vert = self.mpfad.mb.tag_get_data(self.mpfad.dirichlet_tag, node)
-    #     except:
-    #         p_vert = 0.0
-    #         p_tag = self.mpfad.pressure_tag
-    #         nd_weights = self.mpfad.nodes_ws[node]
-    #         for volume, wt in nd_weights.items():
-    #             p_vol = self.mpfad.mb.tag_get_data(p_tag, volume)
-    #             p_vert += p_vol * wt
-    #     return p_vert
-    #
-    # def get_velocity(self, face):
-    #     if face in self.mpfad.dirichlet_faces:
-    #         D_JK, D_JI, K_eq, I, J, K, face_area \
-    #          = self.mpfad.mb.tag_get_data(self.mpfad.flux_info_tag, face)[0]
-    #         adj_vol = self.mesh.mtu.get_bridge_adjacencies(face, 2, 3)
-    #         p_L = self.mesh.mb.tag_get_data(self.mesh.pressure_tag, adj_vol)
-    #         p_I = self.get_node_pressure(int(I))
-    #         p_J = self.get_node_pressure(int(J))
-    #         p_K = self.get_node_pressure(int(K))
-    #         v = - (D_JK * (p_I - p_J)
-    #                - K_eq * (p_J - p_L)
-    #                + D_JI * (p_J - p_K)) * face_area
-    #         # TODO: Implementation of analitical velocity calculation
-    #     else:
-    #         return None
-        # if face in self.mpfad.intern_faces:
-        #     D_JK, D_JI, K_eq, I, J, K, face_area \
-        #      = self.mpfad.mb.tag_get_data(self.mpfad.flux_info_tag, face)[0]
-        #     left_volume, right_volume = \
-        #         self.mesh.mtu.get_bridge_adjacencies(face, 2, 3)
-        #     L = self.mesh.mb.tag_get_data(self.mesh.volume_centre_tag,
-        #                                   left_volume)[0]
-        #     R = self.mesh.mb.tag_get_data(self.mesh.volume_centre_tag,
-        #                                   right_volume)[0]
-        #     dist_LR = R - L
-        #     I, J, K = self.mesh.mtu.get_bridge_adjacencies(face, 0, 0)
-        #     JI = self.mesh.mb.get_coords([I]) - self.mesh.mb.get_coords([J])
-        #     JK = self.mesh.mb.get_coords([K]) - self.mesh.mb.get_coords([J])
-        #
-        #     N_IJK = np.cross(JI, JK) / 2.
-        #     test = np.dot(N_IJK, dist_LR)
-        #
-        #     if test < 0:
-        #         left_volume, right_volume = right_volume, left_volume
-        #
-        #     p_I = self.get_node_pressure(int(I))
-        #     p_J = self.get_node_pressure(int(J))
-        #     p_K = self.get_node_pressure(int(K))
-        #     p_R, p_L = self.mesh.mb.tag_get_data(self.mesh.pressure_tag,
-        #                                          [left_volume, right_volume])
-        #     v = -K_eq * face_area * (2 * (p_R - p_L)
-        #                              - D_JK * (p_J - p_I)
-        #                              + D_JI * (p_J - p_K))
-        # return v
+    def get_velocity(self):
+        self.node_pressure_tag = self.mpfad.mb.tag_get_handle(
+            "Node Pressure", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
+                                                              )
+        p_verts = []
+        for node in self.mesh.all_nodes:
+            try:
+                p_vert = self.mpfad.mb.tag_get_data(self.mpfad.dirichlet_tag,
+                                                    node)
+                p_verts.append(p_vert[0])
+            except:
+                p_vert = 0.0
+                p_tag = self.mpfad.pressure_tag
+                nd_weights = self.mpfad.nodes_ws[node]
+                for volume, wt in nd_weights.items():
+                    p_vol = self.mpfad.mb.tag_get_data(p_tag, volume)
+                    p_vert += p_vol * wt
+                p_verts.append(p_vert[0])
+        self.mpfad.mb.tag_set_data(self.node_pressure_tag, self.mesh.all_nodes,
+                                   p_verts)
+        err = []
+        all_vels = []
+        areas = []
+        for a_volume in self.mesh.all_volumes:
+            vol_faces = self.mesh.mtu.get_bridge_adjacencies(a_volume, 2, 2)
+            vol_nodes = self.mesh.mtu.get_bridge_adjacencies(a_volume, 0, 0)
+            vol_crds = self.mesh.mb.get_coords(vol_nodes)
+            vol_crds = np.reshape(vol_crds, ([4, 3]))
+            vol_volume = self.mesh.get_tetra_volume(vol_crds)
+            I, J, K = self.mesh.mtu.get_bridge_adjacencies(vol_faces[0], 2, 0)
+            L = list(set(vol_nodes).difference(set(
+                self.mesh.mtu.get_bridge_adjacencies(vol_faces[0], 2, 0))))
+            JI = self.mesh.mb.get_coords([I]) - self.mesh.mb.get_coords([J])
+            JK = self.mesh.mb.get_coords([K]) - self.mesh.mb.get_coords([J])
+            LJ = self.mesh.mb.get_coords([J]) - self.mesh.mb.get_coords(L)
+            N_IJK = np.cross(JI, JK) / 2.
+
+            test = np.dot(LJ, N_IJK)
+            if test < 0.:
+                I, K = K, I
+                JI = self.mesh.mb.get_coords([I]) - \
+                    self.mesh.mb.get_coords([J])
+                JK = self.mesh.mb.get_coords([K]) - \
+                    self.mesh.mb.get_coords([J])
+                N_IJK = np.cross(JI, JK) / 2.
+
+            tan_JI = np.cross(N_IJK, JI)
+            tan_JK = np.cross(N_IJK, JK)
+            face_area = np.sqrt(np.dot(N_IJK, N_IJK))
+
+            h_L = geo.get_height(N_IJK, LJ)
+
+            p_I = self.mpfad.mb.tag_get_data(self.node_pressure_tag, I)
+            p_J = self.mpfad.mb.tag_get_data(self.node_pressure_tag, J)
+            p_K = self.mpfad.mb.tag_get_data(self.node_pressure_tag, K)
+            p_L = self.mpfad.mb.tag_get_data(self.node_pressure_tag, L)
+            grad_normal = - 2 * (p_J - p_L) * N_IJK
+            grad_cross_I = (p_J - p_I) * ((np.dot(tan_JK, LJ) / face_area ** 2)
+                                          * N_IJK - (h_L / (face_area)) *
+                                          tan_JK)
+            grad_cross_K = (p_K - p_J) * ((np.dot(tan_JI, LJ) / face_area ** 2)
+                                          * N_IJK - (h_L / (face_area)) *
+                                          tan_JI)
+
+            grad_p = -(1 / (6 * vol_volume)) * (grad_normal +
+                                                grad_cross_I +
+                                                grad_cross_K)
+            vol_centroid = np.asarray(self.mesh.mb.tag_get_data(
+                                      self.mesh.volume_centre_tag,
+                                      a_volume)[0])
+            vol_perm = self.mesh.mb.tag_get_data(self.mesh.perm_tag,
+                                                 a_volume).reshape([3, 3])
+            for face in vol_faces:
+                x, y, z = self.mesh.mb.get_coords([face])
+                face_nodes = self.mesh.mtu.get_bridge_adjacencies(face, 2, 0)
+                face_nodes_crds = self.mesh.mb.get_coords(face_nodes)
+                area_vect = geo._area_vector(face_nodes_crds.reshape([3,3]),
+                                             vol_centroid)[0]
+                unit_area_vec = area_vect / np.sqrt(np.dot(area_vect,
+                                                           area_vect))
+                k_grad_p = np.dot(vol_perm, grad_p[0])
+                vel = - np.dot(k_grad_p, unit_area_vec)
+                calc_vel = - np.dot(self.calculate_K_gradient(
+                    x, y, z, self._benchmark_1), unit_area_vec)
+                err.append(abs(vel - calc_vel) ** 2)
+                areas.append(np.sqrt(np.dot(area_vect, area_vect)))
+
+                all_vels.append(calc_vel ** 2)
+        norm_vel = np.sqrt(np.dot(err, areas) / np.dot(all_vels, areas))
+        return norm_vel
+
+
 
     def norms_calculator(self, error_vector, volumes_vector, u_vector):
         error_vector = np.array(error_vector)
@@ -120,7 +156,12 @@ class BenchmarkFVCA:
         y = y + 1/2.
         z = z + 1/3.
         u1 = 1 + np.sin(pi * x) * np.sin(pi * y) * np.sin(pi * z)
-        return K, u1
+        source = pi ** 2 * (
+                           (3 * np.sin(pi * x)*np.sin(pi * y) * np.sin(pi * z))
+                           - (np.cos(pi * x) * np.cos(pi * y) * np.sin(pi * z))
+                           - (np.sin(pi * x) * np.cos(pi * y) * np.cos(pi * z))
+                           )
+        return K, u1, source
 
     def _benchmark_2(self, x, y, z):
         k_xx = y ** 2 + z ** 2 + 1
@@ -151,12 +192,15 @@ class BenchmarkFVCA:
         return K, u3
 
     def benchmark_case_1(self, log_name):
+        """
+        This is the Finite Volumes for Complex Applications Benchmark
+        Test case 1.
+        """
         for node in self.mesh.get_boundary_nodes():
             x, y, z = self.mesh.mb.get_coords([node])
             g_D = self._benchmark_1(x, y, z)[1]
             self.mesh.mb.tag_set_data(self.mesh.dirichlet_tag, node, g_D)
         volumes = self.mesh.all_volumes
-        faces = self.mesh.all_faces
         vols = []
         for volume in volumes:
             x, y, z = self.mesh.mb.tag_get_data(self.mesh.volume_centre_tag,
@@ -168,7 +212,7 @@ class BenchmarkFVCA:
             vol_nodes_crds = np.reshape(vol_nodes_crds, (4, 3))
             tetra_vol = self.mesh.get_tetra_volume(vol_nodes_crds)
             vols.append(tetra_vol)
-            source_term = self.calculate_divergent(x, y, z, self._benchmark_1)
+            source_term = self._benchmark_1(x, y, z)[2]
             self.mesh.mb.tag_set_data(self.mesh.source_tag, volume,
                                       source_term * tetra_vol)
 
@@ -190,6 +234,7 @@ class BenchmarkFVCA:
                               self.mpfad.pressure_tag, volumes))
         results = self.norms_calculator(u_err, vols, u)
         non_zero_mat = self.mpfad.T.NumGlobalNonzeros()
+        norm_vel = self.get_velocity()
         path = 'paper_mpfad_tests/benchmark_fvca_cases/benchmark_case_1/' \
             + log_name + '_log'
         with open(path, 'w') as f:
@@ -203,10 +248,7 @@ class BenchmarkFVCA:
             f.write('average error:\t %.6g\n' % (results[3]))
             f.write('maximum error:\t %.6g\n' % (results[4]))
             f.write('minimum error:\t %.6g\n' % (results[5]))
-
-        # for face in faces:
-        #     v = self.get_velocity(face)
-        #     print(v)
+            f.write('velocity norm: \t %.6g\n' % norm_vel)
 
         print('max error: ', max(u_err), 'l-2 relative norm: ', results[2])
         path = 'paper_mpfad_tests/benchmark_fvca_cases/benchmark_case_1/'
