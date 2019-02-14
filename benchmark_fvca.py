@@ -16,8 +16,12 @@ class BenchmarkFVCA:
         self.mesh.get_redefine_centre()
         self.mpfad = MpfaD3D(self.mesh)
         self.im = interpolation_method(self.mesh)
+        self.physical_tag = self.mb.tag_get_handle("MATERIAL_SET")
+        self.physical_sets = self.mb.get_entities_by_type_and_tag(
+            0, types.MBENTITYSET, np.array((self.physical_tag,)),
+            np.array((None, )))
 
-    def get_velocity(self):
+    def get_velocity(self, bmk):
         self.node_pressure_tag = self.mpfad.mb.tag_get_handle(
             "Node Pressure", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
                                                               )
@@ -38,14 +42,18 @@ class BenchmarkFVCA:
         self.mpfad.mb.tag_set_data(self.node_pressure_tag, self.mesh.all_nodes,
                                    p_verts)
         err = []
+        err_grad = []
+        grads_p = []
         all_vels = []
         areas = []
+        vols = []
         for a_volume in self.mesh.all_volumes:
             vol_faces = self.mesh.mtu.get_bridge_adjacencies(a_volume, 2, 2)
             vol_nodes = self.mesh.mtu.get_bridge_adjacencies(a_volume, 0, 0)
             vol_crds = self.mesh.mb.get_coords(vol_nodes)
             vol_crds = np.reshape(vol_crds, ([4, 3]))
             vol_volume = self.mesh.get_tetra_volume(vol_crds)
+            vols.append(vol_volume)
             I, J, K = self.mesh.mtu.get_bridge_adjacencies(vol_faces[0], 2, 0)
             L = list(set(vol_nodes).difference(set(
                 self.mesh.mtu.get_bridge_adjacencies(vol_faces[0], 2, 0))))
@@ -74,6 +82,7 @@ class BenchmarkFVCA:
             p_K = self.mpfad.mb.tag_get_data(self.node_pressure_tag, K)
             p_L = self.mpfad.mb.tag_get_data(self.node_pressure_tag, L)
             grad_normal = - 2 * (p_J - p_L) * N_IJK
+
             grad_cross_I = (p_J - p_I) * ((np.dot(tan_JK, LJ) / face_area ** 2)
                                           * N_IJK - (h_L / (face_area)) *
                                           tan_JK)
@@ -89,8 +98,17 @@ class BenchmarkFVCA:
                                       a_volume)[0])
             vol_perm = self.mesh.mb.tag_get_data(self.mesh.perm_tag,
                                                  a_volume).reshape([3, 3])
+            x, y, z = vol_centroid
+            grad_p_bar = self.calculate_gradient(x, y, z, bmk)
+            grads_p.append(np.dot(grad_p_bar, grad_p_bar))
+            # print(grad_p, grad_p_bar, grad_p - grad_p_bar)
+            e = grad_p[0] - grad_p_bar
+            err_norm = np.sqrt(np.dot(e, e))
+            # print(err_norm)
+            err_grad.append(err_norm ** 2)
+
             for face in vol_faces:
-                x, y, z = self.mesh.mb.get_coords([face])
+                # x, y, z = self.mesh.mb.get_coords([face])
                 face_nodes = self.mesh.mtu.get_bridge_adjacencies(face, 2, 0)
                 face_nodes_crds = self.mesh.mb.get_coords(face_nodes)
                 area_vect = geo._area_vector(face_nodes_crds.reshape([3,3]),
@@ -100,13 +118,15 @@ class BenchmarkFVCA:
                 k_grad_p = np.dot(vol_perm, grad_p[0])
                 vel = - np.dot(k_grad_p, unit_area_vec)
                 calc_vel = - np.dot(self.calculate_K_gradient(
-                    x, y, z, self._benchmark_1), unit_area_vec)
+                    x, y, z, bmk), unit_area_vec)
                 err.append(abs(vel - calc_vel) ** 2)
                 areas.append(np.sqrt(np.dot(area_vect, area_vect)))
-
                 all_vels.append(calc_vel ** 2)
         norm_vel = np.sqrt(np.dot(err, areas) / np.dot(all_vels, areas))
-        return norm_vel
+        # print(len(err_norm), len(vols))
+        norm_grad = np.sqrt(np.dot(err_grad, vols) / np.dot(grads_p, vols))
+        print(norm_grad)
+        return norm_vel, norm_grad
 
 
 
@@ -183,13 +203,35 @@ class BenchmarkFVCA:
 
         return K, u2
 
-    def _benchmark_3(self, x, y, z):
-        K = [1E-0, 0E-0, 0E-0,
-             0E-0, 1E-0, 0E-0,
-             0E-0, 0E-0, 1E-3]
-        u3 = np.sin(2 * pi * x) * np.sin(2 * pi * y) * np.sin(2 * pi * z)
+    def _benchmark_5(self, x, y, z, material_set):
+                        # 1  2  3  4
+        table = np.array([1.00, 1.00, 1.00, 1.00],  # ax^i
+                         [10.0, 0.10, 0.01, 100.],  # ay^i
+                         [0.01, 100., 10., 0.100],  # az^i
+                         [0.10, 10.0, 100., 0.01],  # alpha^i
+                         )
+        K_1 = np.array([table[0][0], 0., 0.],
+                       [0., table[1][0], 0.],
+                       [0., 0., table[2][0]])
 
-        return K, u3
+        K_2 = np.array([table[0][1], 0., 0.],
+                       [0., table[1][1], 0.],
+                       [0., 0., table[2][1]])
+
+        K_3 = np.array([table[0][2], 0., 0.],
+                       [0., table[1][2], 0.],
+                       [0., 0., table[2][2]])
+
+        K_4 = np.array([table[0][3], 0., 0.],
+                       [0., table[1][3], 0.],
+                       [0., 0., table[2][3]])
+
+        self.mesh.set_media_property('Permeability', {1: K_1, 2: K_2,
+                                                      3: K_3, 4: K_4},
+                                     dim_target=3)
+
+        u5 = table[3][material_set - 1] * np.sin(2 * pi * x) * np.sin(2 * pi * y) * np.sin(2 * pi * z)
+        return u5, table
 
     def benchmark_case_1(self, log_name):
         """
@@ -234,11 +276,12 @@ class BenchmarkFVCA:
                               self.mpfad.pressure_tag, volumes))
         results = self.norms_calculator(u_err, vols, u)
         non_zero_mat = self.mpfad.T.NumGlobalNonzeros()
-        norm_vel = self.get_velocity()
+        norm_vel, norm_grad = self.get_velocity(self._benchmark_1)
         path = 'paper_mpfad_tests/benchmark_fvca_cases/benchmark_case_1/' \
             + log_name + '_log'
         with open(path, 'w') as f:
             f.write('TEST CASE 1\n\nUnknowns:\t %.0f\n' % (len(volumes)))
+            # f.write('Interpolation Method: {}'.format(self.im.__name__))
             f.write('Non-zero matrix:\t %.0f\n' % (non_zero_mat))
             f.write('Umin:\t %.6f\n' % (u_min))
             f.write('Umax:\t %.6f\n' % (u_max))
@@ -249,6 +292,7 @@ class BenchmarkFVCA:
             f.write('maximum error:\t %.6g\n' % (results[4]))
             f.write('minimum error:\t %.6g\n' % (results[5]))
             f.write('velocity norm: \t %.6g\n' % norm_vel)
+            f.write('gradient norm: \t %.6g\n' % norm_grad)
 
         print('max error: ', max(u_err), 'l-2 relative norm: ', results[2])
         path = 'paper_mpfad_tests/benchmark_fvca_cases/benchmark_case_1/'
@@ -293,10 +337,12 @@ class BenchmarkFVCA:
                               self.mpfad.pressure_tag, volumes))
         results = self.norms_calculator(err, vols, u)
         non_zero_mat = self.mpfad.T.NumGlobalNonzeros()
+        norm_vel, norm_grad = self.get_velocity(self._benchmark_2)
         path = 'paper_mpfad_tests/benchmark_fvca_cases/benchmark_case_2/' \
             + log_name + '_log'
         with open(path, 'w') as f:
             f.write('TEST CASE 2\n\nUnknowns:\t %.6f\n' % (len(volumes)))
+            # f.write('Interpolation Method: {}'.format(self.im.__name__))
             f.write('Non-zero matrix:\t %.6f\n' % (non_zero_mat))
             f.write('Umin:\t %.6f\n' % (u_min))
             f.write('Umax:\t %.6f\n' % (u_max))
@@ -306,6 +352,8 @@ class BenchmarkFVCA:
             f.write('average error:\t %.6f\n' % (results[3]))
             f.write('maximum error:\t %.6f\n' % (results[4]))
             f.write('minimum error:\t %.6f\n' % (results[5]))
+            f.write('velocity norm: \t %.6g\n' % norm_vel)
+            f.write('gradient norm: \t %.6g\n' % norm_grad)
 
         print('max error: ', max(err), 'l-2 relative norm: ', results[2])
         path = 'paper_mpfad_tests/benchmark_fvca_cases/benchmark_case_2/'

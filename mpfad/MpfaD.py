@@ -298,9 +298,9 @@ class MpfaD3D:
         linearProblem = Epetra.LinearProblem(self.T, self.x, self.Q)
         solver = AztecOO.AztecOO(linearProblem)
         solver.SetAztecOption(AztecOO.AZ_output, AztecOO.AZ_none)
-        solver.SetAztecOption(AztecOO.AZ_precond, AztecOO.AZ_dom_decomp)
+        # solver.SetAztecOption(AztecOO.AZ_precond, AztecOO.AZ_dom_decomp)
         solver.Iterate(1000, 1e-16)
-        t = time.time() - begin
+        t = time.time() - t0
         mesh_size = len(self.volumes)
         its = solver.GetAztecStatus()[0]
         solver_time = solver.GetAztecStatus()[6]
