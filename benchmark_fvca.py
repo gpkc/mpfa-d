@@ -16,10 +16,6 @@ class BenchmarkFVCA:
         self.mesh.get_redefine_centre()
         self.mpfad = MpfaD3D(self.mesh)
         self.im = interpolation_method(self.mesh)
-        self.physical_tag = self.mb.tag_get_handle("MATERIAL_SET")
-        self.physical_sets = self.mb.get_entities_by_type_and_tag(
-            0, types.MBENTITYSET, np.array((self.physical_tag,)),
-            np.array((None, )))
 
     def get_velocity(self, bmk):
         self.node_pressure_tag = self.mpfad.mb.tag_get_handle(

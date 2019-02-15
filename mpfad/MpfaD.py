@@ -27,6 +27,9 @@ class MpfaD3D:
         self.flux_info_tag = self.mb.tag_get_handle(
             "flux info", 7, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
 
+        self.normal_tag = self.mb.tag_get_handle(
+            "Normal", 3, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+
         self.dirichlet_nodes = set(self.mb.get_entities_by_type_and_tag(
             0, types.MBVERTEX, self.dirichlet_tag, np.array((None,))))
 
@@ -50,8 +53,10 @@ class MpfaD3D:
 
     def record_data(self, file_name):
         volumes = self.mb.get_entities_by_dimension(0, 3)
+        faces = self.mb.get_entities_by_dimension(0, 2)
         ms = self.mb.create_meshset()
         self.mb.add_entities(ms, volumes)
+        self.mb.add_entities(ms, faces)
         self.mb.write_file(file_name, [ms])
 
     def get_boundary_node_pressure(self, node):
@@ -175,6 +180,8 @@ class MpfaD3D:
                 N_IJK = np.cross(JI, JK) / 2.
             tan_JI = np.cross(N_IJK, JI)
             tan_JK = np.cross(N_IJK, JK)
+            self.mb.tag_set_data(self.normal_tag, face, N_IJK)
+
 
             face_area = np.sqrt(np.dot(N_IJK, N_IJK))
             h_L = geo.get_height(N_IJK, LJ)
