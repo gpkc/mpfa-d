@@ -12,6 +12,7 @@ class InterpolationMethodBase:
         self.dirichlet_tag = mesh_data.dirichlet_tag
         self.neumann_tag = mesh_data.neumann_tag
         self.perm_tag = mesh_data.perm_tag
+        self.node_wts_tag = mesh_data.node_wts_tag
 
         self._set_nodes(mesh_data)
         self._set_faces(mesh_data)

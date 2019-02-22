@@ -54,6 +54,8 @@ class MeshManager:
         self.auxiliary_variables_lpew2_tag = self.mb.tag_get_handle(
             "aux variables for lpew2", 1, types.MB_TYPE_INTEGER,
             types.MB_TAG_DENSE, True)
+        self.node_wts_tag = self.mb.tag_get_handle(
+            "Weights", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
 
         self.all_volumes = self.mb.get_entities_by_dimension(0, self.dimension)
 
@@ -64,7 +66,6 @@ class MeshManager:
 
         self.dirichlet_faces = set()
         self.neumann_faces = set()
-
 
     def create_vertices(self, coords):
         new_vertices = self.mb.create_vertices(coords)

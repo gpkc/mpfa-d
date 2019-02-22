@@ -178,7 +178,7 @@ class LPEW3(InterpolationMethodBase):
             phi_vol = self.phi_lpew3(node, (vol,), a_face)
             phi_neigh = self.phi_lpew3(node, tuple(a_neigh), a_face)
             delta += (phi_vol + phi_neigh) * csi
-        p_weight = zepta - delta
+        p_weight = (zepta - delta)
         return p_weight
 
     def neumann_treatment(self, node):
@@ -194,7 +194,7 @@ class LPEW3(InterpolationMethodBase):
             face_area = geo._area_vector(nodes_crds,
                                          np.array([0.0, 0.0, 0.0]), norma=True)
             # store face_area
-            vol_N = self.mtu.get_bridge_adjacencies(face, 2, 3)
+            vol_N = tuple(self.mtu.get_bridge_adjacencies(face, 2, 3))
             psi_N = self.psi_sum_lpew3(node, vol_N, face)
             phi_N = self.phi_lpew3(node, vol_N, face)
             N_term = -3.0 * (1 + (psi_N - phi_N)) * face_flux * face_area
@@ -202,14 +202,20 @@ class LPEW3(InterpolationMethodBase):
         return N_term_sum
 
     def interpolate(self, node, neumann=False):
+        vols_around_ms = self.mb.create_meshset()
         vols_around = self.mtu.get_bridge_adjacencies(node, 0, 3)
+        self.mb.add_entities(vols_around_ms, vols_around)
         weights = [self.partial_weight_lpew3(node, a_vol)
                    for a_vol in vols_around]
+        # weights = [max(0.0, self.partial_weight_lpew3(node, a_vol))
+        #            for a_vol in vols_around]
         weight_sum = np.sum(weights)
         weights = weights / weight_sum
+        self.mb.tag_set_data(self.node_wts_tag, vols_around, weights)
         node_weights = {
             vol: weight for vol, weight in zip(vols_around, weights)}
         if neumann:
             neu_term = self.neumann_treatment(node) / weight_sum
             node_weights[node] = neu_term
+
         return node_weights

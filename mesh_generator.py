@@ -93,7 +93,8 @@ class GenerateMesh:
             vol_verts = []
             for vert in volume[1:]:
                 vol_verts.append(int(vert))
-            el = self.create_volume(int(volume[0]), vol_verts)
+            el = self.create_volume(int(volume[0]), np.asarray(vol_verts,
+                                                               dtype='uint64'))
             self.mb.tag_set_data(self.gid_tag, el, gid)
             self.mb.add_entities(vol_ms, [el])
             gid += 1

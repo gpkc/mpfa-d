@@ -1,3 +1,5 @@
+"""This is the begin."""
+from functools import lru_cache
 from pymoab import types
 from PyTrilinos import Epetra, AztecOO
 import mpfad.helpers.geometric as geo
@@ -43,7 +45,8 @@ class MpfaD3D:
         self.dirichlet_faces = mesh_data.dirichlet_faces
         self.neumann_faces = mesh_data.neumann_faces
         self.intern_faces = mesh_data.intern_faces()
-
+        # self.intern_faces = set(mesh_data.all_faces).difference(self.dirichlet_faces
+        #                                       | self.neumann_faces)
         self.volumes = self.mesh_data.all_volumes
 
         std_map = Epetra.Map(len(self.volumes), 0, self.comm)
@@ -87,17 +90,15 @@ class MpfaD3D:
     def get_nodes_weights(self, method):
         self.nodes_ws = {}
         self.nodes_nts = {}
-
+        #This is the limiting part of the interpoation method. The Dict
         for node in self.intern_nodes:
             self.nodes_ws[node] = method(node)
+
         for node in self.neumann_nodes:
             self.nodes_ws[node] = method(node, neumann=True)
             self.nodes_nts[node] = self.nodes_ws[node].pop(node)
 
     def _node_treatment(self, node, id_left, id_right, K_eq, D_JK=0, D_JI=0.0):
-        ids = []
-        v_ids = []
-        values = []
         RHS = 0.5 * K_eq * (D_JK + D_JI)
         if node in self.dirichlet_nodes:
             pressure = self.get_boundary_node_pressure(node)
@@ -105,12 +106,17 @@ class MpfaD3D:
             self.Q[id_right] += -RHS * pressure
 
         if node in self.intern_nodes:
+
+            # node_wts = self.interpolation_method(node)
+            # print('sadfasdfasdf', node_wts, self.nodes_ws[node])
             for volume, weight in self.nodes_ws[node].items():
+            # for volume, weight in node_wts.items():
                 self.ids.append([id_left, id_right])
                 v_id = self.mb.tag_get_data(self.global_id_tag, volume)[0][0]
                 self.v_ids.append([v_id, v_id])
                 self.ivalues.append([-RHS * weight, RHS * weight])
         if node in self.neumann_nodes:
+            node_wts = self.interpolation_method(node)
             neu_term = self.nodes_nts[node]
             self.Q[id_right] += -RHS * neu_term
             self.Q[id_left] += RHS * neu_term
@@ -122,6 +128,7 @@ class MpfaD3D:
                 self.ivalues.append([-RHS * weight_N, RHS * weight_N])
 
     def run_solver(self, interpolation_method):
+        self.interpolation_method = interpolation_method
         t0 = time.time()
         n_vertex = len(set(self.mesh_data.all_nodes) - self.dirichlet_nodes)
         print('interpolation runing...')
@@ -157,7 +164,6 @@ class MpfaD3D:
         all_LHS = []
         for face in self.dirichlet_faces:
             # '2' argument was initially '0' but it's incorrect
-            # TODO: Do list comprehension
             I, J, K = self.mtu.get_bridge_adjacencies(face, 2, 0)
 
             left_volume = np.asarray(self.mtu.get_bridge_adjacencies(
@@ -181,7 +187,6 @@ class MpfaD3D:
             tan_JI = np.cross(N_IJK, JI)
             tan_JK = np.cross(N_IJK, JK)
             self.mb.tag_set_data(self.normal_tag, face, N_IJK)
-
 
             face_area = np.sqrt(np.dot(N_IJK, N_IJK))
             h_L = geo.get_height(N_IJK, LJ)
