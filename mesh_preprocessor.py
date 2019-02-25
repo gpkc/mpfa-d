@@ -86,8 +86,13 @@ class MeshManager:
 
     def set_information(self, information_name, physicals_values,
                         dim_target, set_connect=False):
+        try:
+            information_tag = self.mb.tag_get_handle(information_name)
+        except:
+            information_tag = self.mb.tag_get_handle(
+                information_name, 1, types.MB_TYPE_DOUBLE,
+                types.MB_TAG_SPARSE, True)
 
-        information_tag = self.mb.tag_get_handle(information_name)
         for physical, value in physicals_values.items():
             for a_set in self.physical_sets:
                 physical_group = self.mb.tag_get_data(self.physical_tag,
@@ -255,5 +260,5 @@ class MeshManager:
         vect_1 = tet_nodes[1] - tet_nodes[0]
         vect_2 = tet_nodes[2] - tet_nodes[0]
         vect_3 = tet_nodes[3] - tet_nodes[0]
-        vol_eval = abs(np.dot(np.cross(vect_1, vect_2), vect_3))/6.0
+        vol_eval = abs(np.dot(np.cross(vect_1, vect_2), vect_3)) / 6.0
         return vol_eval

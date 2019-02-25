@@ -121,7 +121,7 @@ class BenchmarkFVCA:
         norm_vel = np.sqrt(np.dot(err, areas) / np.dot(all_vels, areas))
         # print(len(err_norm), len(vols))
         norm_grad = np.sqrt(np.dot(err_grad, vols) / np.dot(grads_p, vols))
-        print(norm_grad)
+        # print(norm_grad)
         return norm_vel, norm_grad
 
 
@@ -199,39 +199,50 @@ class BenchmarkFVCA:
 
         return K, u2
 
-    def _benchmark_5(self, x, y, z, material_set):
-                        # 1  2  3  4
-        table = np.array([1.00, 1.00, 1.00, 1.00],  # ax^i
-                         [10.0, 0.10, 0.01, 100.],  # ay^i
-                         [0.01, 100., 10., 0.100],  # az^i
-                         [0.10, 10.0, 100., 0.01],  # alpha^i
-                         )
-        K_1 = np.array([table[0][0], 0., 0.],
-                       [0., table[1][0], 0.],
-                       [0., 0., table[2][0]])
+    def bmk_5(self, x, y, z, alpha):
+        u5 = alpha * np.sin(2 * pi * x) *\
+            np.sin(2 * pi * y) * np.sin(2 * pi * z)
+        return None
 
-        K_2 = np.array([table[0][1], 0., 0.],
-                       [0., table[1][1], 0.],
-                       [0., 0., table[2][1]])
+    def _benchmark_5(self, elems_in_set, material_set, set_props=True):
+        if set_props:
+                            # 1  2  3  4
+            table = np.array([[1.00, 1.00, 1.00, 1.00],  # ax^i
+                             [10.0, 0.10, 0.01, 100.],  # ay^i
+                             [0.01, 100., 10., 0.100]]) # az^i
+            count = material_set - 1
+            k_xx = table[0][count]
+            k_yy = table[1][count]
+            k_zz = table[2][count]
+            K = [k_xx, 0., 0.,
+                 0., k_yy, 0.,
+                 0., 0., k_zz]
+            # volumes = self.mesh.mbget_elements_by_dimension(elems_in_set, 3)
+            # for volume in volumes:
+            #     x, y, z = self.mesh.mb.get_coords(volume)
+            #     source_term = self.calculate_divergent(x, y, z,  self._bmk_5)
 
-        K_3 = np.array([table[0][2], 0., 0.],
-                       [0., table[1][2], 0.],
-                       [0., 0., table[2][2]])
-
-        K_4 = np.array([table[0][3], 0., 0.],
-                       [0., table[1][3], 0.],
-                       [0., 0., table[2][3]])
-
-        self.mesh.set_media_property('Permeability', {1: K_1, 2: K_2,
-                                                      3: K_3, 4: K_4},
-                                     dim_target=3)
-
-        u5 = table[3][material_set - 1] * np.sin(2 * pi * x) * np.sin(2 * pi * y) * np.sin(2 * pi * z)
-        return u5, table
+            self.mesh.set_media_property('Permeability', {material_set: K},
+                                         dim_target=3)
+        else:
+            faces = self.mesh.mb.get_entities_by_dimension(elems_in_set, 2)
+            nodes = self.mesh.mtu.get_bridge_adjacencies(faces, 2, 0)
+            print(nodes)
+            boundary_vals = []
+            for node in nodes:
+                x, y, z = self.mesh.mb.get_coords([node])
+                alpha = self.mesh.mb.tag_get_data(material_set, node)[0]
+                u5 = alpha * np.sin(2 * pi * x) *\
+                    np.sin(2 * pi * y) * np.sin(2 * pi * z)
+                boundary_vals.append(u5)
+            print(max(boundary_vals), min(boundary_vals))
+            self.mesh.mb.tag_set_data(self.mesh.dirichlet_tag, nodes,
+                                      boundary_vals)
 
     def benchmark_case_1(self, log_name):
         """
-        This is the Finite Volumes for Complex Applications Benchmark
+        Do Finite Volumes for Complex Applications Benchmark.
+
         Test case 1.
         """
         for node in self.mesh.get_boundary_nodes():
@@ -355,3 +366,19 @@ class BenchmarkFVCA:
         path = 'paper_mpfad_tests/benchmark_fvca_cases/benchmark_case_2/'
         self.mpfad.record_data(path + log_name + '.vtk')
         print('END OF ' + log_name + '!!!\n')
+
+    def benchmark_case_5(self, log_name):
+        self.mesh.set_media_property('material', {1: 0.1, 2: 10., 3: 100.,
+                                                  4: .01},
+                                     dim_target=3, set_nodes=True)
+        sets = self.mesh.physical_sets[1:]
+        for set in sets:
+            volumes_in_set = self.mesh.mb.get_entities_by_dimension(set, 3)
+            material_set = self.mesh.mb.tag_get_data(self.mesh.physical_tag,
+                                                     set)[0][0]
+            self._benchmark_5(volumes_in_set, material_set)
+        b_faces = self.mesh.physical_sets[0]
+        material_prop = self.mesh.mb.tag_get_handle('material')
+        self._benchmark_5(b_faces, material_prop, set_props=False)
+        self.mpfad.run_solver(self.im.interpolate)
+        self.mesh.mb.write_file('my_file.vtk')

@@ -145,11 +145,21 @@ Line Loop(136) = {91, -83, -98, 82};
 Plane Surface(137) = {136};
 Line Loop(138) = {98, -84, -97, 81};
 Plane Surface(139) = {138};
-Surface Loop(140) = {129, 139, 119, 111, 107, 101};
-Volume(1) = {140};
-Surface Loop(142) = {101, 137, 115, 117, 131, 105};
-Volume(12) = {142};
-Surface Loop(144) = {113, 122, 133, 125, 105, 103};
-Volume(3) = {144};
 Surface Loop(146) = {135, 123, 109, 127, 107, 103};
 Volume(4) = {146};
+Surface Loop(144) = {113, 122, 133, 125, 105, 103};
+Volume(3) = {144};
+Surface Loop(142) = {101, 137, 115, 117, 131, 105};
+Volume(2) = {142};
+Surface Loop(140) = {129, 139, 119, 111, 107, 101};
+Volume(1) = {140};
+//+
+Physical Surface(101) = {123, 135, 133, 113, 115, 137, 139, 111, 109, 119, 122, 117, 131, 125, 127, 129};
+//+
+Physical Volume(1) = {1};
+//+
+Physical Volume(2) = {2};
+//+
+Physical Volume(3) = {3};
+//+
+Physical Volume(4) = {4};
