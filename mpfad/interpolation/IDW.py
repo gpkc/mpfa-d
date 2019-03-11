@@ -12,7 +12,7 @@ class IDW(InterpolationMethodBase):
 
         return inv_dist
 
-    def interpolate(self, node):
+    def interpolate(self, node, neumann=False):
         coords_node = self.mb.get_coords([node])
         vols_around = self.mtu.get_bridge_adjacencies(node, 0, 3)
 
@@ -21,5 +21,7 @@ class IDW(InterpolationMethodBase):
         weights = weights / np.sum(weights)
 
         node_weights = dict(zip(vols_around, weights))
+        if neumann:
+            node_weights[node] = 0.0
 
         return node_weights

@@ -1,6 +1,6 @@
 import numpy as np
 from mpfad.MpfaD import MpfaD3D
-from mpfad.interpolation.LPEW3 import LPEW3
+# from mpfad.interpolation.LPEW3 import LPEW3
 from mesh_preprocessor import MeshManager
 
 
@@ -45,7 +45,7 @@ class ObliqueDrain:
     def _obliqueDrain(self, x, y):
         return - x - 0.2 * y
 
-    def runCase(self, log_name):
+    def runCase(self, interpolation_method, log_name):
         for node in self.mesh.get_boundary_nodes():
             x, y, z = self.mesh.mb.get_coords([node])
             g_D = self._obliqueDrain(x, y)
@@ -61,7 +61,7 @@ class ObliqueDrain:
             tetra_vol = self.mesh.get_tetra_volume(vol_nodes_crds)
             vols.append(tetra_vol)
 
-        self.mpfad.run_solver(LPEW3(self.mesh).interpolate)
+        self.mpfad.run_solver(interpolation_method(self.mesh).interpolate)
 
         for volume in volumes:
             x, y, _ = self.mesh.mb.tag_get_data(self.mesh.volume_centre_tag,
@@ -100,7 +100,9 @@ class ObliqueDrain:
             f.write('maximum error:\t %.6g\n' % (results[4]))
             f.write('minimum error:\t %.6g\n' % (results[5]))
 
-        print('max error: ', max(err), 'l-2 relative norm: ', results[2])
+        print('min u: ', u_min[0], 'max u: ', u_max[0],
+              'l-2 relative norm: ', results[2], 'non-Zero mat', non_zero_mat,
+              'ue min', min(u), 'ue max', max(u))
         path = 'paper_mpfad_tests/oblique_drain_tests/oblique_drain_'
         self.mpfad.record_data(path + log_name + '.vtk')
         print('END OF ' + log_name + '!!!\n')

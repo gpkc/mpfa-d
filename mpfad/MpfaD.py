@@ -96,6 +96,7 @@ class MpfaD3D:
 
         for node in self.neumann_nodes:
             self.nodes_ws[node] = method(node, neumann=True)
+            # print(self.nodes_ws[node])
             self.nodes_nts[node] = self.nodes_ws[node].pop(node)
 
     def _node_treatment(self, node, id_left, id_right, K_eq, D_JK=0, D_JI=0.0):
@@ -106,17 +107,13 @@ class MpfaD3D:
             self.Q[id_right] += -RHS * pressure
 
         if node in self.intern_nodes:
-
-            # node_wts = self.interpolation_method(node)
-            # print('sadfasdfasdf', node_wts, self.nodes_ws[node])
             for volume, weight in self.nodes_ws[node].items():
-            # for volume, weight in node_wts.items():
                 self.ids.append([id_left, id_right])
                 v_id = self.mb.tag_get_data(self.global_id_tag, volume)[0][0]
                 self.v_ids.append([v_id, v_id])
                 self.ivalues.append([-RHS * weight, RHS * weight])
+
         if node in self.neumann_nodes:
-            node_wts = self.interpolation_method(node)
             neu_term = self.nodes_nts[node]
             self.Q[id_right] += -RHS * neu_term
             self.Q[id_left] += RHS * neu_term
@@ -214,8 +211,8 @@ class MpfaD3D:
             all_LHS.append(LHS)
 
             self.Q[id_volume] += -RHS
-            self.mb.tag_set_data(self.flux_info_tag, face,
-                                 [D_JK, D_JI, K_eq, I, J, K, face_area])
+            # self.mb.tag_set_data(self.flux_info_tag, face,
+            #                      [D_JK, D_JI, K_eq, I, J, K, face_area])
 
         all_cols = []
         all_rows = []
@@ -296,8 +293,8 @@ class MpfaD3D:
             self._node_treatment(J, id_left, id_right, K_eq,
                                  D_JI=D_JI, D_JK=-D_JK)
             self._node_treatment(K, id_left, id_right, K_eq, D_JI=-D_JI)
-            self.mb.tag_set_data(self.flux_info_tag, face,
-                                 [D_JK, D_JI, K_eq, I, J, K, face_area])
+            # self.mb.tag_set_data(self.flux_info_tag, face,
+            #                      [D_JK, D_JI, K_eq, I, J, K, face_area])
 
         self.T.InsertGlobalValues(self.ids, self.v_ids, self.ivalues)
         self.T.InsertGlobalValues(id_volumes, id_volumes, all_LHS)
@@ -305,7 +302,7 @@ class MpfaD3D:
         self.T.FillComplete()
         mat_fill_time = time.time() - begin
         print('matrix fill took {0} seconds...'.format(mat_fill_time))
-
+        mesh_size = len(self.volumes)
         print('running solver...')
         linearProblem = Epetra.LinearProblem(self.T, self.x, self.Q)
         solver = AztecOO.AztecOO(linearProblem)
@@ -313,11 +310,11 @@ class MpfaD3D:
         # solver.SetAztecOption(AztecOO.AZ_precond, AztecOO.AZ_dom_decomp)
         solver.Iterate(1000, 1e-16)
         t = time.time() - t0
-        mesh_size = len(self.volumes)
+        print('Solver took {0} seconds to run over {1} volumes'.format(t,
+              mesh_size))
         its = solver.GetAztecStatus()[0]
         solver_time = solver.GetAztecStatus()[6]
-        print('solver took {0} seconds to run over {1} volumes'.format(t,
-              mesh_size))
-        print('Solver converged at %.dth iteration in %3f seconds.' \
-              % (int(its), solver_time))
         self.mb.tag_set_data(self.pressure_tag, self.volumes, self.x)
+        print('Solver converged at %.dth iteration in %3f seconds.'
+              % (int(its), solver_time))
+        # print(self.x)

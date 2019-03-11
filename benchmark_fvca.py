@@ -200,16 +200,18 @@ class BenchmarkFVCA:
         return K, u2
 
     def bmk_5(self, x, y, z, alpha):
+        """Return the Benchmark test case 5 analytical solution."""
         u5 = alpha * np.sin(2 * pi * x) *\
             np.sin(2 * pi * y) * np.sin(2 * pi * z)
         return None
 
     def _benchmark_5(self, elems_in_set, material_set, set_props=True):
         if set_props:
-                            # 1  2  3  4
+            # 1  2  3  4
             table = np.array([[1.00, 1.00, 1.00, 1.00],  # ax^i
                              [10.0, 0.10, 0.01, 100.],  # ay^i
-                             [0.01, 100., 10., 0.100]]) # az^i
+                             [0.01, 100., 10., 0.100]]  # az^i
+                             )
             count = material_set - 1
             k_xx = table[0][count]
             k_yy = table[1][count]
@@ -241,7 +243,7 @@ class BenchmarkFVCA:
 
     def benchmark_case_1(self, log_name):
         """
-        Do Finite Volumes for Complex Applications Benchmark.
+        Call the Finite Volumes for Complex Applications Benchmark.
 
         Test case 1.
         """
@@ -307,6 +309,11 @@ class BenchmarkFVCA:
         print('END OF ' + log_name + '!!!\n')
 
     def benchmark_case_2(self, log_name):
+        """
+        Call the Finite Volumes for Complex Applications Benchmark.
+
+        Test case 2.
+        """
         for node in self.mesh.get_boundary_nodes():
             x, y, z = self.mesh.mb.get_coords([node])
             g_D = self._benchmark_2(x, y, z)[1]
@@ -361,13 +368,17 @@ class BenchmarkFVCA:
             f.write('minimum error:\t %.6f\n' % (results[5]))
             f.write('velocity norm: \t %.6g\n' % norm_vel)
             f.write('gradient norm: \t %.6g\n' % norm_grad)
-
         print('max error: ', max(err), 'l-2 relative norm: ', results[2])
         path = 'paper_mpfad_tests/benchmark_fvca_cases/benchmark_case_2/'
         self.mpfad.record_data(path + log_name + '.vtk')
         print('END OF ' + log_name + '!!!\n')
 
     def benchmark_case_5(self, log_name):
+        """
+        Call the Finite Volumes for Complex Applications Benchmark.
+
+        Test case 5.
+        """
         self.mesh.set_media_property('material', {1: 0.1, 2: 10., 3: 100.,
                                                   4: .01},
                                      dim_target=3, set_nodes=True)
