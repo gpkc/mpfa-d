@@ -52,10 +52,11 @@ class DiscreteMaxPrinciple:
         R_x = self.rotation_matrix(-np.pi / 3, axis=0)
         R_y = self.rotation_matrix(-np.pi / 4, axis=1)
         R_z = self.rotation_matrix(-np.pi / 6, axis=2)
-        R_xyz = R_z * R_y * R_x
+        R_xyz = np.matmul(np.matmul(R_z, R_y), R_x)
         perm = np.diag([300, 15, 1])
-        perm = (R_xyz * perm * R_xyz).reshape([1, 9])[0]
-
+        # perm = (R_xyz * perm * R_xyz.transpose()).reshape([1, 9])[0]
+        perm = np.matmul(np.matmul(R_xyz,
+                                   perm), R_xyz.transpose()).reshape([1, 9])[0]
         perms = []
         for volume in self.mesh.all_volumes:
             perms.append(perm)
@@ -81,14 +82,11 @@ class DiscreteMaxPrinciple:
             tetra_vol = self.mesh.get_tetra_volume(vol_nodes_crds)
             eps_mx = max(pressure - self.mx, 0.) ** 2
             oversh.append(eps_mx * tetra_vol)
-            eps_mn = min(self.mn - pressure, 0.) ** 2
+            eps_mn = min(pressure - self.mn, 0.) ** 2
             undersh.append(eps_mn * tetra_vol)
         overshooting = sum(oversh) ** (1 / 2.)
         undershooting = sum(undersh) ** (1 / 2.)
-
-
         print(max_p, min_p, sum(oversh) ** (1 / 2.), sum(undersh) ** (1 / 2.))
-
 
         path = 'paper_mpfad_tests/dmp_tests/' + log_name
         with open(path + '_log', 'w') as f:
