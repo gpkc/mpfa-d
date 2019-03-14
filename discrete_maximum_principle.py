@@ -1,6 +1,7 @@
 import numpy as np
 from mpfad.MpfaD import MpfaD3D
 from mesh_preprocessor import MeshManager
+from mpfad.interpolation.LSW import LSW
 
 
 class DiscreteMaxPrinciple:
@@ -9,8 +10,6 @@ class DiscreteMaxPrinciple:
         self.mesh = MeshManager(filename, dim=3)
         self.mesh.set_global_id()
         self.mesh.get_redefine_centre()
-        # self.mesh.set_boundary_condition('Dirichlet', {101: 0.},
-        #                                  dim_target=2, set_nodes=True)
         self.mx = 2.
         self.mn = 0.
         self.mesh.set_boundary_condition('Dirichlet', {51: self.mx,
@@ -18,6 +17,7 @@ class DiscreteMaxPrinciple:
                                          dim_target=2, set_nodes=True)
         self.mpfad = MpfaD3D(self.mesh)
         self.im = interpolation_method(self.mesh)
+        self.precond = LSW(self.mesh)
     def rotation_matrix(self, theta, axis=0):
         """
         Return the rotation matrix.
@@ -54,7 +54,6 @@ class DiscreteMaxPrinciple:
         R_z = self.rotation_matrix(-np.pi / 6, axis=2)
         R_xyz = np.matmul(np.matmul(R_z, R_y), R_x)
         perm = np.diag([300, 15, 1])
-        # perm = (R_xyz * perm * R_xyz.transpose()).reshape([1, 9])[0]
         perm = np.matmul(np.matmul(R_xyz,
                                    perm), R_xyz.transpose()).reshape([1, 9])[0]
         perms = []
@@ -65,6 +64,9 @@ class DiscreteMaxPrinciple:
 
     def run_dmp(self, log_name):
         self.get_perm_tensor()
+        precond = self.mpfad.run_solver(self.precond.interpolate)
+        x = self.mpfad.x
+        self.mpfad = MpfaD3D(self.mesh)
         self.mpfad.run_solver(self.im.interpolate)
         max_p = max(self.mpfad.x)
         min_p = min(self.mpfad.x)
@@ -84,6 +86,13 @@ class DiscreteMaxPrinciple:
             oversh.append(eps_mx * tetra_vol)
             eps_mn = min(pressure - self.mn, 0.) ** 2
             undersh.append(eps_mn * tetra_vol)
+            # if pressure == max_p:
+            #     for vert in vol_nodes:
+            #         try:
+            #             print(self.mpfad.nodes_ws[vert])
+            #         except:
+            #             print(self.mesh.mb.tag_get_data(self.mesh.dirichlet_tag, vert))
+
         overshooting = sum(oversh) ** (1 / 2.)
         undershooting = sum(undersh) ** (1 / 2.)
         print(max_p, min_p, sum(oversh) ** (1 / 2.), sum(undersh) ** (1 / 2.))

@@ -9,7 +9,7 @@ import time
 
 class MpfaD3D:
 
-    def __init__(self, mesh_data):
+    def __init__(self, mesh_data, x=None):
 
         self.mesh_data = mesh_data
         self.mb = mesh_data.mb
@@ -52,14 +52,17 @@ class MpfaD3D:
         std_map = Epetra.Map(len(self.volumes), 0, self.comm)
         self.T = Epetra.CrsMatrix(Epetra.Copy, std_map, 0)
         self.Q = Epetra.Vector(std_map)
-        self.x = Epetra.Vector(std_map)
+        if x is None:
+            self.x = Epetra.Vector(std_map)
+        else:
+            self.x = x
 
     def record_data(self, file_name):
         volumes = self.mb.get_entities_by_dimension(0, 3)
-        faces = self.mb.get_entities_by_dimension(0, 2)
+        # faces = self.mb.get_entities_by_dimension(0, 2)
         ms = self.mb.create_meshset()
         self.mb.add_entities(ms, volumes)
-        self.mb.add_entities(ms, faces)
+        # self.mb.add_entities(ms, faces)
         self.mb.write_file(file_name, [ms])
 
     def get_boundary_node_pressure(self, node):
@@ -307,7 +310,7 @@ class MpfaD3D:
         linearProblem = Epetra.LinearProblem(self.T, self.x, self.Q)
         solver = AztecOO.AztecOO(linearProblem)
         solver.SetAztecOption(AztecOO.AZ_output, AztecOO.AZ_none)
-        # solver.SetAztecOption(AztecOO.AZ_precond, AztecOO.AZ_dom_decomp)
+        # solver.SetAztecOption(AztecOO.AZ_precond, AztecOO.AZ_Jacobi)
         solver.Iterate(1000, 1e-16)
         t = time.time() - t0
         print('Solver took {0} seconds to run over {1} volumes'.format(t,
@@ -317,4 +320,3 @@ class MpfaD3D:
         self.mb.tag_set_data(self.pressure_tag, self.volumes, self.x)
         print('Solver converged at %.dth iteration in %3f seconds.'
               % (int(its), solver_time))
-        # print(self.x)
