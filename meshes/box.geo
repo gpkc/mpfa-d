@@ -34,7 +34,7 @@ Plane Surface(24) = {23};
 Surface Loop(25) = {20, 16, 24, 14, 18, 22};
 Volume(26) = {25};
 Physical Surface(101) = {18, 20, 24, 14, 16, 22};
-Transfinite Line {3, 4, 1, 2, 10, 8, 9, 5, 6, 11, 7, 12} = 4 Using Progression 1;
+Transfinite Line {3, 4, 1, 2, 10, 8, 9, 5, 6, 11, 7, 12} = 1 Using Progression 1;
 Transfinite Surface {14};
 Transfinite Surface {18};
 Transfinite Surface {20};

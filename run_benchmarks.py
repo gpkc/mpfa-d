@@ -7,22 +7,22 @@ from oblique_drain import ObliqueDrain
 from discrete_maximum_principle import DiscreteMaxPrinciple
 
 interpolations = [LPEW3] #, IDW, LSW]
-# benchmark_fvca_cases = ['5'] #, '3', '4'] #, '5', '6', '7', '8']
+# benchmark_fvca_cases = ['2'] #, '3', '4'] #, '5', '6', '7', '8']
 # fvcaMeshesB = [BenchMeshGenerator(str(case)).generate_mesh()
 #                for case in benchmark_fvca_cases]
 # for mesh in fvcaMeshesB:
 #     for im in interpolations:
-#         # log_name_1 = ('test_case_1_' + im.__name__ + '_'
-#         #               + mesh).strip('.h5m')
+#         log_name_1 = ('test_case_1_' + im.__name__ + '_'
+#                       + mesh).strip('.h5m')
 #         log_name_2 = ('test_case_2_' + im.__name__ + '_'
 #                       + mesh).strip('.h5m')
-#         # BenchmarkFVCA(mesh, im).benchmark_case_1(log_name_1)
-#         BenchmarkFVCA(mesh, im).benchmark_case_2(log_name_2)
+#         BenchmarkFVCA(mesh, im).benchmark_case_1(log_name_1)
+        # BenchmarkFVCA(mesh, im).benchmark_case_2(log_name_2)
 
 # mesh = 'meshes/benchmark_test_case_5.msh'
 # BenchmarkFVCA(mesh, LSW).benchmark_case_5('log_name_1')
 
-cases_dmp = ['4x4x4', '8x8x8', '16x16x16'] #, '32x32x32'] #, '64x64x64']
+cases_dmp = ['16x16x16'] #, '32x32x32'] #, '64x64x64']
 for case in cases_dmp:
     for im in interpolations:
         log_name = ('monotonicity_test_' + im.__name__ + '_' + case)

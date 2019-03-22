@@ -4,6 +4,7 @@ from mesh_preprocessor import MeshManager
 from mpfad.interpolation.LSW import LSW
 
 
+
 class DiscreteMaxPrinciple:
 
     def __init__(self, filename, interpolation_method):
@@ -56,16 +57,18 @@ class DiscreteMaxPrinciple:
         perm = np.diag([300, 15, 1])
         perm = np.matmul(np.matmul(R_xyz,
                                    perm), R_xyz.transpose()).reshape([1, 9])[0]
+
         perms = []
         for volume in self.mesh.all_volumes:
             perms.append(perm)
         self.mesh.mb.tag_set_data(self.mesh.perm_tag,
                                   self.mesh.all_volumes, perms)
 
+
     def run_dmp(self, log_name):
         self.get_perm_tensor()
-        precond = self.mpfad.run_solver(self.precond.interpolate)
-        x = self.mpfad.x
+        # precond = self.mpfad.run_solver(self.precond.interpolate)
+        # x = self.mpfad.x
         self.mpfad = MpfaD3D(self.mesh)
         self.mpfad.run_solver(self.im.interpolate)
         max_p = max(self.mpfad.x)
