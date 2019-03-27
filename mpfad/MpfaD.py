@@ -99,7 +99,6 @@ class MpfaD3D:
 
         for node in self.neumann_nodes:
             self.nodes_ws[node] = method(node, neumann=True)
-            # print(self.nodes_ws[node])
             self.nodes_nts[node] = self.nodes_ws[node].pop(node)
 
     def _node_treatment(self, node, id_left, id_right, K_eq, D_JK=0, D_JI=0.0):
@@ -252,7 +251,6 @@ class MpfaD3D:
 
             K_R = self.mb.tag_get_data(self.perm_tag,
                                        right_volume).reshape([3, 3])
-
             RJ = (R - self.mb.get_coords([J]))
             h_R = geo.get_height(N_IJK, RJ)
 
@@ -303,24 +301,22 @@ class MpfaD3D:
         self.T.InsertGlobalValues(id_volumes, id_volumes, all_LHS)
         self.T.InsertGlobalValues(all_cols, all_rows, all_values)
         self.T.FillComplete()
-        print(self.T)
         mat_fill_time = time.time() - begin
-        # print('matrix fill took {0} seconds...'.format(mat_fill_time))
-        # mesh_size = len(self.volumes)
-        # print('running solver...')
+        print('matrix fill took {0} seconds...'.format(mat_fill_time))
+        mesh_size = len(self.volumes)
+        print('running solver...')
         linearProblem = Epetra.LinearProblem(self.T, self.x, self.Q)
         solver = AztecOO.AztecOO(linearProblem)
-        solver.SetAztecOption(AztecOO.AZ_solver, AztecOO.AZ_gmres_condnum)
-
+        solver.SetAztecOption(AztecOO.AZ_solver, AztecOO.AZ_gmres)
         solver.SetAztecOption(AztecOO.AZ_output, AztecOO.AZ_none)
-        solver.SetAztecOption(AztecOO.AZ_precond, AztecOO.AZ_dom_decomp)
+        # solver.SetAztecOption(AztecOO.AZ_precond, AztecOO.AZ_Jacobi)
         # solver.SetAztecOption(AztecOO.AZ_kspace, 50)
         solver.Iterate(2000, 1e-16)
         t = time.time() - t0
-        # print('Solver took {0} seconds to run over {1} volumes'.format(t,
-        #       mesh_size))
+        print('Solver took {0} seconds to run over {1} volumes'.format(t,
+              mesh_size))
         its = solver.GetAztecStatus()[0]
         solver_time = solver.GetAztecStatus()[6]
         self.mb.tag_set_data(self.pressure_tag, self.volumes, self.x)
-        # print('Solver converged at %.dth iteration in %3f seconds.'
-        #       % (int(its), solver_time))
+        print('Solver converged at %.dth iteration in %3f seconds.'
+              % (int(its), solver_time))

@@ -205,10 +205,11 @@ class LPEW3(InterpolationMethodBase):
         # vols_around_ms = self.mb.create_meshset()
         vols_around = self.mtu.get_bridge_adjacencies(node, 0, 3)
         # self.mb.add_entities(vols_around_ms, vols_around)
-        weights = [self.partial_weight_lpew3(node, a_vol)
-                   for a_vol in vols_around]
-        # weights = [max(0.0, self.partial_weight_lpew3(node, a_vol))
+        # weights = [self.partial_weight_lpew3(node, a_vol)
         #            for a_vol in vols_around]
+        weights = [max(0.0, self.partial_weight_lpew3(node, a_vol))
+                   for a_vol in vols_around]
+
         weight_sum = np.sum(weights)
         weights = weights / weight_sum
         # self.mb.tag_set_data(self.node_wts_tag, vols_around, weights)

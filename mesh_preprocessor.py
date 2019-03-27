@@ -88,6 +88,7 @@ class MeshManager:
                         dim_target, set_connect=False):
         try:
             information_tag = self.mb.tag_get_handle(information_name)
+
         except:
             information_tag = self.mb.tag_get_handle(
                 information_name, 1, types.MB_TYPE_DOUBLE,

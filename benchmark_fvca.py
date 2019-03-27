@@ -10,7 +10,7 @@ class BenchmarkFVCA:
 
     def __init__(self, filename, interpolation_method):
         self.mesh = MeshManager(filename, dim=3)
-        self.mesh.set_boundary_condition('Dirichlet', {101: None},
+        self.mesh.set_boundary_condition('Dirichlet', {101: 0.},
                                          dim_target=2, set_nodes=True)
         self.mesh.set_global_id()
         self.mesh.get_redefine_centre()
@@ -139,27 +139,25 @@ class BenchmarkFVCA:
                    avr_error, max_error, min_error]
         return results
 
-    def calculate_gradient(self, x, y, z, benchmark, alpha, delta=0.00001):
-        grad_x = (benchmark(x + delta, y, z, alpha)[1] -
-                  benchmark(x, y, z, alpha)[1]) / delta
-        grad_y = (benchmark(x, y + delta, z, alpha)[1] -
-                  benchmark(x, y, z, alpha)[1]) / delta
-        grad_z = (benchmark(x, y, z + delta, alpha)[1] -
-                  benchmark(x, y, z, alpha)[1]) / delta
+    def calculate_gradient(self, x, y, z, benchmark, delta=0.00001):
+        grad_x = (benchmark(x + delta, y, z)[1] -
+                  benchmark(x, y, z)[1]) / delta
+        grad_y = (benchmark(x, y + delta, z)[1] -
+                  benchmark(x, y, z)[1]) / delta
+        grad_z = (benchmark(x, y, z + delta)[1] -
+                  benchmark(x, y, z)[1]) / delta
         grad = np.array([grad_x, grad_y, grad_z])
         return grad
 
-    def calculate_K_gradient(self, x, y, z, benchmark, alpha, K):
+    def calculate_K_gradient(self, x, y, z, benchmark):
         try:
-            perm = np.array(benchmark(x, y, z, alpha)[0]).reshape([3, 3])
+            perm = np.array(benchmark(x, y, z)[0]).reshape([3, 3])
         except:
             perm = np.array(K).reshape([3, 3])
-        print(perm)
-        grad = self.calculate_gradient(x, y, z, benchmark, alpha)
+        grad = self.calculate_gradient(x, y, z, benchmark)
         return np.dot(perm, grad)
 
-    def calculate_divergent(self, x, y, z, benchmark, delta=0.00001,
-                            alpha=None):
+    def calculate_divergent(self, x, y, z, benchmark, delta=0.00001):
         k_grad_x = (self.calculate_K_gradient(x + delta, y, z, benchmark)[0]
                     - self.calculate_K_gradient(x, y, z, benchmark)[0]) / delta
         k_grad_y = (self.calculate_K_gradient(x, y + delta, z, benchmark)[1]
@@ -168,21 +166,19 @@ class BenchmarkFVCA:
                     - self.calculate_K_gradient(x, y, z, benchmark)[2]) / delta
         return -np.sum(k_grad_x + k_grad_y + k_grad_z)
 
-    def _benchmark_1(self, x, y, z, alpha=None):
+    def _benchmark_1(self, x, y, z):
         K = [1.0, 0.5, 0.0,
              0.5, 1.0, 0.5,
              0.0, 0.5, 1.0]
-        y = y + 1/2.
-        z = z + 1/3.
-        u1 = 1 + np.sin(pi * x) * np.sin(pi * y) * np.sin(pi * z)
-        source = pi ** 2 * (
-                           (3 * np.sin(pi * x)*np.sin(pi * y) * np.sin(pi * z))
-                           - (np.cos(pi * x) * np.cos(pi * y) * np.sin(pi * z))
-                           - (np.sin(pi * x) * np.cos(pi * y) * np.cos(pi * z))
-                           )
+        u1 = 1 + np.sin(pi * x) * np.sin(pi * (y + 1/2.)) *\
+            np.sin(pi * (z + 1/3.))
+        source = pi ** 2 * (3.0 * np.sin(pi * x) * np.sin(pi * (z + 1/3.)) *
+                            np.cos(pi * y) + np.sin(pi * y) *
+                            np.sin(pi * (x + z + 1/3.)))
+
         return K, u1, source
 
-    def _benchmark_2(self, x, y, z, alpha=None):
+    def _benchmark_2(self, x, y, z):
         k_xx = y ** 2 + z ** 2 + 1
         k_xy = - x * y
         k_xz = - x * z
@@ -206,49 +202,38 @@ class BenchmarkFVCA:
         """Return the Benchmark test case 5 analytical solution."""
         u5 = alpha * np.sin(2 * pi * x) *\
             np.sin(2 * pi * y) * np.sin(2 * pi * z)
-        return None, u5
+        return u5
 
-    def _benchmark_5(self, elems_in_set, material_set, set_props=True):
+    def _benchmark_5(self, elems_in_set, material_set):
         # def set_props(self):
         #     # 1  2  3  4
-        if set_props:
-            table = np.array([[1.00, 1.00, 1.00, 1.00],  # ax^i
-                              [10.0, 0.10, 0.01, 100.],  # ay^i
-                              [0.01, 100., 10., 0.100]]  # az^i
-                             )
-            count = material_set - 1
-            k_xx = table[0][count]
-            k_yy = table[1][count]
-            k_zz = table[2][count]
-            K = [k_xx, 0., 0.,
-                 0., k_yy, 0.,
-                 0., 0., k_zz]
-            # volumes = elems_in_set
-            for volume in elems_in_set:
-                x, y, z = self.mesh.mb.get_coords(volume)
-                material_set = self.mesh.mb.tag_get_handle('material')
-                alpha = self.mesh.mb.tag_get_data(material_set, volume)[0][0]
-                delta = 0.00001
-                grad = self.calculate_K_gradient(x, y, z, self._bmk_5, alpha, K)
-                print(grad)
-
-                # print(grad, np.asarray(K).reshape([3,3]))
-                # source_term = self.calculate_divergent(x, y, z,  self._bmk_5,
-                #                                        alpha=alpha)
-
-            self.mesh.set_media_property('Permeability', {material_set: K},
-                                         dim_target=3)
-        else:
-            faces = self.mesh.mb.get_entities_by_dimension(elems_in_set, 2)
-            nodes = self.mesh.mtu.get_bridge_adjacencies(faces, 2, 0)
-            boundary_vals = []
-            for node in nodes:
-                x, y, z = self.mesh.mb.get_coords([node])
-                alpha = self.mesh.mb.tag_get_data(material_set, node)[0]
-                u5 = self._bmk_5(x, y, z, alpha)[1]
-                boundary_vals.append(u5)
-            self.mesh.mb.tag_set_data(self.mesh.dirichlet_tag, nodes,
-                                      boundary_vals)
+        table = np.array([[1.00, 1.00, 1.00, 1.00],  # ax^i
+                          [10.0, 0.10, 0.01, 100.],  # ay^i
+                          [0.01, 100., 10., 0.100]]  # az^i
+                         )
+        count = material_set - 1
+        k_xx = table[0][count]
+        k_yy = table[1][count]
+        k_zz = table[2][count]
+        K = [k_xx, 0., 0.,
+             0., k_yy, 0.,
+             0., 0., k_zz]
+        source_terms = []
+        for volume in elems_in_set:
+            x, y, z = self.mesh.mb.get_coords(volume)
+            vol_nodes = self.mesh.mb.get_adjacencies(volume, 0)
+            vol_nodes_crds = self.mesh.mb.get_coords(vol_nodes)
+            vol_nodes_crds = np.reshape(vol_nodes_crds, (4, 3))
+            tetra_vol = self.mesh.get_tetra_volume(vol_nodes_crds)
+            material_set = self.mesh.mb.tag_get_handle('material')
+            alpha = self.mesh.mb.tag_get_data(material_set, volume)[0][0]
+            st = 4 * pi ** 2 * alpha * (k_xx + k_yy + k_zz) * \
+                np.sin(2 * pi * x) * np.sin(2 * pi * y) * \
+                np.sin(2 * pi * z)
+            source_terms.append(st * tetra_vol)
+            self.mesh.mb.tag_set_data(self.mesh.perm_tag, volume, K)
+        self.mesh.mb.tag_set_data(self.mesh.source_tag, elems_in_set,
+                                  source_terms)
 
     def benchmark_case_1(self, log_name):
         """
@@ -396,17 +381,33 @@ class BenchmarkFVCA:
             volumes_in_set = self.mesh.mb.get_entities_by_dimension(set, 3)
             material_set = self.mesh.mb.tag_get_data(self.mesh.physical_tag,
                                                      set)[0][0]
-            # handle = self.mesh.mb.tag_get_handle('material')
-            # for volume in volumes_in_set:
-            #     alpha = self.mesh.mb.tag_get_data(handle, volume)
-            #     print(alpha)
-
-            # mat = self.mesh.mb.tag_get_data(self.mesh.material_set_tag, set)
-            # print(material_set, mat)
             self._benchmark_5(volumes_in_set, material_set)
-        b_faces = self.mesh.physical_sets[0]
-        print(b_faces)
-        material_prop = self.mesh.mb.tag_get_handle('material')
-        self._benchmark_5(b_faces, material_prop, set_props=False)
-        # self.mpfad.run_solver(self.im.interpolate)
-        self.mesh.mb.write_file('my_file.vtk')
+        self.mpfad.run_solver(self.im.interpolate)
+        volumes = self.mesh.all_volumes
+        err = []
+        u = []
+        vols = []
+        for set in sets:
+            volumes_in_set = self.mesh.mb.get_entities_by_dimension(set, 3)
+            for volume in volumes_in_set:
+                x, y, z = self.mesh.mb.get_coords(volume)
+                vol_nodes = self.mesh.mb.get_adjacencies(volume, 0)
+                vol_nodes_crds = self.mesh.mb.get_coords(vol_nodes)
+                vol_nodes_crds = np.reshape(vol_nodes_crds, (4, 3))
+                tetra_vol = self.mesh.get_tetra_volume(vol_nodes_crds)
+                vols.append(tetra_vol)
+                material_set = self.mesh.mb.tag_get_handle('material')
+                alpha = self.mesh.mb.tag_get_data(material_set, volume)[0][0]
+                analytical_solution = self._bmk_5(x, y, z, alpha)
+                calculated_solution = self.mpfad.mb.tag_get_data(self.mpfad.pressure_tag,
+                                                 volume)[0][0]
+                u.append(analytical_solution)
+                err.append(np.absolute((analytical_solution -
+                                        calculated_solution)))
+        u_max = max(self.mpfad.mb.tag_get_data(
+                              self.mpfad.pressure_tag, volumes))
+        u_min = min(self.mpfad.mb.tag_get_data(
+                              self.mpfad.pressure_tag, volumes))
+        results = self.norms_calculator(err, vols, u)
+        non_zero_mat = self.mpfad.T.NumGlobalNonzeros()
+        print(results[2])
