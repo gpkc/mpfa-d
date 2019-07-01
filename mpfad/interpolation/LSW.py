@@ -103,5 +103,5 @@ class LSW(InterpolationMethodBase):
 
         if neumann:
             nodes_weights[node] = 0.0
-
+        # print(nodes_weights)
         return nodes_weights

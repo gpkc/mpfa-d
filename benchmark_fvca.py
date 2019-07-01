@@ -350,7 +350,6 @@ class BenchmarkFVCA:
             + log_name + '_log'
         with open(path, 'w') as f:
             f.write('TEST CASE 2\n\nUnknowns:\t %.6f\n' % (len(volumes)))
-            # f.write('Interpolation Method: {}'.format(self.im.__name__))
             f.write('Non-zero matrix:\t %.6f\n' % (non_zero_mat))
             f.write('Umin:\t %.6f\n' % (u_min))
             f.write('Umax:\t %.6f\n' % (u_max))
@@ -399,8 +398,8 @@ class BenchmarkFVCA:
                 material_set = self.mesh.mb.tag_get_handle('material')
                 alpha = self.mesh.mb.tag_get_data(material_set, volume)[0][0]
                 analytical_solution = self._bmk_5(x, y, z, alpha)
-                calculated_solution = self.mpfad.mb.tag_get_data(self.mpfad.pressure_tag,
-                                                 volume)[0][0]
+                calculated_solution = self.mpfad.mb.tag_get_data(
+                                        self.mpfad.pressure_tag, volume)[0][0]
                 u.append(analytical_solution)
                 err.append(np.absolute((analytical_solution -
                                         calculated_solution)))
@@ -410,4 +409,22 @@ class BenchmarkFVCA:
                               self.mpfad.pressure_tag, volumes))
         results = self.norms_calculator(err, vols, u)
         non_zero_mat = self.mpfad.T.NumGlobalNonzeros()
-        print(results[2])
+        path = 'paper_mpfad_tests/benchmark_fvca_cases/benchmark_case_5/' \
+            + log_name + '_log'
+        with open(path, 'w') as f:
+            f.write('TEST CASE 2\n\nUnknowns:\t %.6f\n' % (len(volumes)))
+            f.write('Non-zero matrix:\t %.6f\n' % (non_zero_mat))
+            f.write('Umin:\t %.6f\n' % (u_min))
+            f.write('Umax:\t %.6f\n' % (u_max))
+            f.write('L2 norm:\t %.6f\n' % (results[0]))
+            f.write('l2 norm volume weighted:\t %.6f\n' % (results[1]))
+            f.write('Relative L2 norm:\t %.6f\n' % (results[2]))
+            f.write('average error:\t %.6f\n' % (results[3]))
+            f.write('maximum error:\t %.6f\n' % (results[4]))
+            f.write('minimum error:\t %.6f\n' % (results[5]))
+            # f.write('velocity norm: \t %.6g\n' % norm_vel)
+            # f.write('gradient norm: \t %.6g\n' % norm_grad)
+        print('max error: ', max(err), 'l-2 relative norm: ', results[2], 'u_min: ', u_min, 'u_max: ', u_max)
+        path = 'paper_mpfad_tests/benchmark_fvca_cases/benchmark_case_2/'
+        self.mpfad.record_data(path + log_name + '.vtk')
+        print('END OF ' + log_name + '!!!\n')

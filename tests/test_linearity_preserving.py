@@ -53,8 +53,7 @@ class LinearityPreservingTests(unittest.TestCase):
         self.hvolumes = self.mesh_heterogeneous.all_volumes
 
         self.slanted_mesh = MeshManager('meshes/mesh_slanted_mesh.h5m', dim=3)
-        self.slanted_mesh.set_boundary_condition('Dirichlet',
-                                                 {101: None},
+        self.slanted_mesh.set_boundary_condition('Dirichlet', {101: None},
                                                  dim_target=2,
                                                  set_nodes=True)
         self.slanted_mesh.set_boundary_condition('Neumann',

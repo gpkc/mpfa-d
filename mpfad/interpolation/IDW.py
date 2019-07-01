@@ -23,5 +23,5 @@ class IDW(InterpolationMethodBase):
         node_weights = dict(zip(vols_around, weights))
         if neumann:
             node_weights[node] = 0.0
-
+        # print(node_weights)
         return node_weights

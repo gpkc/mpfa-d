@@ -1,11 +1,14 @@
 """This is the begin."""
 from functools import lru_cache
 from pymoab import types
-from PyTrilinos import Epetra, AztecOO
+from PyTrilinos import Epetra, AztecOO, Amesos
 import mpfad.helpers.geometric as geo
 import numpy as np
 import time
-
+# from scipy.sparse import lil_matrix
+# from scipy.sparse.linalg import spsolve
+from scipy.sparse import lil_matrix
+from scipy.sparse.linalg import spsolve
 
 class MpfaD3D:
 
@@ -49,13 +52,16 @@ class MpfaD3D:
         #                                       | self.neumann_faces)
         self.volumes = self.mesh_data.all_volumes
 
-        std_map = Epetra.Map(len(self.volumes), 0, self.comm)
-        self.T = Epetra.CrsMatrix(Epetra.Copy, std_map, 0)
-        self.Q = Epetra.Vector(std_map)
-        if x is None:
-            self.x = Epetra.Vector(std_map)
-        else:
-            self.x = x
+        # std_map = Epetra.Map(len(self.volumes), 0, self.comm)
+        # self.T = Epetra.CrsMatrix(Epetra.Copy, std_map, 0)
+        # self.Q = Epetra.Vector(std_map)
+        # if x is None:
+        #     self.x = Epetra.Vector(std_map)
+        # else:
+        #     self.x = x
+        self.T = lil_matrix((len(self.volumes), len(self.volumes)),
+                            dtype=np.float)
+        self.Q = lil_matrix((len(self.volumes), 1), dtype=np.float)
 
     def record_data(self, file_name):
         volumes = self.mb.get_entities_by_dimension(0, 3)
@@ -105,8 +111,10 @@ class MpfaD3D:
         RHS = 0.5 * K_eq * (D_JK + D_JI)
         if node in self.dirichlet_nodes:
             pressure = self.get_boundary_node_pressure(node)
-            self.Q[id_left] += RHS * pressure
-            self.Q[id_right] += -RHS * pressure
+            # self.Q[id_left] += RHS * pressure
+            # self.Q[id_right] += -RHS * pressure
+            self.Q[id_left[0], 0] += RHS * pressure
+            self.Q[id_right[0], 0] += - RHS * pressure
 
         if node in self.intern_nodes:
             for volume, weight in self.nodes_ws[node].items():
@@ -117,8 +125,10 @@ class MpfaD3D:
 
         if node in self.neumann_nodes:
             neu_term = self.nodes_nts[node]
-            self.Q[id_right] += -RHS * neu_term
-            self.Q[id_left] += RHS * neu_term
+            # self.Q[id_right] += -RHS * neu_term
+            # self.Q[id_left] += RHS * neu_term
+            self.Q[id_right, 0] += - RHS * neu_term
+            self.Q[id_left, 0] += RHS * neu_term
 
             for volume, weight_N in self.nodes_ws[node].items():
                 self.ids.append([id_left, id_right])
@@ -133,7 +143,7 @@ class MpfaD3D:
         print('interpolation runing...')
         self.get_nodes_weights(interpolation_method)
         print('done interpolation...',
-              'took {0} seconds to interpolate over {1} verts'.
+              'took {0} seconds to interpolate over {1} verts'.\
               format(time.time() - t0, n_vertex))
         print('filling the transmissibility matrix...')
         begin = time.time()
@@ -143,7 +153,9 @@ class MpfaD3D:
                 volume_id = self.mb.tag_get_data(self.global_id_tag,
                                                  volume)[0][0]
                 RHS = self.mb.tag_get_data(self.source_tag, volume)[0][0]
-                self.Q[volume_id] += RHS
+                # self.Q[volume_id] += RHS
+                self.Q[volume_id, 0] += RHS
+
         except:
             pass
 
@@ -157,7 +169,8 @@ class MpfaD3D:
             node_crds = self.mb.get_coords(face_nodes).reshape([3, 3])
             face_area = geo._area_vector(node_crds, norma=True)
             RHS = face_flow * face_area
-            self.Q[id_volume] += - RHS
+            # self.Q[id_volume] += - RHS
+            self.Q[id_volume, 0] += - RHS
 
         id_volumes = []
         all_LHS = []
@@ -212,7 +225,8 @@ class MpfaD3D:
             LHS = K_eq
             all_LHS.append(LHS)
 
-            self.Q[id_volume] += -RHS
+            # self.Q[id_volume] += -RHS
+            self.Q[id_volume, 0] += - RHS
             # self.mb.tag_set_data(self.flux_info_tag, face,
             #                      [D_JK, D_JI, K_eq, I, J, K, face_area])
 
@@ -289,7 +303,6 @@ class MpfaD3D:
             all_cols.append(col_ids)
             all_rows.append(row_ids)
             all_values.append(values)
-
             self._node_treatment(I, id_left, id_right, K_eq, D_JK=D_JK)
             self._node_treatment(J, id_left, id_right, K_eq,
                                  D_JI=D_JI, D_JK=-D_JK)
@@ -297,26 +310,47 @@ class MpfaD3D:
             # self.mb.tag_set_data(self.flux_info_tag, face,
             #                      [D_JK, D_JI, K_eq, I, J, K, face_area])
 
-        self.T.InsertGlobalValues(self.ids, self.v_ids, self.ivalues)
-        self.T.InsertGlobalValues(id_volumes, id_volumes, all_LHS)
-        self.T.InsertGlobalValues(all_cols, all_rows, all_values)
-        self.T.FillComplete()
+        # self.T.InsertGlobalValues(self.ids, self.v_ids, self.ivalues)
+        self.T[self.ids, self.v_ids] = self.ivalues
+        # self.T.InsertGlobalValues(id_volumes, id_volumes, all_LHS)
+        self.T[id_volumes, id_volumes] = all_LHS
+        # self.T.InsertGlobalValues(all_cols, all_rows, all_values)
+        self.T[all_cols, all_rows] = all_values
+        # self.T.FillComplete()
+
         mat_fill_time = time.time() - begin
         print('matrix fill took {0} seconds...'.format(mat_fill_time))
         mesh_size = len(self.volumes)
         print('running solver...')
-        linearProblem = Epetra.LinearProblem(self.T, self.x, self.Q)
-        solver = AztecOO.AztecOO(linearProblem)
-        solver.SetAztecOption(AztecOO.AZ_solver, AztecOO.AZ_gmres)
-        solver.SetAztecOption(AztecOO.AZ_output, AztecOO.AZ_none)
-        # solver.SetAztecOption(AztecOO.AZ_precond, AztecOO.AZ_Jacobi)
-        # solver.SetAztecOption(AztecOO.AZ_kspace, 50)
-        solver.Iterate(2000, 1e-16)
-        t = time.time() - t0
-        print('Solver took {0} seconds to run over {1} volumes'.format(t,
-              mesh_size))
-        its = solver.GetAztecStatus()[0]
-        solver_time = solver.GetAztecStatus()[6]
+        # USE_DIRECT_SOLVER = True
+        # linearProblem = Epetra.LinearProblem(self.T, self.x, self.Q)
+        # if USE_DIRECT_SOLVER:
+        #     solver = Amesos.Lapack(linearProblem)
+        #     print("1) Performing symbolic factorizations...")
+        #     solver.SymbolicFactorization()
+        #     print("2) Performing numeric factorizations...")
+        #     solver.NumericFactorization()
+        #     print("3) Solving the linear system...")
+        #     solver.Solve()
+        #     t = time.time() - t0
+        #     print('Solver took {0} seconds to run over {1} volumes'.format(t,
+        #           mesh_size))
+        # else:
+        #     solver = AztecOO.AztecOO(linearProblem)
+        #     solver.SetAztecOption(AztecOO.AZ_solver, AztecOO.AZ_gmres)
+        #     solver.SetAztecOption(AztecOO.AZ_output, AztecOO.AZ_none)
+        #     solver.SetAztecOption(AztecOO.AZ_precond, AztecOO.AZ_Jacobi)
+        #     # solver.SetAztecOption(AztecOO.AZ_kspace, 50)
+        #
+        #     solver.Iterate(2000, 1e-16)
+        #     t = time.time() - t0
+        #     its = solver.GetAztecStatus()[0]
+        #     solver_time = solver.GetAztecStatus()[6]
+        #     print('Solver took {0} seconds to run over {1} volumes'.format(t,
+        #           mesh_size))
+        #     print('Solver converged at %.dth iteration in %3f seconds.'
+        #           % (int(its), solver_time))
+        self.T = self.T.tocsc()
+        self.Q = self.Q.tocsc()
+        self.x = spsolve(self.T, self.Q)
         self.mb.tag_set_data(self.pressure_tag, self.volumes, self.x)
-        print('Solver converged at %.dth iteration in %3f seconds.'
-              % (int(its), solver_time))

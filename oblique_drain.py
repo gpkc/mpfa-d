@@ -60,7 +60,6 @@ class ObliqueDrain:
             vol_nodes_crds = np.reshape(vol_nodes_crds, (4, 3))
             tetra_vol = self.mesh.get_tetra_volume(vol_nodes_crds)
             vols.append(tetra_vol)
-
         self.mpfad.run_solver(interpolation_method(self.mesh).interpolate)
 
         for volume in volumes:
@@ -87,7 +86,7 @@ class ObliqueDrain:
                               self.mpfad.pressure_tag, volumes))
         results = self.norms_calculator(err, vols, u)
         non_zero_mat = self.mpfad.T.NumGlobalNonzeros()
-        path = 'paper_mpfad_tests/oblique_drain_tests/' + log_name + '_log'
+        path = 'paper_mpfad_tests/oblique_drain_tests/' + log_name + '_' + interpolation_method.__name__ + '_log'
         with open(path, 'w') as f:
             f.write('TEST CASE 1\n\nUnknowns:\t %.0f\n' % (len(volumes)))
             f.write('Non-zero matrix:\t %.0f\n' % (non_zero_mat))
@@ -104,5 +103,5 @@ class ObliqueDrain:
               'l-2 relative norm: ', results[2], 'non-Zero mat', non_zero_mat,
               'ue min', min(u), 'ue max', max(u))
         path = 'paper_mpfad_tests/oblique_drain_tests/oblique_drain_'
-        self.mpfad.record_data(path + log_name + '.vtk')
+        self.mpfad.record_data(path + log_name + '_' + interpolation_method.__name__ + '.vtk')
         print('END OF ' + log_name + '!!!\n')
