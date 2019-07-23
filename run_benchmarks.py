@@ -20,7 +20,7 @@ from discrete_maximum_principle import DiscreteMaxPrinciple
         # BenchmarkFVCA(mesh, im).benchmark_case_2(log_name_2)
 # meshes = []
 mesh = 'meshes/benchmark_test_case_5.msh'
-BenchmarkFVCA(mesh, LPEW3).benchmark_case_5('log_name_4_LSW')
+BenchmarkFVCA(mesh, LPEW3).benchmark_case_5('log_name_4_LPEW3')
 
 # cases_dmp = ['16x16x16']
 # for case in cases_dmp:

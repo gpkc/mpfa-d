@@ -11,9 +11,9 @@ class LinearityPreservingTests(unittest.TestCase):
 
     def setUp(self):
 
-        self.K_1 = np.array([2.0, 1.0, 0.0,
-                             1.0, 2.0, 1.0,
-                             0.0, 1.0, 2.0])
+        self.K_1 = np.array([1.0, .50, 0.0,
+                             .50, 1.0, .50,
+                             0.0, .50, 1.0])
         self.K_2 = np.array([10.0, 1.0, 0.0,
                              1.0, 10.0, 1.0,
                              0.0, 1.0, 10.0])
@@ -72,7 +72,7 @@ class LinearityPreservingTests(unittest.TestCase):
     def psol1(self, coords):
         x, y, z = coords
 
-        return - x - 0.2 * y
+        return x + y + z #- 0.2 * y
 
     def lp_schneider_2018(self, coords, p_max, p_min,
                           x_max, x_min, y_max, y_min, z_max, z_min):
@@ -101,6 +101,11 @@ class LinearityPreservingTests(unittest.TestCase):
             bcVal = self.psol1(vertCoords)
             mb.tag_set_data(self.mesh_homogeneous.dirichlet_tag, bcVert, bcVal)
         self.mpfad_homogeneous.run_solver(LPEW3(self.mesh_homogeneous).interpolate)
+        T = self.mpfad_homogeneous.T
+        Q = self.mpfad_homogeneous.Q
+        for i in range(len(Q)):
+            print(np.sum(T[i]), Q[i])
+
 
         for volume in allVolumes:
             coords = mb.get_coords([volume])

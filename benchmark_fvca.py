@@ -408,12 +408,12 @@ class BenchmarkFVCA:
         u_min = min(self.mpfad.mb.tag_get_data(
                               self.mpfad.pressure_tag, volumes))
         results = self.norms_calculator(err, vols, u)
-        non_zero_mat = self.mpfad.T.NumGlobalNonzeros()
+        # non_zero_mat = self.mpfad.T.NumGlobalNonzeros()
         path = 'paper_mpfad_tests/benchmark_fvca_cases/benchmark_case_5/' \
             + log_name + '_log'
         with open(path, 'w') as f:
             f.write('TEST CASE 2\n\nUnknowns:\t %.6f\n' % (len(volumes)))
-            f.write('Non-zero matrix:\t %.6f\n' % (non_zero_mat))
+            # f.write('Non-zero matrix:\t %.6f\n' % (non_zero_mat))
             f.write('Umin:\t %.6f\n' % (u_min))
             f.write('Umax:\t %.6f\n' % (u_max))
             f.write('L2 norm:\t %.6f\n' % (results[0]))

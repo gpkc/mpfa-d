@@ -52,16 +52,16 @@ class MpfaD3D:
         #                                       | self.neumann_faces)
         self.volumes = self.mesh_data.all_volumes
 
-        # std_map = Epetra.Map(len(self.volumes), 0, self.comm)
-        # self.T = Epetra.CrsMatrix(Epetra.Copy, std_map, 0)
-        # self.Q = Epetra.Vector(std_map)
-        # if x is None:
-        #     self.x = Epetra.Vector(std_map)
-        # else:
-        #     self.x = x
-        self.T = lil_matrix((len(self.volumes), len(self.volumes)),
-                            dtype=np.float)
-        self.Q = lil_matrix((len(self.volumes), 1), dtype=np.float)
+        std_map = Epetra.Map(len(self.volumes), 0, self.comm)
+        self.T = Epetra.CrsMatrix(Epetra.Copy, std_map, 0)
+        self.Q = Epetra.Vector(std_map)
+        if x is None:
+            self.x = Epetra.Vector(std_map)
+        else:
+            self.x = x
+        # self.T = lil_matrix((len(self.volumes), len(self.volumes)),
+        #                     dtype=np.float)
+        # self.Q = lil_matrix((len(self.volumes), 1), dtype=np.float)
 
     def record_data(self, file_name):
         volumes = self.mb.get_entities_by_dimension(0, 3)
@@ -111,10 +111,10 @@ class MpfaD3D:
         RHS = 0.5 * K_eq * (D_JK + D_JI)
         if node in self.dirichlet_nodes:
             pressure = self.get_boundary_node_pressure(node)
-            # self.Q[id_left] += RHS * pressure
-            # self.Q[id_right] += -RHS * pressure
-            self.Q[id_left[0], 0] += RHS * pressure
-            self.Q[id_right[0], 0] += - RHS * pressure
+            self.Q[id_left] += RHS * pressure
+            self.Q[id_right] += -RHS * pressure
+            # self.Q[id_left[0], 0] += RHS * pressure
+            # self.Q[id_right[0], 0] += - RHS * pressure
 
         if node in self.intern_nodes:
             for volume, weight in self.nodes_ws[node].items():
@@ -125,10 +125,10 @@ class MpfaD3D:
 
         if node in self.neumann_nodes:
             neu_term = self.nodes_nts[node]
-            # self.Q[id_right] += -RHS * neu_term
-            # self.Q[id_left] += RHS * neu_term
-            self.Q[id_right, 0] += - RHS * neu_term
-            self.Q[id_left, 0] += RHS * neu_term
+            self.Q[id_right] += -RHS * neu_term
+            self.Q[id_left] += RHS * neu_term
+            # self.Q[id_right, 0] += - RHS * neu_term
+            # self.Q[id_left, 0] += RHS * neu_term
 
             for volume, weight_N in self.nodes_ws[node].items():
                 self.ids.append([id_left, id_right])
@@ -153,8 +153,8 @@ class MpfaD3D:
                 volume_id = self.mb.tag_get_data(self.global_id_tag,
                                                  volume)[0][0]
                 RHS = self.mb.tag_get_data(self.source_tag, volume)[0][0]
-                # self.Q[volume_id] += RHS
-                self.Q[volume_id, 0] += RHS
+                self.Q[volume_id] += RHS
+                # self.Q[volume_id, 0] += RHS
 
         except:
             pass
@@ -169,8 +169,8 @@ class MpfaD3D:
             node_crds = self.mb.get_coords(face_nodes).reshape([3, 3])
             face_area = geo._area_vector(node_crds, norma=True)
             RHS = face_flow * face_area
-            # self.Q[id_volume] += - RHS
-            self.Q[id_volume, 0] += - RHS
+            self.Q[id_volume] += - RHS
+            # self.Q[id_volume, 0] += - RHS
 
         id_volumes = []
         all_LHS = []
@@ -225,8 +225,8 @@ class MpfaD3D:
             LHS = K_eq
             all_LHS.append(LHS)
 
-            # self.Q[id_volume] += -RHS
-            self.Q[id_volume, 0] += - RHS
+            self.Q[id_volume] += -RHS
+            # self.Q[id_volume, 0] += - RHS
             # self.mb.tag_set_data(self.flux_info_tag, face,
             #                      [D_JK, D_JI, K_eq, I, J, K, face_area])
 
@@ -310,47 +310,49 @@ class MpfaD3D:
             # self.mb.tag_set_data(self.flux_info_tag, face,
             #                      [D_JK, D_JI, K_eq, I, J, K, face_area])
 
-        # self.T.InsertGlobalValues(self.ids, self.v_ids, self.ivalues)
-        self.T[self.ids, self.v_ids] = self.ivalues
-        # self.T.InsertGlobalValues(id_volumes, id_volumes, all_LHS)
-        self.T[id_volumes, id_volumes] = all_LHS
-        # self.T.InsertGlobalValues(all_cols, all_rows, all_values)
-        self.T[all_cols, all_rows] = all_values
-        # self.T.FillComplete()
-
+        self.T.InsertGlobalValues(self.ids, self.v_ids, self.ivalues)
+        # self.T[np.asarray(self.ids)[:, :, 0, 0], np.asarray(self.v_ids)] = np.asarray(self.ivalues)
+        self.T.InsertGlobalValues(id_volumes, id_volumes, all_LHS)
+        # self.T[np.asarray(id_volumes), np.asarray(id_volumes)] = np.asarray(all_LHS)
+        self.T.InsertGlobalValues(all_cols, all_rows, all_values)
+        # self.T[np.asarray(all_cols)[:, 0, 0, 0], np.asarray(all_rows)[:, 0, 0, 0]] = np.asarray(all_values)[:, 0]
+        self.T.FillComplete()
         mat_fill_time = time.time() - begin
         print('matrix fill took {0} seconds...'.format(mat_fill_time))
         mesh_size = len(self.volumes)
         print('running solver...')
-        # USE_DIRECT_SOLVER = True
-        # linearProblem = Epetra.LinearProblem(self.T, self.x, self.Q)
-        # if USE_DIRECT_SOLVER:
-        #     solver = Amesos.Lapack(linearProblem)
-        #     print("1) Performing symbolic factorizations...")
-        #     solver.SymbolicFactorization()
-        #     print("2) Performing numeric factorizations...")
-        #     solver.NumericFactorization()
-        #     print("3) Solving the linear system...")
-        #     solver.Solve()
-        #     t = time.time() - t0
-        #     print('Solver took {0} seconds to run over {1} volumes'.format(t,
-        #           mesh_size))
-        # else:
-        #     solver = AztecOO.AztecOO(linearProblem)
-        #     solver.SetAztecOption(AztecOO.AZ_solver, AztecOO.AZ_gmres)
-        #     solver.SetAztecOption(AztecOO.AZ_output, AztecOO.AZ_none)
-        #     solver.SetAztecOption(AztecOO.AZ_precond, AztecOO.AZ_Jacobi)
-        #     # solver.SetAztecOption(AztecOO.AZ_kspace, 50)
-        #
-        #     solver.Iterate(2000, 1e-16)
-        #     t = time.time() - t0
-        #     its = solver.GetAztecStatus()[0]
-        #     solver_time = solver.GetAztecStatus()[6]
-        #     print('Solver took {0} seconds to run over {1} volumes'.format(t,
-        #           mesh_size))
-        #     print('Solver converged at %.dth iteration in %3f seconds.'
-        #           % (int(its), solver_time))
-        self.T = self.T.tocsc()
-        self.Q = self.Q.tocsc()
-        self.x = spsolve(self.T, self.Q)
+        USE_DIRECT_SOLVER = False
+        linearProblem = Epetra.LinearProblem(self.T, self.x, self.Q)
+        if USE_DIRECT_SOLVER:
+            solver = Amesos.Lapack(linearProblem)
+            print("1) Performing symbolic factorizations...")
+            solver.SymbolicFactorization()
+            print("2) Performing numeric factorizations...")
+            solver.NumericFactorization()
+            print("3) Solving the linear system...")
+            solver.Solve()
+            t = time.time() - t0
+            print('Solver took {0} seconds to run over {1} volumes'.format(t,
+                  mesh_size))
+        else:
+            solver = AztecOO.AztecOO(linearProblem)
+            solver.SetAztecOption(AztecOO.AZ_solver, AztecOO.AZ_gmres)
+            solver.SetAztecOption(AztecOO.AZ_output, AztecOO.AZ_none)
+            solver.SetAztecOption(AztecOO.AZ_precond, AztecOO.AZ_Jacobi)
+            solver.SetAztecOption(AztecOO.AZ_kspace, 1251)
+            # solver.SetAztecOption(AztecOO.AZ_orthog, AztecOO.AZ_modified)
+            solver.SetAztecOption(AztecOO.AZ_conv, AztecOO.AZ_Anorm)
+            solver.Iterate(8000, 1e-10)
+            t = time.time() - t0
+            its = solver.GetAztecStatus()[0]
+            solver_time = solver.GetAztecStatus()[6]
+            print('Solver took {0} seconds to run over {1} volumes'.format(t,
+                  mesh_size))
+            print('Solver converged at %.dth iteration in %3f seconds.'
+                  % (int(its), solver_time))
+        # self.T = self.T.tocsc()
+        # self.Q = self.Q.tocsc()
+        # self.x = spsolve(self.T, self.Q)
+        # print(np.sum(self.T[50]), self.Q[50])
         self.mb.tag_set_data(self.pressure_tag, self.volumes, self.x)
+        self.mb.write_file('asdfasdfasd.vtk')
