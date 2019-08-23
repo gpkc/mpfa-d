@@ -258,6 +258,7 @@ class BenchmarkFVCA:
             tetra_vol = self.mesh.get_tetra_volume(vol_nodes_crds)
             vols.append(tetra_vol)
             source_term = self._benchmark_1(x, y, z)[2]
+            print(source_term, tetra_vol)
             self.mesh.mb.tag_set_data(self.mesh.source_tag, volume,
                                       source_term * tetra_vol)
 

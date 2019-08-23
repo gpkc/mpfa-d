@@ -338,10 +338,10 @@ class MpfaD3D:
             solver = AztecOO.AztecOO(linearProblem)
             solver.SetAztecOption(AztecOO.AZ_solver, AztecOO.AZ_gmres)
             solver.SetAztecOption(AztecOO.AZ_output, AztecOO.AZ_none)
-            solver.SetAztecOption(AztecOO.AZ_precond, AztecOO.AZ_Jacobi)
-            solver.SetAztecOption(AztecOO.AZ_kspace, 1251)
+            # solver.SetAztecOption(AztecOO.AZ_precond, AztecOO.AZ_Jacobi)
+            # solver.SetAztecOption(AztecOO.AZ_kspace, 1251)
             # solver.SetAztecOption(AztecOO.AZ_orthog, AztecOO.AZ_modified)
-            solver.SetAztecOption(AztecOO.AZ_conv, AztecOO.AZ_Anorm)
+            # solver.SetAztecOption(AztecOO.AZ_conv, AztecOO.AZ_Anorm)
             solver.Iterate(8000, 1e-10)
             t = time.time() - t0
             its = solver.GetAztecStatus()[0]
@@ -350,6 +350,7 @@ class MpfaD3D:
                   mesh_size))
             print('Solver converged at %.dth iteration in %3f seconds.'
                   % (int(its), solver_time))
+        print(self.T, self.Q)
         # self.T = self.T.tocsc()
         # self.Q = self.Q.tocsc()
         # self.x = spsolve(self.T, self.Q)
