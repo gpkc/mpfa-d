@@ -47,14 +47,6 @@ Volume(26) = {25};
 
 mesh_size = 1.5;
 
-
-Physical Point(102) = {1, 4, 8, 5};
-Physical Point(202) = {2, 3, 7, 6};
-
-Physical Surface(201) = {18, 14, 22, 16};
-Physical Surface(102) = {24};
-Physical Surface(202) = {20};
-
 Physical Volume(1) = {26};
 Transfinite Line {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12} = 3 Using Progression 1;
 Transfinite Surface {20};
@@ -64,3 +56,5 @@ Transfinite Surface {16};
 Transfinite Surface {22};
 Transfinite Surface {18};
 Transfinite Volume{26};
+//+
+Physical Surface(101) = {16, 20, 22, 14, 24, 18};

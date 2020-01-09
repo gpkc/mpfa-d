@@ -102,3 +102,27 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+asdfasdfasd.vtk
+b.txt
+basic_mesh.geo
+differenciate.py
+dmp_lai.vtk
+generalized_mpfad_mesh.py
+gnome-tweak-tool.de
+louco.vtk
+matrix.txt
+matrix_out.txt
+mesh_tet1.h5m
+mesh_tet2.h5m
+mesh_tet3.h5m
+mesh_tet4.h5m
+mesh_tet5.h5m
+meshes/benchmark_test_case_5.msh
+meshes/box_dmp.geo
+meshes/mesh_test_10.msh
+mpfad_codes_tests.zip
+my_file.vtk
+myfile.vtk
+paper_mpfad_tests/
+run_enchmark.cprof
