@@ -39,14 +39,23 @@ class PressureSolverTest(unittest.TestCase):
                                                  {101: None},
                                                  dim_target=2,
                                                  set_nodes=True)
-        self.od.set_boundary_condition('Neumann',
-                                                 {201: 0.0},
-                                                 dim_target=2,
-                                                 set_nodes=True)
+        self.od.set_boundary_condition(
+            'Neumann',
+            {
+                201: 0.0
+            },
+            dim_target=2,
+            set_nodes=True
+        )
 
-        self.od.set_media_property('Permeability', {1: bed_perm_isotropic,
-                                                    2: fracture_perm_isotropic},
-                                                    dim_target=3)
+        self.od.set_media_property(
+            'Permeability',
+            {
+                1: bed_perm_isotropic,
+                2: fracture_perm_isotropic
+            },
+            dim_target=3
+        )
         self.od.get_redefine_centre()
         self.od.set_global_id()
         self.od_mpfad = MpfaD3D(self.od)
@@ -55,8 +64,14 @@ class PressureSolverTest(unittest.TestCase):
                               1.0, 2.0, 1.0,
                               0.0, 1.0, 2.0])
         self.m = MeshManager('test_mesh_5_vols.h5m', dim=3)
-        self.m.set_boundary_condition('Dirichlet', {101: None}, dim_target=2,
-                                      set_nodes=True)
+        self.m.set_boundary_condition(
+            'Dirichlet',
+            {
+                101: None
+            },
+            dim_target=2,
+            set_nodes=True
+        )
         self.m.get_redefine_centre()
         self.m.set_global_id()
         self.m_mpfad = MpfaD3D(self.m)
@@ -79,7 +94,7 @@ class PressureSolverTest(unittest.TestCase):
         for volume in self.mesh.all_volumes:
             c_solution = self.mb.tag_get_data(self.mpfad.pressure_tag, volume)
             a_solution = 1 - self.mb.get_coords([volume])[0]
-            self.assertAlmostEqual(c_solution, a_solution, delta=5e-15)
+            self.assertAlmostEqual(c_solution, a_solution, delta=1e-14)
 
     # @unittest.skip('later')
     def test_if_inner_verts_weighted_calculation_yelds_exact_solution(self):
@@ -180,13 +195,6 @@ class PressureSolverTest(unittest.TestCase):
                 k_grad_p = np.dot(vol_perm, grad_p[0])
                 vel = - np.dot(k_grad_p, unit_area_vec)
                 v += vel * np.sqrt(np.dot(area_vect, area_vect))
-            print('volume', a_volume, 'sum velocity', v)
-
-
-
-
-            # for c_grad, a_grad in zip(grad_p[0], -np.array([1., 0., 0.])):
-            #     self.assertAlmostEqual(c_grad, a_grad, delta=1e-14)
 
     # @unittest.skip('later')
     def test_if_flux_is_conservative_for_all_volumes(self):
@@ -203,20 +211,22 @@ class PressureSolverTest(unittest.TestCase):
         self.od_mpfad.run_solver(LPEW3(self.od).interpolate)
         p_verts = []
         for node in self.od.all_nodes:
-            try:
-                p_vert = self.od_mpfad.mb.tag_get_data(self.od_mpfad.dirichlet_tag,
-                                                    node)
-                p_verts.append(p_vert[0])
-            except:
-                p_vert = 0.0
-                p_tag = self.od_mpfad.pressure_tag
-                nd_weights = self.od_mpfad.nodes_ws[node]
-                for volume, wt in nd_weights.items():
-                    p_vol = self.od_mpfad.mb.tag_get_data(p_tag, volume)
-                    p_vert += p_vol * wt
-                p_verts.append(p_vert[0])
-        self.od_mpfad.mb.tag_set_data(self.node_pressure_tag, self.od.all_nodes,
-                                   p_verts)
+        # try:
+            p_vert = self.od_mpfad.mb.tag_get_data(
+                self.od_mpfad.dirichlet_tag, node
+            )
+            p_verts.append(p_vert[0])
+        # except:
+            # p_vert = 0.0
+            # p_tag = self.od_mpfad.pressure_tag
+            # nd_weights = self.od_mpfad.nodes_ws[node]
+            # for volume, wt in nd_weights.items():
+            #     p_vol = self.od_mpfad.mb.tag_get_data(p_tag, volume)
+            #     p_vert += p_vol * wt
+            # p_verts.append(p_vert[0])
+        self.od_mpfad.mb.tag_set_data(
+            self.node_pressure_tag, self.od.all_nodes, p_verts
+        )
         for a_volume in self.od.all_volumes:
             vol_centroid = self.od.mtu.get_average_position([a_volume])
             vol_faces = self.od.mtu.get_bridge_adjacencies(a_volume, 2, 2)
@@ -248,7 +258,7 @@ class PressureSolverTest(unittest.TestCase):
                 flux = - np.dot(np.dot(vol_perm, grad), area_vect)
                 fluxes.append(flux)
             fluxes_sum = abs(sum(fluxes))
-            self.assertAlmostEqual(fluxes_sum, 0.0, delta=1.2e-10)
+            self.assertAlmostEqual(fluxes_sum, 0.0, delta=1e-9)
 
     # @unittest.skip('later')
     def test_if_method_yields_correct_T_matrix(self):
@@ -273,4 +283,4 @@ class PressureSolverTest(unittest.TestCase):
                                       source[c])
             c += 1
         self.m_mpfad.run_solver(LPEW3(self.m).interpolate)
-        print(self.m_mpfad.T, self.m_mpfad.x, self.m_mpfad.Q)
+        # print(self.m_mpfad.T, self.m_mpfad.x, self.m_mpfad.Q)

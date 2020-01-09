@@ -72,7 +72,7 @@ class LinearityPreservingTests(unittest.TestCase):
     def psol1(self, coords):
         x, y, z = coords
 
-        return x + y + z #- 0.2 * y
+        return -x - 0.2 * y
 
     def lp_schneider_2018(self, coords, p_max, p_min,
                           x_max, x_min, y_max, y_min, z_max, z_min):
@@ -92,21 +92,16 @@ class LinearityPreservingTests(unittest.TestCase):
         Test if mesh_homogeneous with tensor K_1 and solution 1
         """
         for volume in self.volumes:
-            mb.tag_set_data(self.mesh_homogeneous.perm_tag,
-                                 volume, self.K_1)
+            mb.tag_set_data(self.mesh_homogeneous.perm_tag, volume, self.K_1)
         allVolumes = self.mesh_homogeneous.all_volumes
         bcVerts = self.mesh_homogeneous.get_boundary_nodes()
         for bcVert in bcVerts:
             vertCoords = mb.get_coords([bcVert])
             bcVal = self.psol1(vertCoords)
             mb.tag_set_data(self.mesh_homogeneous.dirichlet_tag, bcVert, bcVal)
-        self.mpfad_homogeneous.run_solver(LPEW3(self.mesh_homogeneous).interpolate)
-        T = self.mpfad_homogeneous.T
-        Q = self.mpfad_homogeneous.Q
-        for i in range(len(Q)):
-            print(np.sum(T[i]), Q[i])
-
-
+        self.mpfad_homogeneous.run_solver(
+            LPEW3(self.mesh_homogeneous).interpolate
+        )
         for volume in allVolumes:
             coords = mb.get_coords([volume])
             u = self.psol1(coords)
@@ -116,9 +111,7 @@ class LinearityPreservingTests(unittest.TestCase):
 
     # @unittest.skip('debugging other tests')
     def test_case_2(self):
-        """
-        Test if mesh_homogeneous with tensor K_2 and solution 1
-        """
+        """Test if mesh_homogeneous with tensor K_2 and solution 1."""
         mb = self.mesh_homogeneous.mb
         for volume in self.volumes:
             mb.tag_set_data(self.mesh_homogeneous.perm_tag,
@@ -164,9 +157,7 @@ class LinearityPreservingTests(unittest.TestCase):
 
     # @unittest.skip('debugging other tests')
     def test_case_4(self):
-        """
-        Test if mesh_heterogeneous with tensor K_1/K_2 and solution 1
-        """
+        """Test if mesh_heterogeneous with tensor K_1/K_2 and solution 1."""
         mb = self.mesh_heterogeneous.mb
         mtu = self.mesh_heterogeneous.mtu
         for volume in self.hvolumes:
