@@ -48,8 +48,9 @@ class MpfaD3D:
         self.dirichlet_faces = mesh_data.dirichlet_faces
         self.neumann_faces = mesh_data.neumann_faces
         self.intern_faces = mesh_data.intern_faces()
-        # self.intern_faces = set(mesh_data.all_faces).difference(self.dirichlet_faces
-        #                                       | self.neumann_faces)
+        # self.intern_faces = set(mesh_data.all_faces).difference(
+        #     self.dirichlet_faces | self.neumann_faces
+        # )
         self.volumes = self.mesh_data.all_volumes
 
         std_map = Epetra.Map(len(self.volumes), 0, self.comm)
@@ -80,9 +81,9 @@ class MpfaD3D:
                np.dot(normal_vector, normal_vector))
         return vmv
 
-    def get_cross_diffusion_term(self, tan, vec, S, h1,
-                                 Kn1, Kt1, h2=0, Kt2=0,
-                                 Kn2=0, boundary=False):
+    def get_cross_diffusion_term(
+        self, tan, vec, S, h1, Kn1, Kt1, h2=0, Kt2=0, Kn2=0, boundary=False
+    ):
         if not boundary:
             mesh_anisotropy_term = (np.dot(tan, vec)/(S ** 2))
             physical_anisotropy_term = -((1 / S) * (h1 * (Kt1 / Kn1)
@@ -99,7 +100,7 @@ class MpfaD3D:
     def get_nodes_weights(self, method):
         self.nodes_ws = {}
         self.nodes_nts = {}
-        #This is the limiting part of the interpoation method. The Dict
+        # This is the limiting part of the interpoation method. The Dict
         for node in self.intern_nodes:
             self.nodes_ws[node] = method(node)
 
@@ -142,9 +143,12 @@ class MpfaD3D:
         n_vertex = len(set(self.mesh_data.all_nodes) - self.dirichlet_nodes)
         print('interpolation runing...')
         self.get_nodes_weights(interpolation_method)
-        print('done interpolation...',
-              'took {0} seconds to interpolate over {1} verts'.\
-              format(time.time() - t0, n_vertex))
+        print(
+            'done interpolation...',
+            'took {0} seconds to interpolate over {1} verts'.format(
+                time.time() - t0, n_vertex
+            )
+        )
         print('filling the transmissibility matrix...')
         begin = time.time()
 
@@ -155,8 +159,7 @@ class MpfaD3D:
                 RHS = self.mb.tag_get_data(self.source_tag, volume)[0][0]
                 self.Q[volume_id] += RHS
                 # self.Q[volume_id, 0] += RHS
-
-        except:
+        except Exception:
             pass
 
         for face in self.neumann_faces:
@@ -213,12 +216,12 @@ class MpfaD3D:
             K_L_JI = self.vmv_multiply(N_IJK, K_L, tan_JI)
             K_L_JK = self.vmv_multiply(N_IJK, K_L, tan_JK)
 
-            D_JK = self.get_cross_diffusion_term(tan_JK, LJ, face_area,
-                                                 h_L, K_n_L, K_L_JK,
-                                                 boundary=True)
-            D_JI = self.get_cross_diffusion_term(tan_JI, LJ, face_area,
-                                                 h_L, K_n_L, K_L_JI,
-                                                 boundary=True)
+            D_JK = self.get_cross_diffusion_term(
+                tan_JK, LJ, face_area, h_L, K_n_L, K_L_JK, boundary=True
+            )
+            D_JI = self.get_cross_diffusion_term(
+                tan_JI, LJ, face_area, h_L, K_n_L, K_L_JI, boundary=True
+            )
             K_eq = (1 / h_L)*(face_area * K_n_L)
 
             RHS = (D_JK * (g_I - g_J) - K_eq * g_J + D_JI * (g_J - g_K))
@@ -253,18 +256,21 @@ class MpfaD3D:
 
             if test < 0:
                 left_volume, right_volume = right_volume, left_volume
-                L = self.mesh_data.mb.tag_get_data(self.volume_centre_tag,
-                                                   left_volume)[0]
-                R = self.mesh_data.mb.tag_get_data(self.volume_centre_tag,
-                                                   right_volume)[0]
+                L = self.mesh_data.mb.tag_get_data(
+                    self.volume_centre_tag, left_volume
+                )[0]
+                R = self.mesh_data.mb.tag_get_data(
+                    self.volume_centre_tag, right_volume
+                )[0]
                 dist_LR = R - L
 
             face_area = np.sqrt(np.dot(N_IJK, N_IJK))
             tan_JI = np.cross(N_IJK, JI)
             tan_JK = np.cross(N_IJK, JK)
 
-            K_R = self.mb.tag_get_data(self.perm_tag,
-                                       right_volume).reshape([3, 3])
+            K_R = self.mb.tag_get_data(
+                self.perm_tag, right_volume
+            ).reshape([3, 3])
             RJ = (R - self.mb.get_coords([J]))
             h_R = geo.get_height(N_IJK, RJ)
 
@@ -272,8 +278,9 @@ class MpfaD3D:
             K_R_JI = self.vmv_multiply(N_IJK, K_R, tan_JI)
             K_R_JK = self.vmv_multiply(N_IJK, K_R, tan_JK)
 
-            K_L = self.mb.tag_get_data(self.perm_tag,
-                                       left_volume).reshape([3, 3])
+            K_L = self.mb.tag_get_data(
+                self.perm_tag, left_volume
+            ).reshape([3, 3])
 
             LJ = (L - self.mb.get_coords([J]))
             h_L = geo.get_height(N_IJK, LJ)
@@ -282,19 +289,20 @@ class MpfaD3D:
             K_L_JI = self.vmv_multiply(N_IJK, K_L, tan_JI)
             K_L_JK = self.vmv_multiply(N_IJK, K_L, tan_JK)
 
-            D_JI = self.get_cross_diffusion_term(tan_JI, dist_LR,
-                                                 face_area, h_L, K_L_n,
-                                                 K_L_JI, h_R,
-                                                 K_R_JI, K_R_n)
-            D_JK = self.get_cross_diffusion_term(tan_JK, dist_LR,
-                                                 face_area, h_L, K_L_n,
-                                                 K_L_JK, h_R,
-                                                 K_R_JK, K_R_n)
+            D_JI = self.get_cross_diffusion_term(
+                tan_JI, dist_LR, face_area, h_L, K_L_n, K_L_JI, h_R, K_R_JI,
+                K_R_n
+            )
+            D_JK = self.get_cross_diffusion_term(
+                tan_JK, dist_LR, face_area, h_L, K_L_n, K_L_JK, h_R, K_R_JK,
+                K_R_n
+            )
 
             K_eq = (K_R_n * K_L_n)/(K_R_n * h_L + K_L_n * h_R) * face_area
 
-            id_right = self.mb.tag_get_data(self.global_id_tag,
-                                            right_volume)
+            id_right = self.mb.tag_get_data(
+                self.global_id_tag, right_volume
+            )
             id_left = self.mb.tag_get_data(self.global_id_tag, left_volume)
 
             col_ids = [id_right, id_right, id_left, id_left]
@@ -311,11 +319,17 @@ class MpfaD3D:
             #                      [D_JK, D_JI, K_eq, I, J, K, face_area])
 
         self.T.InsertGlobalValues(self.ids, self.v_ids, self.ivalues)
-        # self.T[np.asarray(self.ids)[:, :, 0, 0], np.asarray(self.v_ids)] = np.asarray(self.ivalues)
+        # self.T[
+        #     np.asarray(self.ids)[:, :, 0, 0], np.asarray(self.v_ids)
+        # ] = np.asarray(self.ivalues)
         self.T.InsertGlobalValues(id_volumes, id_volumes, all_LHS)
-        # self.T[np.asarray(id_volumes), np.asarray(id_volumes)] = np.asarray(all_LHS)
+        # self.T[
+        #     np.asarray(id_volumes), np.asarray(id_volumes)
+        # ] = np.asarray(all_LHS)
         self.T.InsertGlobalValues(all_cols, all_rows, all_values)
-        # self.T[np.asarray(all_cols)[:, 0, 0, 0], np.asarray(all_rows)[:, 0, 0, 0]] = np.asarray(all_values)[:, 0]
+        # self.T[
+        #     np.asarray(all_cols)[:, 0, 0, 0], np.asarray(all_rows)[:, 0, 0, 0]
+        # ] = np.asarray(all_values)[:, 0]
         self.T.FillComplete()
         mat_fill_time = time.time() - begin
         print('matrix fill took {0} seconds...'.format(mat_fill_time))
@@ -332,8 +346,11 @@ class MpfaD3D:
             print("3) Solving the linear system...")
             solver.Solve()
             t = time.time() - t0
-            print('Solver took {0} seconds to run over {1} volumes'.format(t,
-                  mesh_size))
+            print(
+                'Solver took {0} seconds to run over {1} volumes'.format(
+                    t, mesh_size
+                )
+            )
         else:
             solver = AztecOO.AztecOO(linearProblem)
             solver.SetAztecOption(AztecOO.AZ_solver, AztecOO.AZ_gmres)
@@ -350,7 +367,6 @@ class MpfaD3D:
                   mesh_size))
             print('Solver converged at %.dth iteration in %3f seconds.'
                   % (int(its), solver_time))
-        print(self.T, self.Q)
         # self.T = self.T.tocsc()
         # self.Q = self.Q.tocsc()
         # self.x = spsolve(self.T, self.Q)
