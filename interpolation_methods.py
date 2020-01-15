@@ -6,7 +6,6 @@ from pressure_solver_3D import MpfaD3D
 
 
 class InterpolMethod(MpfaD3D):
-
     def __init__(self, mesh_data):
         self.mesh_data = mesh_data
         self.mb = mesh_data.mb
@@ -15,21 +14,27 @@ class InterpolMethod(MpfaD3D):
         self.neumann_tag = mesh_data.neumann_tag
         self.perm_tag = mesh_data.perm_tag
 
-        self.dirichlet_nodes = set(self.mb.get_entities_by_type_and_tag(
-            0, types.MBVERTEX, self.dirichlet_tag, np.array((None,))))
+        self.dirichlet_nodes = set(
+            self.mb.get_entities_by_type_and_tag(
+                0, types.MBVERTEX, self.dirichlet_tag, np.array((None,))
+            )
+        )
 
-        self.neumann_nodes = set(self.mb.get_entities_by_type_and_tag(
-            0, types.MBVERTEX, self.neumann_tag, np.array((None,))))
+        self.neumann_nodes = set(
+            self.mb.get_entities_by_type_and_tag(
+                0, types.MBVERTEX, self.neumann_tag, np.array((None,))
+            )
+        )
         self.neumann_nodes = self.neumann_nodes - self.dirichlet_nodes
 
-        boundary_nodes = (self.dirichlet_nodes | self.neumann_nodes)
+        boundary_nodes = self.dirichlet_nodes | self.neumann_nodes
         self.intern_nodes = set(mesh_data.all_nodes) - boundary_nodes
 
         self.dirichlet_faces = mesh_data.dirichlet_faces
         self.neumann_faces = mesh_data.neumann_faces
 
         self.all_faces = self.mb.get_entities_by_dimension(0, 2)
-        boundary_faces = (self.dirichlet_faces | self.neumann_faces)
+        boundary_faces = self.dirichlet_faces | self.neumann_faces
         # print('ALL FACES', all_faces, len(all_faces))
         self.intern_faces = set(self.all_faces) - boundary_faces
 
@@ -40,12 +45,13 @@ class InterpolMethod(MpfaD3D):
         weight_sum = 0.0
         for a_volume in vols_around:
             vol_cent = self.mesh_data.get_centroid(a_volume)
-            inv_dist = 1/self.mesh_data.point_distance(coords_node, vol_cent)
+            inv_dist = 1 / self.mesh_data.point_distance(coords_node, vol_cent)
             weights = np.append(weights, inv_dist)
             weight_sum += inv_dist
         weights = weights / weight_sum
         node_weights = {
-            vol: weight for vol, weight in zip(vols_around, weights)}
+            vol: weight for vol, weight in zip(vols_around, weights)
+        }
         return node_weights
 
     def by_least_squares(self, node):
@@ -72,43 +78,53 @@ class InterpolMethod(MpfaD3D):
             I_xz += x_k * z_k
             I_yz += y_k * z_k
 
-        G = I_xx * (I_yy*I_zz - I_yz*I_yz) + \
-            I_xy * (I_yz*I_xz - I_xy*I_zz) + \
-            I_xz * (I_xy*I_yz - I_yy*I_xz)
+        G = (
+            I_xx * (I_yy * I_zz - I_yz * I_yz)
+            + I_xy * (I_yz * I_xz - I_xy * I_zz)
+            + I_xz * (I_xy * I_yz - I_yy * I_xz)
+        )
 
-        psi_x = (R_x * (I_yz*I_yz - I_yy*I_zz) +
-                 R_y * (I_xy*I_zz - I_yz*I_xz) +
-                 R_z * (I_yy*I_xz - I_xy*I_yz)) / G
+        psi_x = (
+            R_x * (I_yz * I_yz - I_yy * I_zz)
+            + R_y * (I_xy * I_zz - I_yz * I_xz)
+            + R_z * (I_yy * I_xz - I_xy * I_yz)
+        ) / G
 
-        psi_y = (R_x * (I_xy*I_zz - I_yz*I_xz) +
-                 R_y * (I_xz*I_xz - I_xx*I_zz) +
-                 R_z * (I_xx*I_yz - I_xy*I_xz)) / G
+        psi_y = (
+            R_x * (I_xy * I_zz - I_yz * I_xz)
+            + R_y * (I_xz * I_xz - I_xx * I_zz)
+            + R_z * (I_xx * I_yz - I_xy * I_xz)
+        ) / G
 
-        psi_z = (R_x * (I_yy*I_xz - I_xy*I_yz) +
-                 R_y * (I_xx*I_yz - I_xy*I_xz) +
-                 R_z * (I_xy*I_xy - I_xx*I_yy)) / G
+        psi_z = (
+            R_x * (I_yy * I_xz - I_xy * I_yz)
+            + R_y * (I_xx * I_yz - I_xy * I_xz)
+            + R_z * (I_xy * I_xy - I_xx * I_yy)
+        ) / G
 
         num_vols = len(vols_around)
         nodes_weights = {}
 
         for x_k, y_k, z_k, volume in rel_vol_position:
-            numerator = 1.0 + x_k*psi_x + y_k*psi_y + z_k*psi_z
-            denominator = num_vols + R_x*psi_x + R_y*psi_y + R_z*psi_z
+            numerator = 1.0 + x_k * psi_x + y_k * psi_y + z_k * psi_z
+            denominator = num_vols + R_x * psi_x + R_y * psi_y + R_z * psi_z
             nodes_weights[volume] = numerator / denominator
 
         return nodes_weights
 
     def _get_volumes_sharing_face_and_node(self, node, volume):
-        faces_in_volume = set(self.mtu.get_bridge_adjacencies(
-                                      volume, 3, 2))
-        faces_sharing_vertice = set(self.mtu.get_bridge_adjacencies(
-                                            node, 0, 2))
+        faces_in_volume = set(self.mtu.get_bridge_adjacencies(volume, 3, 2))
+        faces_sharing_vertice = set(
+            self.mtu.get_bridge_adjacencies(node, 0, 2)
+        )
         faces_sharing_vertice = faces_in_volume.intersection(
-                                        faces_sharing_vertice)
+            faces_sharing_vertice
+        )
         adj_vols = []
         for face in faces_sharing_vertice:
-            volumes_sharing_face = set(self.mtu.get_bridge_adjacencies(
-                                            face, 2, 3))
+            volumes_sharing_face = set(
+                self.mtu.get_bridge_adjacencies(face, 2, 3)
+            )
             side_volume = volumes_sharing_face - {volume}
             adj_vols.append(side_volume)
         return adj_vols
@@ -118,24 +134,26 @@ class InterpolMethod(MpfaD3D):
         vol_perm = np.reshape(vol_perm, (3, 3))
         node_coords = self.mb.get_coords([node])
         volume_centroid = self.mesh_data.get_centroid(volume)
-        tetra_coords = np.reshape([node_coords,
-                                   volume_centroid,
-                                   reff_node[1],
-                                   auxiliary_node[1]], [4, 3])
+        tetra_coords = np.reshape(
+            [node_coords, volume_centroid, reff_node[1], auxiliary_node[1]],
+            [4, 3],
+        )
         tetra_volume = self.mesh_data.get_tetra_volume(tetra_coords)
-        continuity_face_coords = np.reshape([node_coords,
-                                            auxiliary_node[1],
-                                            reff_node[1]], [3, 3])
-        N_opposite_to_centroid = self._area_vector(continuity_face_coords,
-                                                   volume_centroid)[0]
-        oppose_reff_face_coords = np.reshape([node_coords,
-                                              auxiliary_node[1],
-                                              volume_centroid], [3, 3])
-        N_opposite_to_reff_node = self._area_vector(oppose_reff_face_coords,
-                                                    reff_node[1])[0]
-        neta = self._flux_term(N_opposite_to_reff_node,
-                               vol_perm,
-                               N_opposite_to_centroid) / (3.0 * tetra_volume)
+        continuity_face_coords = np.reshape(
+            [node_coords, auxiliary_node[1], reff_node[1]], [3, 3]
+        )
+        N_opposite_to_centroid = self._area_vector(
+            continuity_face_coords, volume_centroid
+        )[0]
+        oppose_reff_face_coords = np.reshape(
+            [node_coords, auxiliary_node[1], volume_centroid], [3, 3]
+        )
+        N_opposite_to_reff_node = self._area_vector(
+            oppose_reff_face_coords, reff_node[1]
+        )[0]
+        neta = self._flux_term(
+            N_opposite_to_reff_node, vol_perm, N_opposite_to_centroid
+        ) / (3.0 * tetra_volume)
 
         return neta
 
@@ -147,8 +165,9 @@ class InterpolMethod(MpfaD3D):
     def csi_lpew2(self, volume, opposite_vertice, face):
         pass
 
-    def _phi_lpew2(self, neta_k_r, neta_k_r_plus_1,
-                   neta_k_j_r, neta_k_j_r_plus_1):
+    def _phi_lpew2(
+        self, neta_k_r, neta_k_r_plus_1, neta_k_j_r, neta_k_j_r_plus_1
+    ):
         phi = (neta_k_j_r - neta_k_r) / (neta_k_j_r_plus_1 - neta_k_r_plus_1)
 
         return phi
@@ -157,42 +176,53 @@ class InterpolMethod(MpfaD3D):
         T = {}
         adj_vols = self._get_volumes_sharing_face_and_node(node, volume)
         adj_vols = [list(adj_vols[i])[0] for i in range(len(adj_vols))]
-        aux_verts_bkp = list(set(self.mtu.get_bridge_adjacencies(volume,
-                                 3, 0)).difference(set([node])))
-        aux_faces = list(set(self.mtu.get_bridge_adjacencies(volume,
-                                 3, 2)))
+        aux_verts_bkp = list(
+            set(self.mtu.get_bridge_adjacencies(volume, 3, 0)).difference(
+                set([node])
+            )
+        )
+        aux_faces = list(set(self.mtu.get_bridge_adjacencies(volume, 3, 2)))
         for face in aux_faces:
-            nodes_in_aux_face = list(set(self.mtu.get_bridge_adjacencies(
-                                         face, 2, 0)).difference(set([node])
-                                                                 )
-                                     )
+            nodes_in_aux_face = list(
+                set(self.mtu.get_bridge_adjacencies(face, 2, 0)).difference(
+                    set([node])
+                )
+            )
             if len(nodes_in_aux_face) == 3:
-                    aux_faces.remove(face)
+                aux_faces.remove(face)
         aux_verts = cycle(aux_verts_bkp)
         for index, aux_vert in zip([1, 3, 5], aux_verts):
             T[index] = aux_vert
         for aux_face in aux_faces:
-            aux_verts = list(set(self.mtu.get_bridge_adjacencies(
-                                         aux_face, 2, 0)).difference(set(
-                                                                     [node]
-                                                                     )))
-            adj_vol = set(self.mtu.get_bridge_adjacencies(aux_face,
-                          2, 3)).difference(set([volume]))
+            aux_verts = list(
+                set(
+                    self.mtu.get_bridge_adjacencies(aux_face, 2, 0)
+                ).difference(set([node]))
+            )
+            adj_vol = set(
+                self.mtu.get_bridge_adjacencies(aux_face, 2, 3)
+            ).difference(set([volume]))
             aux1 = list(T.keys())[list(T.values()).index(aux_verts[0])]
             aux2 = list(T.keys())[list(T.values()).index(aux_verts[1])]
             if aux1 + aux2 != 6:
                 index = (aux1 + aux2) / 2
-                T[int(index)] = (aux_face,
-                                 self.mtu.get_average_position([aux_face]),
-                                 adj_vol)
+                T[int(index)] = (
+                    aux_face,
+                    self.mtu.get_average_position([aux_face]),
+                    adj_vol,
+                )
             else:
-                T[6] = (aux_face, self.mtu.get_average_position([aux_face]),
-                        adj_vol)
+                T[6] = (
+                    aux_face,
+                    self.mtu.get_average_position([aux_face]),
+                    adj_vol,
+                )
         aux_verts = cycle(aux_verts_bkp)
         for index, aux_vert in zip([1, 3, 5], aux_verts):
-            T[index] = (aux_vert,
-                        self.mtu.get_average_position([node, aux_vert])
-                        )
+            T[index] = (
+                aux_vert,
+                self.mtu.get_average_position([node, aux_vert]),
+            )
         T[7] = T[1]
         """
         vol_centroid = np.asarray(self.mesh_data.get_centroid(volume))
@@ -244,8 +274,7 @@ class InterpolMethod(MpfaD3D):
             indices = cycle([1, 2, 3, 4, 5, 6])
             for a_vol in vols_around:
                 k_hat = self.mesh_data.get_centroid(a_vol)
-                T = self._arrange_auxiliary_faces_and_verts(
-                                      node, a_vol)
+                T = self._arrange_auxiliary_faces_and_verts(node, a_vol)
                 for j in range(1, 7, 1):
                     for _, r in zip(range(1, 7, 1), indices):
                         if j == r:
@@ -269,7 +298,7 @@ class InterpolMethod(MpfaD3D):
         AC = nodes[2] - nodes[0]
         area_vector = np.cross(AB, AC) / 2.0
         if np.dot(area_vector, ref_vect) < 0.0:
-            area_vector = - area_vector
+            area_vector = -area_vector
             return [area_vector, -1]
         return [area_vector, 1]
 
@@ -295,7 +324,9 @@ class InterpolMethod(MpfaD3D):
             ref_node_i = self.mb.get_coords(ref_node_i)
             N_int = self._area_vector([node, aux_node, vol_cent], ref_node)[0]
             N_i = self._area_vector(face_nodes_crds, ref_node_i)[0]
-            lambda_l += self._flux_term(N_i, vol_perm, N_int)/(3.0*tetra_vol)
+            lambda_l += self._flux_term(N_i, vol_perm, N_int) / (
+                3.0 * tetra_vol
+            )
         return lambda_l
 
     def _neta_lpew3(self, node, vol, face):
@@ -317,7 +348,7 @@ class InterpolMethod(MpfaD3D):
         node = self.mb.get_coords([node])
         N_out = self._area_vector(face_nodes_i, node)[0]
         N_i = self._area_vector(face_nodes_crds, ref_node)[0]
-        neta = self._flux_term(N_out, vol_perm, N_i)/(3.0 * tetra_vol)
+        neta = self._flux_term(N_out, vol_perm, N_i) / (3.0 * tetra_vol)
         return neta
 
     def _csi_lpew3(self, face, vol):
@@ -331,7 +362,7 @@ class InterpolMethod(MpfaD3D):
         sub_vol = np.append(face_nodes, vol_cent)
         sub_vol = np.reshape(sub_vol, (4, 3))
         tetra_vol = self.mesh_data.get_tetra_volume(sub_vol)
-        csi = self._flux_term(N_i, vol_perm, N_i)/(3.0*tetra_vol)
+        csi = self._flux_term(N_i, vol_perm, N_i) / (3.0 * tetra_vol)
         return csi
 
     def _sigma_lpew3(self, node, vol):
@@ -395,10 +426,10 @@ class InterpolMethod(MpfaD3D):
             other_node = set(face_nodes) - set(a_face_nodes)
             other_node = list(other_node)
             lbd_1 = self._lambda_lpew3(node, aux_node[0], faces[i])
-            lbd_2 = self._lambda_lpew3(node, other_node[0], faces[i-1])
+            lbd_2 = self._lambda_lpew3(node, other_node[0], faces[i - 1])
             neta = self._neta_lpew3(node, vol, faces[i])
             phi = lbd_1 * lbd_2 * neta
-            phi_sum += + phi
+            phi_sum += +phi
         sigma = self._sigma_lpew3(node, vol)
         phi_sum = phi_sum / sigma
         return phi_sum
@@ -432,5 +463,6 @@ class InterpolMethod(MpfaD3D):
             weight_sum += p_weight
         weights = weights / weight_sum
         node_weights = {
-            vol: weight for vol, weight in zip(vols_around, weights)}
+            vol: weight for vol, weight in zip(vols_around, weights)
+        }
         return node_weights

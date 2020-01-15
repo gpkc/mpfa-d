@@ -5,7 +5,6 @@ from pymoab import topo_util
 
 
 class GenerateMesh:
-
     def __init__(self, mesh_file):
 
         self.mesh_file = mesh_file
@@ -16,16 +15,20 @@ class GenerateMesh:
     def create_tags(self):
 
         self.gid_tag = self.mb.tag_get_handle(
-            "GLOBAL_ID", 1, types.MB_TYPE_INTEGER,
-            types.MB_TAG_DENSE, True)
+            "GLOBAL_ID", 1, types.MB_TYPE_INTEGER, types.MB_TAG_DENSE, True
+        )
 
         self.dirichlet_boundaries_tag = self.mb.tag_get_handle(
-            "dirichlet_boundaries", 1, types.MB_TYPE_INTEGER,
-            types.MB_TAG_SPARSE, True)
+            "dirichlet_boundaries",
+            1,
+            types.MB_TYPE_INTEGER,
+            types.MB_TAG_SPARSE,
+            True,
+        )
 
         self.material_set_tag = self.mb.tag_get_handle(
-            "MATERIAL_SET", 1, types.MB_TYPE_INTEGER,
-            types.MB_TAG_SPARSE, True)
+            "MATERIAL_SET", 1, types.MB_TYPE_INTEGER, types.MB_TAG_SPARSE, True
+        )
 
     def create_vert(self, vert_coords):
         vert = self.mb.create_vertices(vert_coords)
@@ -46,14 +49,14 @@ class GenerateMesh:
         with open(self.mesh_file) as msh:
             informations = []
             for i, line in enumerate(msh):
-                line.strip().split('/n')
+                line.strip().split("/n")
                 if "Number of vertices" in line:
                     informations.append(i + 2)
                 if "Number of control volume" in line:
                     informations.append(i + 2)
-                if 'Vertices  ' in line:
+                if "Vertices  " in line:
                     informations.append(i + 2)
-                if 'Volumes->faces' in line:
+                if "Volumes->faces" in line:
                     informations.append(i + 2)
                 if "Volumes->Verticess" in line:
                     informations.append(i + 2)
@@ -71,8 +74,10 @@ class GenerateMesh:
         verts = lines[first_vert:last_vert]
         size = len(verts)
         verts = np.asarray([vert.split() for vert in verts]).reshape(size, 3)
-        verts_coords = np.array([[float(vert) for vert in verts[i]]
-                                for i in range(0, size)], dtype='float64')
+        verts_coords = np.array(
+            [[float(vert) for vert in verts[i]] for i in range(0, size)],
+            dtype="float64",
+        )
         msh.close()
 
         verts = self.mb.create_vertices(verts_coords.flatten())
@@ -93,8 +98,9 @@ class GenerateMesh:
             vol_verts = []
             for vert in volume[1:]:
                 vol_verts.append(int(vert))
-            el = self.create_volume(int(volume[0]), np.asarray(vol_verts,
-                                                               dtype='uint64'))
+            el = self.create_volume(
+                int(volume[0]), np.asarray(vol_verts, dtype="uint64")
+            )
             self.mb.tag_set_data(self.gid_tag, el, gid)
             self.mb.add_entities(vol_ms, [el])
             gid += 1
@@ -111,8 +117,9 @@ class GenerateMesh:
             adjacent_vols = self.mtu.get_bridge_adjacencies(face, 2, 3)
             if len(adjacent_vols) < 2:
                 self.mb.add_entities(dirichlet_boundary_faces, [face])
-        self.mb.tag_set_data(self.material_set_tag,
-                             dirichlet_boundary_faces, 101)
+        self.mb.tag_set_data(
+            self.material_set_tag, dirichlet_boundary_faces, 101
+        )
 
     def write_msh_file(self, mesh_name):
         self.mb.write_file(mesh_name)
