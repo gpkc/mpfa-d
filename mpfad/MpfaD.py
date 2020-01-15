@@ -5,10 +5,21 @@ import mpfad.helpers.geometric as geo
 import numpy as np
 import time
 
+import logging
 # from scipy.sparse import lil_matrix
 # from scipy.sparse.linalg import spsolve
 # from scipy.sparse import lil_matrix
 # from scipy.sparse.linalg import spsolve
+
+logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger(__name__)
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+formatter = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+ch.setFormatter(formatter)
+logger.addHandler(ch)
 
 
 class MpfaD3D:
@@ -16,6 +27,7 @@ class MpfaD3D:
 
     def __init__(self, mesh_data, x=None):
         """Init class."""
+        logger.info('Process started.')
         self.mesh_data = mesh_data
         self.mb = mesh_data.mb
         self.mtu = mesh_data.mtu
@@ -161,15 +173,15 @@ class MpfaD3D:
         self.interpolation_method = interpolation_method
         t0 = time.time()
         n_vertex = len(set(self.mesh_data.all_nodes) - self.dirichlet_nodes)
-        print("interpolation runing...")
+        logger.info("interpolation runing...")
         self.get_nodes_weights(interpolation_method)
-        print(
-            "done interpolation...",
-            "took {0} seconds to interpolate over {1} verts".format(
+        logger.info(
+            """done interpolation...
+            took {0} seconds to interpolate over {1} verts""".format(
                 time.time() - t0, n_vertex
             ),
         )
-        print("filling the transmissibility matrix...")
+        logger.info("filling the transmissibility matrix...")
         begin = time.time()
 
         try:
@@ -180,7 +192,7 @@ class MpfaD3D:
                 RHS = self.mb.tag_get_data(self.source_tag, volume)[0][0]
                 self.Q[volume_id] += RHS
                 # self.Q[volume_id, 0] += RHS
-        except Exception:
+        except RuntimeError:
             pass
 
         for face in self.neumann_faces:
@@ -375,21 +387,21 @@ class MpfaD3D:
         # ] = np.asarray(all_values)[:, 0]
         self.T.FillComplete()
         mat_fill_time = time.time() - begin
-        print("matrix fill took {0} seconds...".format(mat_fill_time))
+        logger.info("matrix fill took {0} seconds...".format(mat_fill_time))
         mesh_size = len(self.volumes)
-        print("running solver...")
+        logger.info("running solver...")
         USE_DIRECT_SOLVER = False
         linearProblem = Epetra.LinearProblem(self.T, self.x, self.Q)
         if USE_DIRECT_SOLVER:
             solver = Amesos.Lapack(linearProblem)
-            print("1) Performing symbolic factorizations...")
+            logger.info("1) Performing symbolic factorizations...")
             solver.SymbolicFactorization()
-            print("2) Performing numeric factorizations...")
+            logger.info("2) Performing numeric factorizations...")
             solver.NumericFactorization()
-            print("3) Solving the linear system...")
+            logger.info("3) Solving the linear system...")
             solver.Solve()
             t = time.time() - t0
-            print(
+            logger.info(
                 "Solver took {0} seconds to run over {1} volumes".format(
                     t, mesh_size
                 )
@@ -406,17 +418,17 @@ class MpfaD3D:
             t = time.time() - t0
             its = solver.GetAztecStatus()[0]
             solver_time = solver.GetAztecStatus()[6]
-            print(
+            logger.info(
                 "Solver took {0} seconds to run over {1} volumes".format(
                     t, mesh_size
                 )
             )
-            print(
+            logger.info(
                 "Solver converged at %.dth iteration in %3f seconds."
                 % (int(its), solver_time)
             )
         # self.T = self.T.tocsc()
         # self.Q = self.Q.tocsc()
         # self.x = spsolve(self.T, self.Q)
-        # print(np.sum(self.T[50]), self.Q[50])
+        # logger.info(np.sum(self.T[50]), self.Q[50])
         self.mb.tag_set_data(self.pressure_tag, self.volumes, self.x)
