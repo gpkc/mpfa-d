@@ -5,8 +5,8 @@ from scipy.sparse.linalg import spsolve
 import mpfad.helpers.geometric as geo
 from math import pi
 
-class MpfaD3D:
 
+class MpfaD3D:
     def __init__(self, mesh_data):
 
         self.mesh_data = mesh_data
@@ -18,48 +18,56 @@ class MpfaD3D:
         self.perm_tag = mesh_data.perm_tag
 
         self.pressure_tag = self.mb.tag_get_handle(
-            "Pressure", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+            "Pressure", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
+        )
 
         self.global_id_tag = self.mb.tag_get_handle(
-                        "GLOBAL_ID_VOLUME", 1, types.MB_TYPE_DOUBLE,
-                        types.MB_TAG_SPARSE, True)
+            "GLOBAL_ID_VOLUME",
+            1,
+            types.MB_TYPE_DOUBLE,
+            types.MB_TAG_SPARSE,
+            True,
+        )
 
-        self.dirichlet_nodes = set(self.mb.get_entities_by_type_and_tag(
-            0, types.MBVERTEX, self.dirichlet_tag, np.array((None,))))
+        self.dirichlet_nodes = set(
+            self.mb.get_entities_by_type_and_tag(
+                0, types.MBVERTEX, self.dirichlet_tag, np.array((None,))
+            )
+        )
 
-        self.neumann_nodes = set(self.mb.get_entities_by_type_and_tag(
-            0, types.MBVERTEX, self.neumann_tag, np.array((None,))))
+        self.neumann_nodes = set(
+            self.mb.get_entities_by_type_and_tag(
+                0, types.MBVERTEX, self.neumann_tag, np.array((None,))
+            )
+        )
         self.neumann_nodes = self.neumann_nodes - self.dirichlet_nodes
 
-        boundary_nodes = (self.dirichlet_nodes | self.neumann_nodes)
+        boundary_nodes = self.dirichlet_nodes | self.neumann_nodes
         self.intern_nodes = set(mesh_data.all_nodes) - boundary_nodes
 
         self.dirichlet_faces = mesh_data.dirichlet_faces
         self.neumann_faces = mesh_data.neumann_faces
 
         self.all_faces = mesh_data.all_faces
-        boundary_faces = (self.dirichlet_faces | self.neumann_faces)
+        boundary_faces = self.dirichlet_faces | self.neumann_faces
         # print('ALL FACES', all_faces, len(all_faces))
         self.intern_faces = set(self.all_faces) - boundary_faces
 
         self.volumes = self.mesh_data.all_volumes
 
-        self.A = lil_matrix((len(self.volumes), len(self.volumes)),
-                            dtype=np.float)
+        self.A = lil_matrix(
+            (len(self.volumes), len(self.volumes)), dtype=np.float
+        )
 
         # self.A = np.zeros([len(self.volumes), len(self.volumes)])
         # print('CRIOU MATRIZ A')
-        self.b = lil_matrix((len(self.volumes), 1),
-                            dtype=np.float)
+        self.b = lil_matrix((len(self.volumes), 1), dtype=np.float)
         # self.b = np.zeros([1, len(self.volumes)])
 
-
     def _benchmark_1(self, x, y, z):
-        K = [1.0, 0.5, 0.0,
-             0.5, 1.0, 0.5,
-             0.0, 0.5, 1.0]
-        y = y + 1/2.
-        z = z + 1/3.
+        K = [1.0, 0.5, 0.0, 0.5, 1.0, 0.5, 0.0, 0.5, 1.0]
+        y = y + 1 / 2.0
+        z = z + 1 / 3.0
         u1 = 1 + np.sin(pi * x) * np.sin(pi * y) * np.sin(pi * z)
         return K, u1
 
@@ -70,7 +78,7 @@ class MpfaD3D:
             area = np.sqrt(np.dot(area_vector, area_vector))
             return area
         if np.dot(area_vector, ref_vect) < 0.0:
-            area_vector = - area_vector
+            area_vector = -area_vector
             return [area_vector, -1]
         return [area_vector, 1]
 
@@ -79,7 +87,7 @@ class MpfaD3D:
         if test_vector.all() != (np.zeros(3)).all():
             check_left_or_right = np.dot(test_vector, N_IJK)
             if check_left_or_right < 0:
-                N_IJK = - N_IJK
+                N_IJK = -N_IJK
         return N_IJK
 
     def set_global_id(self):
@@ -96,23 +104,40 @@ class MpfaD3D:
         return flux_term
 
     # chamar essa função de cross_diffusion_term
-    def _intern_cross_term(self, tan_vector, cent_vector, face_area,
-                           tan_term_1st, tan_term_2nd,
-                           norm_term_1st, norm_term_2nd,
-                           cent_dist_1st, cent_dist_2nd):
+    def _intern_cross_term(
+        self,
+        tan_vector,
+        cent_vector,
+        face_area,
+        tan_term_1st,
+        tan_term_2nd,
+        norm_term_1st,
+        norm_term_2nd,
+        cent_dist_1st,
+        cent_dist_2nd,
+    ):
         mesh_aniso_term = np.dot(tan_vector, cent_vector) / (face_area ** 2.0)
-        phys_aniso_term = ((tan_term_1st / norm_term_1st) * cent_dist_1st) - \
-                          ((tan_term_2nd / norm_term_2nd) * cent_dist_2nd)
+        phys_aniso_term = ((tan_term_1st / norm_term_1st) * cent_dist_1st) - (
+            (tan_term_2nd / norm_term_2nd) * cent_dist_2nd
+        )
 
         cross_flux_term = mesh_aniso_term + phys_aniso_term / face_area
         return cross_flux_term
 
-    def _boundary_cross_term(self, tan_vector, norm_vector, face_area,
-                             tan_flux_term, norm_flux_term, cent_dist):
-        mesh_aniso_term = np.dot(tan_vector, norm_vector)/(face_area ** 2.0)
+    def _boundary_cross_term(
+        self,
+        tan_vector,
+        norm_vector,
+        face_area,
+        tan_flux_term,
+        norm_flux_term,
+        cent_dist,
+    ):
+        mesh_aniso_term = np.dot(tan_vector, norm_vector) / (face_area ** 2.0)
         phys_aniso_term = tan_flux_term / face_area
-        cross_term = mesh_aniso_term * (norm_flux_term / cent_dist) + \
-            phys_aniso_term
+        cross_term = (
+            mesh_aniso_term * (norm_flux_term / cent_dist) + phys_aniso_term
+        )
         return cross_term
 
     def get_nodes_weights(self, method):
@@ -124,8 +149,17 @@ class MpfaD3D:
             self.nodes_ws[node] = method(node, neumann=True)
             self.nodes_nts[node] = self.nodes_ws[node].pop(node)
 
-    def _node_treatment(self, node, id_1st, id_2nd, v_ids,
-                        transm, cross_1st, cross_2nd=0.0, is_J=-1):
+    def _node_treatment(
+        self,
+        node,
+        id_1st,
+        id_2nd,
+        v_ids,
+        transm,
+        cross_1st,
+        cross_2nd=0.0,
+        is_J=-1,
+    ):
         value = (is_J) * transm * (cross_1st + cross_2nd)
         if node in self.dirichlet_nodes:
             x_n, y_n, z_n = self.mb.get_coords([node])
@@ -153,4 +187,3 @@ class MpfaD3D:
     def run_solver(self):
 
         v_ids = self.set_global_id()
-        

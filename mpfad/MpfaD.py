@@ -1,19 +1,21 @@
 """This is the begin."""
-from functools import lru_cache
 from pymoab import types
 from PyTrilinos import Epetra, AztecOO, Amesos
 import mpfad.helpers.geometric as geo
 import numpy as np
 import time
+
 # from scipy.sparse import lil_matrix
 # from scipy.sparse.linalg import spsolve
-from scipy.sparse import lil_matrix
-from scipy.sparse.linalg import spsolve
+# from scipy.sparse import lil_matrix
+# from scipy.sparse.linalg import spsolve
+
 
 class MpfaD3D:
+    """Implement the MPFAD method."""
 
     def __init__(self, mesh_data, x=None):
-
+        """Init class."""
         self.mesh_data = mesh_data
         self.mb = mesh_data.mb
         self.mtu = mesh_data.mtu
@@ -30,19 +32,27 @@ class MpfaD3D:
         # self.sw = two_phase.water_saturation
 
         self.flux_info_tag = self.mb.tag_get_handle(
-            "flux info", 7, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+            "flux info", 7, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
+        )
 
         self.normal_tag = self.mb.tag_get_handle(
-            "Normal", 3, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True)
+            "Normal", 3, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
+        )
 
-        self.dirichlet_nodes = set(self.mb.get_entities_by_type_and_tag(
-            0, types.MBVERTEX, self.dirichlet_tag, np.array((None,))))
+        self.dirichlet_nodes = set(
+            self.mb.get_entities_by_type_and_tag(
+                0, types.MBVERTEX, self.dirichlet_tag, np.array((None,))
+            )
+        )
 
-        self.neumann_nodes = set(self.mb.get_entities_by_type_and_tag(
-            0, types.MBVERTEX, self.neumann_tag, np.array((None,))))
+        self.neumann_nodes = set(
+            self.mb.get_entities_by_type_and_tag(
+                0, types.MBVERTEX, self.neumann_tag, np.array((None,))
+            )
+        )
         self.neumann_nodes = self.neumann_nodes - self.dirichlet_nodes
 
-        boundary_nodes = (self.dirichlet_nodes | self.neumann_nodes)
+        boundary_nodes = self.dirichlet_nodes | self.neumann_nodes
         self.intern_nodes = set(self.mesh_data.all_nodes) - boundary_nodes
 
         self.dirichlet_faces = mesh_data.dirichlet_faces
@@ -65,6 +75,7 @@ class MpfaD3D:
         # self.Q = lil_matrix((len(self.volumes), 1), dtype=np.float)
 
     def record_data(self, file_name):
+        """Record data to file."""
         volumes = self.mb.get_entities_by_dimension(0, 3)
         # faces = self.mb.get_entities_by_dimension(0, 2)
         ms = self.mb.create_meshset()
@@ -73,23 +84,29 @@ class MpfaD3D:
         self.mb.write_file(file_name, [ms])
 
     def get_boundary_node_pressure(self, node):
+        """Return pressure at the boundary nodes of the mesh."""
         pressure = self.mesh_data.mb.tag_get_data(self.dirichlet_tag, node)[0]
         return pressure
 
     def vmv_multiply(self, normal_vector, tensor, CD):
-        vmv = (np.dot(np.dot(normal_vector, tensor), CD) /
-               np.dot(normal_vector, normal_vector))
+        """Return a vector-matrix-vector multiplication."""
+        vmv = np.dot(np.dot(normal_vector, tensor), CD) / np.dot(
+            normal_vector, normal_vector
+        )
         return vmv
 
     def get_cross_diffusion_term(
         self, tan, vec, S, h1, Kn1, Kt1, h2=0, Kt2=0, Kn2=0, boundary=False
     ):
+        """Return a cross diffusion multiplication term."""
         if not boundary:
-            mesh_anisotropy_term = (np.dot(tan, vec)/(S ** 2))
-            physical_anisotropy_term = -((1 / S) * (h1 * (Kt1 / Kn1)
-                                         + h2 * (Kt2 / Kn2)))
-            cross_diffusion_term = (mesh_anisotropy_term +
-                                    physical_anisotropy_term)
+            mesh_anisotropy_term = np.dot(tan, vec) / (S ** 2)
+            physical_anisotropy_term = -(
+                (1 / S) * (h1 * (Kt1 / Kn1) + h2 * (Kt2 / Kn2))
+            )
+            cross_diffusion_term = (
+                mesh_anisotropy_term + physical_anisotropy_term
+            )
             return cross_diffusion_term
         if boundary:
             dot_term = np.dot(-tan, vec) * Kn1
@@ -141,21 +158,22 @@ class MpfaD3D:
         self.interpolation_method = interpolation_method
         t0 = time.time()
         n_vertex = len(set(self.mesh_data.all_nodes) - self.dirichlet_nodes)
-        print('interpolation runing...')
+        print("interpolation runing...")
         self.get_nodes_weights(interpolation_method)
         print(
-            'done interpolation...',
-            'took {0} seconds to interpolate over {1} verts'.format(
+            "done interpolation...",
+            "took {0} seconds to interpolate over {1} verts".format(
                 time.time() - t0, n_vertex
-            )
+            ),
         )
-        print('filling the transmissibility matrix...')
+        print("filling the transmissibility matrix...")
         begin = time.time()
 
         try:
             for volume in self.volumes:
-                volume_id = self.mb.tag_get_data(self.global_id_tag,
-                                                 volume)[0][0]
+                volume_id = self.mb.tag_get_data(self.global_id_tag, volume)[
+                    0
+                ][0]
                 RHS = self.mb.tag_get_data(self.source_tag, volume)[0][0]
                 self.Q[volume_id] += RHS
                 # self.Q[volume_id, 0] += RHS
@@ -165,14 +183,13 @@ class MpfaD3D:
         for face in self.neumann_faces:
             face_flow = self.mb.tag_get_data(self.neumann_tag, face)[0][0]
             volume = self.mtu.get_bridge_adjacencies(face, 2, 3)
-            volume = np.asarray(volume, dtype='uint64')
-            id_volume = self.mb.tag_get_data(self.global_id_tag,
-                                             volume)[0][0]
+            volume = np.asarray(volume, dtype="uint64")
+            id_volume = self.mb.tag_get_data(self.global_id_tag, volume)[0][0]
             face_nodes = self.mtu.get_bridge_adjacencies(face, 0, 0)
             node_crds = self.mb.get_coords(face_nodes).reshape([3, 3])
             face_area = geo._area_vector(node_crds, norma=True)
             RHS = face_flow * face_area
-            self.Q[id_volume] += - RHS
+            self.Q[id_volume] += -RHS
             # self.Q[id_volume, 0] += - RHS
 
         id_volumes = []
@@ -181,24 +198,29 @@ class MpfaD3D:
             # '2' argument was initially '0' but it's incorrect
             I, J, K = self.mtu.get_bridge_adjacencies(face, 2, 0)
 
-            left_volume = np.asarray(self.mtu.get_bridge_adjacencies(
-                                     face, 2, 3), dtype='uint64')
-            id_volume = self.mb.tag_get_data(self.global_id_tag,
-                                             left_volume)[0][0]
+            left_volume = np.asarray(
+                self.mtu.get_bridge_adjacencies(face, 2, 3), dtype="uint64"
+            )
+            id_volume = self.mb.tag_get_data(self.global_id_tag, left_volume)[
+                0
+            ][0]
             id_volumes.append(id_volume)
 
             JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
             JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
-            LJ = self.mb.get_coords([J]) - \
-                self.mesh_data.mb.tag_get_data(self.volume_centre_tag,
-                                               left_volume)[0]
-            N_IJK = np.cross(JI, JK) / 2.
+            LJ = (
+                self.mb.get_coords([J])
+                - self.mesh_data.mb.tag_get_data(
+                    self.volume_centre_tag, left_volume
+                )[0]
+            )
+            N_IJK = np.cross(JI, JK) / 2.0
             _test = np.dot(LJ, N_IJK)
-            if _test < 0.:
+            if _test < 0.0:
                 I, K = K, I
                 JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
                 JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
-                N_IJK = np.cross(JI, JK) / 2.
+                N_IJK = np.cross(JI, JK) / 2.0
             tan_JI = np.cross(N_IJK, JI)
             tan_JK = np.cross(N_IJK, JK)
             self.mb.tag_set_data(self.normal_tag, face, N_IJK)
@@ -210,8 +232,9 @@ class MpfaD3D:
             g_J = self.get_boundary_node_pressure(J)
             g_K = self.get_boundary_node_pressure(K)
 
-            K_L = self.mb.tag_get_data(self.perm_tag,
-                                       left_volume).reshape([3, 3])
+            K_L = self.mb.tag_get_data(self.perm_tag, left_volume).reshape(
+                [3, 3]
+            )
             K_n_L = self.vmv_multiply(N_IJK, K_L, N_IJK)
             K_L_JI = self.vmv_multiply(N_IJK, K_L, tan_JI)
             K_L_JK = self.vmv_multiply(N_IJK, K_L, tan_JK)
@@ -222,9 +245,9 @@ class MpfaD3D:
             D_JI = self.get_cross_diffusion_term(
                 tan_JI, LJ, face_area, h_L, K_n_L, K_L_JI, boundary=True
             )
-            K_eq = (1 / h_L)*(face_area * K_n_L)
+            K_eq = (1 / h_L) * (face_area * K_n_L)
 
-            RHS = (D_JK * (g_I - g_J) - K_eq * g_J + D_JI * (g_J - g_K))
+            RHS = D_JK * (g_I - g_J) - K_eq * g_J + D_JI * (g_J - g_K)
             LHS = K_eq
             all_LHS.append(LHS)
 
@@ -240,18 +263,21 @@ class MpfaD3D:
         self.v_ids = []
         self.ivalues = []
         for face in self.intern_faces:
-            left_volume, right_volume = \
-                self.mtu.get_bridge_adjacencies(face, 2, 3)
-            L = self.mesh_data.mb.tag_get_data(self.volume_centre_tag,
-                                               left_volume)[0]
-            R = self.mesh_data.mb.tag_get_data(self.volume_centre_tag,
-                                               right_volume)[0]
+            left_volume, right_volume = self.mtu.get_bridge_adjacencies(
+                face, 2, 3
+            )
+            L = self.mesh_data.mb.tag_get_data(
+                self.volume_centre_tag, left_volume
+            )[0]
+            R = self.mesh_data.mb.tag_get_data(
+                self.volume_centre_tag, right_volume
+            )[0]
             dist_LR = R - L
             I, J, K = self.mtu.get_bridge_adjacencies(face, 0, 0)
             JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
             JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
 
-            N_IJK = np.cross(JI, JK) / 2.
+            N_IJK = np.cross(JI, JK) / 2.0
             test = np.dot(N_IJK, dist_LR)
 
             if test < 0:
@@ -268,21 +294,21 @@ class MpfaD3D:
             tan_JI = np.cross(N_IJK, JI)
             tan_JK = np.cross(N_IJK, JK)
 
-            K_R = self.mb.tag_get_data(
-                self.perm_tag, right_volume
-            ).reshape([3, 3])
-            RJ = (R - self.mb.get_coords([J]))
+            K_R = self.mb.tag_get_data(self.perm_tag, right_volume).reshape(
+                [3, 3]
+            )
+            RJ = R - self.mb.get_coords([J])
             h_R = geo.get_height(N_IJK, RJ)
 
             K_R_n = self.vmv_multiply(N_IJK, K_R, N_IJK)
             K_R_JI = self.vmv_multiply(N_IJK, K_R, tan_JI)
             K_R_JK = self.vmv_multiply(N_IJK, K_R, tan_JK)
 
-            K_L = self.mb.tag_get_data(
-                self.perm_tag, left_volume
-            ).reshape([3, 3])
+            K_L = self.mb.tag_get_data(self.perm_tag, left_volume).reshape(
+                [3, 3]
+            )
 
-            LJ = (L - self.mb.get_coords([J]))
+            LJ = L - self.mb.get_coords([J])
             h_L = geo.get_height(N_IJK, LJ)
 
             K_L_n = self.vmv_multiply(N_IJK, K_L, N_IJK)
@@ -290,19 +316,31 @@ class MpfaD3D:
             K_L_JK = self.vmv_multiply(N_IJK, K_L, tan_JK)
 
             D_JI = self.get_cross_diffusion_term(
-                tan_JI, dist_LR, face_area, h_L, K_L_n, K_L_JI, h_R, K_R_JI,
-                K_R_n
+                tan_JI,
+                dist_LR,
+                face_area,
+                h_L,
+                K_L_n,
+                K_L_JI,
+                h_R,
+                K_R_JI,
+                K_R_n,
             )
             D_JK = self.get_cross_diffusion_term(
-                tan_JK, dist_LR, face_area, h_L, K_L_n, K_L_JK, h_R, K_R_JK,
-                K_R_n
+                tan_JK,
+                dist_LR,
+                face_area,
+                h_L,
+                K_L_n,
+                K_L_JK,
+                h_R,
+                K_R_JK,
+                K_R_n,
             )
 
-            K_eq = (K_R_n * K_L_n)/(K_R_n * h_L + K_L_n * h_R) * face_area
+            K_eq = (K_R_n * K_L_n) / (K_R_n * h_L + K_L_n * h_R) * face_area
 
-            id_right = self.mb.tag_get_data(
-                self.global_id_tag, right_volume
-            )
+            id_right = self.mb.tag_get_data(self.global_id_tag, right_volume)
             id_left = self.mb.tag_get_data(self.global_id_tag, left_volume)
 
             col_ids = [id_right, id_right, id_left, id_left]
@@ -312,8 +350,9 @@ class MpfaD3D:
             all_rows.append(row_ids)
             all_values.append(values)
             self._node_treatment(I, id_left, id_right, K_eq, D_JK=D_JK)
-            self._node_treatment(J, id_left, id_right, K_eq,
-                                 D_JI=D_JI, D_JK=-D_JK)
+            self._node_treatment(
+                J, id_left, id_right, K_eq, D_JI=D_JI, D_JK=-D_JK
+            )
             self._node_treatment(K, id_left, id_right, K_eq, D_JI=-D_JI)
             # self.mb.tag_set_data(self.flux_info_tag, face,
             #                      [D_JK, D_JI, K_eq, I, J, K, face_area])
@@ -328,13 +367,14 @@ class MpfaD3D:
         # ] = np.asarray(all_LHS)
         self.T.InsertGlobalValues(all_cols, all_rows, all_values)
         # self.T[
-        #     np.asarray(all_cols)[:, 0, 0, 0], np.asarray(all_rows)[:, 0, 0, 0]
+        #     np.asarray(all_cols)[:, 0, 0, 0],
+        #     np.asarray(all_rows)[:, 0, 0, 0]
         # ] = np.asarray(all_values)[:, 0]
         self.T.FillComplete()
         mat_fill_time = time.time() - begin
-        print('matrix fill took {0} seconds...'.format(mat_fill_time))
+        print("matrix fill took {0} seconds...".format(mat_fill_time))
         mesh_size = len(self.volumes)
-        print('running solver...')
+        print("running solver...")
         USE_DIRECT_SOLVER = False
         linearProblem = Epetra.LinearProblem(self.T, self.x, self.Q)
         if USE_DIRECT_SOLVER:
@@ -347,7 +387,7 @@ class MpfaD3D:
             solver.Solve()
             t = time.time() - t0
             print(
-                'Solver took {0} seconds to run over {1} volumes'.format(
+                "Solver took {0} seconds to run over {1} volumes".format(
                     t, mesh_size
                 )
             )
@@ -363,13 +403,18 @@ class MpfaD3D:
             t = time.time() - t0
             its = solver.GetAztecStatus()[0]
             solver_time = solver.GetAztecStatus()[6]
-            print('Solver took {0} seconds to run over {1} volumes'.format(t,
-                  mesh_size))
-            print('Solver converged at %.dth iteration in %3f seconds.'
-                  % (int(its), solver_time))
+            print(
+                "Solver took {0} seconds to run over {1} volumes".format(
+                    t, mesh_size
+                )
+            )
+            print(
+                "Solver converged at %.dth iteration in %3f seconds."
+                % (int(its), solver_time)
+            )
         # self.T = self.T.tocsc()
         # self.Q = self.Q.tocsc()
         # self.x = spsolve(self.T, self.Q)
         # print(np.sum(self.T[50]), self.Q[50])
         self.mb.tag_set_data(self.pressure_tag, self.volumes, self.x)
-        self.mb.write_file('asdfasdfasd.vtk')
+        self.mb.write_file("asdfasdfasd.vtk")

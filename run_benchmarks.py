@@ -6,14 +6,15 @@ from benchmark_fvca import BenchmarkFVCA
 from oblique_drain import ObliqueDrain
 from discrete_maximum_principle import DiscreteMaxPrinciple
 
-interpolations = [LPEW3] #, IDW, LSW]
-benchmark_fvca_cases = ['2'] #, '3', '4'] #, '5', '6', '7', '8']
-fvcaMeshesB = [BenchMeshGenerator(str(case)).generate_mesh()
-               for case in benchmark_fvca_cases]
+interpolations = [LPEW3]  # , IDW, LSW]
+benchmark_fvca_cases = ["2"]  # , '3', '4'] #, '5', '6', '7', '8']
+fvcaMeshesB = [
+    BenchMeshGenerator(str(case)).generate_mesh()
+    for case in benchmark_fvca_cases
+]
 for mesh in fvcaMeshesB:
     for im in interpolations:
-        log_name_1 = ('test_case_1_' + im.__name__ + '_'
-                      + mesh).strip('.h5m')
+        log_name_1 = ("test_case_1_" + im.__name__ + "_" + mesh).strip(".h5m")
         # log_name_2 = ('test_case_2_' + im.__name__ + '_'
         #               + mesh).strip('.h5m')
         BenchmarkFVCA(mesh, im).benchmark_case_1(log_name_1)
@@ -37,5 +38,5 @@ for mesh in fvcaMeshesB:
 #     for im in interpolations:
 #         print(setCase, logName)
 #         ObliqueDrain(setCase).runCase(im, logName)
-mesh = 'meshes/mesh_slanted_mesh.h5m'
-ObliqueDrain(mesh).runCase(LPEW3, 'filipe')
+mesh = "meshes/mesh_slanted_mesh.h5m"
+ObliqueDrain(mesh).runCase(LPEW3, "filipe")
