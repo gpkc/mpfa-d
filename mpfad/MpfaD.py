@@ -115,6 +115,7 @@ class MpfaD3D:
             return b_cross_difusion_term
 
     def get_nodes_weights(self, method):
+        """Return the node weights."""
         self.nodes_ws = {}
         self.nodes_nts = {}
         # This is the limiting part of the interpoation method. The Dict
@@ -126,6 +127,7 @@ class MpfaD3D:
             self.nodes_nts[node] = self.nodes_ws[node].pop(node)
 
     def _node_treatment(self, node, id_left, id_right, K_eq, D_JK=0, D_JI=0.0):
+        """Add flux term from nodes RHS."""
         RHS = 0.5 * K_eq * (D_JK + D_JI)
         if node in self.dirichlet_nodes:
             pressure = self.get_boundary_node_pressure(node)
@@ -155,6 +157,7 @@ class MpfaD3D:
                 self.ivalues.append([-RHS * weight_N, RHS * weight_N])
 
     def run_solver(self, interpolation_method):
+        """Run solver."""
         self.interpolation_method = interpolation_method
         t0 = time.time()
         n_vertex = len(set(self.mesh_data.all_nodes) - self.dirichlet_nodes)
@@ -171,9 +174,9 @@ class MpfaD3D:
 
         try:
             for volume in self.volumes:
-                volume_id = self.mb.tag_get_data(self.global_id_tag, volume)[
-                    0
-                ][0]
+                volume_id = self.mb.tag_get_data(
+                    self.global_id_tag, volume
+                )[0][0]
                 RHS = self.mb.tag_get_data(self.source_tag, volume)[0][0]
                 self.Q[volume_id] += RHS
                 # self.Q[volume_id, 0] += RHS
@@ -417,4 +420,3 @@ class MpfaD3D:
         # self.x = spsolve(self.T, self.Q)
         # print(np.sum(self.T[50]), self.Q[50])
         self.mb.tag_set_data(self.pressure_tag, self.volumes, self.x)
-        self.mb.write_file("asdfasdfasd.vtk")
