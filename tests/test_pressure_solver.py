@@ -1,3 +1,4 @@
+"""Mesh manager tests."""
 import unittest
 import numpy as np
 import mpfad.helpers.geometric as geo
@@ -7,24 +8,24 @@ from mesh_preprocessor import MeshManager
 from pymoab import types
 
 
-class PressureSolverTest(unittest.TestCase):
+class MeshManagerTest(unittest.TestCase):
+    """Test MeshManager class."""
 
-    """
-    These tests are more MeshManager class related. We should rename
-    this test suite.
-    """
     def setUp(self):
-
-        K_1 = np.array([1.0, 0.0, 0.0,
-                        0.0, 1.0, 0.0,
-                        0.0, 0.0, 1.0])
-
+        """Init test suite."""
+        K_1 = np.array(
+            [1.0, 0.0, 0.0,
+             0.0, 1.0, 0.0,
+             0.0, 0.0, 1.0]
+        )
         self.mesh = MeshManager('meshes/mesh_test_conservative.msh', dim=3)
         self.mesh.set_media_property('Permeability', {1: K_1}, dim_target=3)
-        self.mesh.set_boundary_condition('Dirichlet', {102: 1.0, 101: 0.0},
-                                         dim_target=2, set_nodes=True)
-        self.mesh.set_boundary_condition('Neumann', {201: 0.0},
-                                         dim_target=2, set_nodes=True)
+        self.mesh.set_boundary_condition(
+            'Dirichlet', {102: 1.0, 101: 0.0}, dim_target=2, set_nodes=True
+        )
+        self.mesh.set_boundary_condition(
+            'Neumann', {201: 0.0}, dim_target=2, set_nodes=True
+        )
         self.mesh.get_redefine_centre()
         self.mesh.set_global_id()
         self.mpfad = MpfaD3D(self.mesh)
@@ -35,17 +36,11 @@ class PressureSolverTest(unittest.TestCase):
         fracture_perm_isotropic = [96.538461538461530, 17.307692307692307, 0.,
                                    17.307692307692307, 13.461538461538462, 0.,
                                    0., 0., 1.]
-        self.od.set_boundary_condition('Dirichlet',
-                                                 {101: None},
-                                                 dim_target=2,
-                                                 set_nodes=True)
         self.od.set_boundary_condition(
-            'Neumann',
-            {
-                201: 0.0
-            },
-            dim_target=2,
-            set_nodes=True
+            'Dirichlet', {101: None}, dim_target=2, set_nodes=True
+        )
+        self.od.set_boundary_condition(
+            'Neumann', {201: 0.0}, dim_target=2, set_nodes=True
         )
 
         self.od.set_media_property(
@@ -65,29 +60,26 @@ class PressureSolverTest(unittest.TestCase):
                               0.0, 1.0, 2.0])
         self.m = MeshManager('test_mesh_5_vols.h5m', dim=3)
         self.m.set_boundary_condition(
-            'Dirichlet',
-            {
-                101: None
-            },
-            dim_target=2,
-            set_nodes=True
+            'Dirichlet', {101: None}, dim_target=2, set_nodes=True
         )
         self.m.get_redefine_centre()
         self.m.set_global_id()
         self.m_mpfad = MpfaD3D(self.m)
 
     def psol1(self, coords):
+        """Return solution to problem 1."""
         x, y, z = coords
 
         return - x - 0.2 * y
 
     def psol2(self, coords):
+        """Return solution to problem 2."""
         x, y, z = coords
 
         return y ** 2
 
-    # @unittest.skip('later')
     def test_if_method_yields_exact_solution(self):
+        """Test if method yields exact solution for a flow channel problem."""
         self.mtu = self.mesh.mtu
         self.mb = self.mesh.mb
         self.mpfad.run_solver(LPEW3(self.mesh).interpolate)
@@ -96,8 +88,8 @@ class PressureSolverTest(unittest.TestCase):
             a_solution = 1 - self.mb.get_coords([volume])[0]
             self.assertAlmostEqual(c_solution, a_solution, delta=1e-14)
 
-    # @unittest.skip('later')
     def test_if_inner_verts_weighted_calculation_yelds_exact_solution(self):
+        """Test if inner verts weights match expected values."""
         self.mtu = self.mpfad.mtu
         self.mb = self.mpfad.mb
         self.mpfad.run_solver(LPEW3(self.mesh).interpolate)
@@ -109,31 +101,22 @@ class PressureSolverTest(unittest.TestCase):
                 p_vol = self.mpfad.mb.tag_get_data(self.mpfad.pressure_tag,
                                                    volume)
                 p_vert += p_vol * wt
-            self.assertAlmostEqual(p_vert, analytical_solution,
-                                   delta=5e-15)
+            self.assertAlmostEqual(p_vert, analytical_solution, delta=5e-15)
 
-    # @unittest.skip('later')
+    @unittest.skip('later')
     def test_if_gradient_yields_correct_values(self):
+        """Test if gradient yelds expeted values."""
         self.node_pressure_tag = self.mpfad.mb.tag_get_handle(
             "Node Pressure", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
-                                                              )
+        )
         self.mpfad.run_solver(LPEW3(self.mesh).interpolate)
         p_verts = []
         for node in self.mesh.all_nodes:
-            try:
-                p_vert = self.mpfad.mb.tag_get_data(self.mpfad.dirichlet_tag,
-                                                    node)
-                p_verts.append(p_vert[0])
-            except:
-                p_vert = 0.0
-                p_tag = self.mpfad.pressure_tag
-                nd_weights = self.mpfad.nodes_ws[node]
-                for volume, wt in nd_weights.items():
-                    p_vol = self.mpfad.mb.tag_get_data(p_tag, volume)
-                    p_vert += p_vol * wt
-                p_verts.append(p_vert[0])
-        self.mpfad.mb.tag_set_data(self.node_pressure_tag, self.mesh.all_nodes,
-                                   p_verts)
+            p_vert = self.mpfad.mb.tag_get_data(self.mpfad.dirichlet_tag, node)
+            p_verts.append(p_vert[0])
+        self.mpfad.mb.tag_set_data(
+            self.node_pressure_tag, self.mesh.all_nodes, p_verts
+        )
         for a_volume in self.mesh.all_volumes:
             vol_faces = self.mesh.mtu.get_bridge_adjacencies(a_volume, 2, 2)
             vol_nodes = self.mesh.mtu.get_bridge_adjacencies(a_volume, 0, 0)
@@ -185,19 +168,20 @@ class PressureSolverTest(unittest.TestCase):
                                                  a_volume).reshape([3, 3])
             v = 0.
             for face in vol_faces:
-                face_centroid = self.mesh.mb.get_coords([face])
                 face_nodes = self.mesh.mtu.get_bridge_adjacencies(face, 2, 0)
                 face_nodes_crds = self.mesh.mb.get_coords(face_nodes)
-                area_vect = geo._area_vector(face_nodes_crds.reshape([3,3]),
-                                             vol_centroid)[0]
-                unit_area_vec = area_vect / np.sqrt(np.dot(area_vect,
-                                                           area_vect))
+                area_vect = geo._area_vector(
+                    face_nodes_crds.reshape([3, 3]), vol_centroid
+                )[0]
+                unit_area_vec = area_vect / np.sqrt(
+                    np.dot(area_vect, area_vect)
+                )
                 k_grad_p = np.dot(vol_perm, grad_p[0])
                 vel = - np.dot(k_grad_p, unit_area_vec)
                 v += vel * np.sqrt(np.dot(area_vect, area_vect))
 
-    # @unittest.skip('later')
     def test_if_flux_is_conservative_for_all_volumes(self):
+        """Test if flux is conservative for all volumes in the test domain."""
         mb = self.od.mb
         bcVerts = self.od.get_boundary_nodes()
         for bcVert in bcVerts:
@@ -207,23 +191,14 @@ class PressureSolverTest(unittest.TestCase):
 
         self.node_pressure_tag = self.od_mpfad.mb.tag_get_handle(
             "Node Pressure", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
-                                                              )
+        )
         self.od_mpfad.run_solver(LPEW3(self.od).interpolate)
         p_verts = []
         for node in self.od.all_nodes:
-        # try:
             p_vert = self.od_mpfad.mb.tag_get_data(
                 self.od_mpfad.dirichlet_tag, node
             )
             p_verts.append(p_vert[0])
-        # except:
-            # p_vert = 0.0
-            # p_tag = self.od_mpfad.pressure_tag
-            # nd_weights = self.od_mpfad.nodes_ws[node]
-            # for volume, wt in nd_weights.items():
-            #     p_vol = self.od_mpfad.mb.tag_get_data(p_tag, volume)
-            #     p_vert += p_vol * wt
-            # p_verts.append(p_vert[0])
         self.od_mpfad.mb.tag_set_data(
             self.node_pressure_tag, self.od.all_nodes, p_verts
         )
@@ -231,13 +206,15 @@ class PressureSolverTest(unittest.TestCase):
             vol_centroid = self.od.mtu.get_average_position([a_volume])
             vol_faces = self.od.mtu.get_bridge_adjacencies(a_volume, 2, 2)
             vol_p = self.od.mb.tag_get_data(
-                    self.od_mpfad.pressure_tag, a_volume)[0][0]
+                self.od_mpfad.pressure_tag, a_volume
+            )[0][0]
             vol_nodes = self.od.mtu.get_bridge_adjacencies(a_volume, 0, 0)
             vol_crds = self.od.mb.get_coords(vol_nodes)
             vol_crds = np.reshape(vol_crds, ([4, 3]))
             vol_volume = self.od.get_tetra_volume(vol_crds)
             vol_perm = self.od.mb.tag_get_data(
-                       self.od_mpfad.perm_tag, a_volume).reshape([3, 3])
+                self.od_mpfad.perm_tag, a_volume
+            ).reshape([3, 3])
             fluxes = []
             for a_face in vol_faces:
                 f_nodes = self.od.mtu.get_bridge_adjacencies(a_face, 0, 0)
@@ -245,12 +222,15 @@ class PressureSolverTest(unittest.TestCase):
                 fc_nodes = np.reshape(fc_nodes, ([3, 3]))
                 grad = np.zeros(3)
                 for i in range(len(fc_nodes)):
-                    area_vect = geo._area_vector(np.array([fc_nodes[i],
-                                                          fc_nodes[i-1],
-                                                          vol_centroid]),
-                                                 fc_nodes[i-2])[0]
+                    set_of_verts = np.array(
+                        [fc_nodes[i], fc_nodes[i-1], vol_centroid]
+                    )
+                    area_vect = geo._area_vector(
+                        set_of_verts, fc_nodes[i-2]
+                    )[0]
                     p_node_op = self.od_mpfad.mb.tag_get_data(
-                                self.node_pressure_tag, f_nodes[i-2])[0][0]
+                        self.node_pressure_tag, f_nodes[i-2]
+                    )[0][0]
                     grad += area_vect * p_node_op
                 area_vect = geo._area_vector(fc_nodes, vol_centroid)[0]
                 grad += area_vect * vol_p
@@ -260,27 +240,19 @@ class PressureSolverTest(unittest.TestCase):
             fluxes_sum = abs(sum(fluxes))
             self.assertAlmostEqual(fluxes_sum, 0.0, delta=1e-9)
 
-    # @unittest.skip('later')
+    @unittest.skip('later')
     def test_if_method_yields_correct_T_matrix(self):
-        """
-        This is not quite a test. It's design just to certify if the method
-        will yield known values for an expected case compared to a matlab run
-        by other programmer
-        """
+        """Test not well suited."""
         for node in self.m.get_boundary_nodes():
             coords = self.m.mb.get_coords([node])
             g_D = coords[1] ** 2
             self.m.mb.tag_set_data(self.m.dirichlet_tag, node, g_D)
         volumes = self.m.all_volumes
-        vols = []
         source = [-0.666666721827, -0.666666721827, -0.666667091901,
                   -0.666667091901, -1.33333307358]
         c = 0
         for volume in volumes:
-            self.m.mb.tag_set_data(self.m.perm_tag, volume,
-                                      self.perm)
-            self.m.mb.tag_set_data(self.m.source_tag, volume,
-                                      source[c])
+            self.m.mb.tag_set_data(self.m.perm_tag, volume, self.perm)
+            self.m.mb.tag_set_data(self.m.source_tag, volume, source[c])
             c += 1
         self.m_mpfad.run_solver(LPEW3(self.m).interpolate)
-        # print(self.m_mpfad.T, self.m_mpfad.x, self.m_mpfad.Q)
