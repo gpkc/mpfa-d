@@ -5,8 +5,8 @@ from mpfad.MpfaD import MpfaD3D
 from mesh_preprocessor import MeshManager
 from pymoab import types
 
-class TestCasesMGE:
 
+class TestCasesMGE:
     def __init__(self, filename, interpolation_method):
         self.mesh = MeshManager(filename, dim=3)
         self.mesh.set_boundary_condition(
@@ -24,9 +24,7 @@ class TestCasesMGE:
         p_verts = []
         for node in self.mesh.all_nodes:
             try:
-                p_vert = self.mpfad.mb.tag_get_data(
-                    self.mpfad.dirichlet_tag, node
-                )
+                p_vert = self.mpfad.mb.tag_get_data(self.mpfad.dirichlet_tag, node)
                 p_verts.append(p_vert[0])
             except:
                 p_vert = 0.0
@@ -36,9 +34,7 @@ class TestCasesMGE:
                     p_vol = self.mpfad.mb.tag_get_data(p_tag, volume)
                     p_vert += p_vol * wt
                 p_verts.append(p_vert[0])
-        self.mpfad.mb.tag_set_data(
-            self.node_pressure_tag, self.mesh.all_nodes, p_verts
-        )
+        self.mpfad.mb.tag_set_data(self.node_pressure_tag, self.mesh.all_nodes, p_verts)
         err = []
         err_grad = []
         grads_p = []
@@ -55,11 +51,7 @@ class TestCasesMGE:
             I, J, K = self.mesh.mtu.get_bridge_adjacencies(vol_faces[0], 2, 0)
             L = list(
                 set(vol_nodes).difference(
-                    set(
-                        self.mesh.mtu.get_bridge_adjacencies(
-                            vol_faces[0], 2, 0
-                        )
-                    )
+                    set(self.mesh.mtu.get_bridge_adjacencies(vol_faces[0], 2, 0))
                 )
             )
             JI = self.mesh.mb.get_coords([I]) - self.mesh.mb.get_coords([J])
@@ -70,12 +62,8 @@ class TestCasesMGE:
             test = np.dot(LJ, N_IJK)
             if test < 0.0:
                 I, K = K, I
-                JI = self.mesh.mb.get_coords([I]) - self.mesh.mb.get_coords(
-                    [J]
-                )
-                JK = self.mesh.mb.get_coords([K]) - self.mesh.mb.get_coords(
-                    [J]
-                )
+                JI = self.mesh.mb.get_coords([I]) - self.mesh.mb.get_coords([J])
+                JK = self.mesh.mb.get_coords([K]) - self.mesh.mb.get_coords([J])
                 N_IJK = np.cross(JI, JK) / 2.0
 
             tan_JI = np.cross(N_IJK, JI)
@@ -103,13 +91,11 @@ class TestCasesMGE:
                 grad_normal + grad_cross_I + grad_cross_K
             )
             vol_centroid = np.asarray(
-                self.mesh.mb.tag_get_data(
-                    self.mesh.volume_centre_tag, a_volume
-                )[0]
+                self.mesh.mb.tag_get_data(self.mesh.volume_centre_tag, a_volume)[0]
             )
-            vol_perm = self.mesh.mb.tag_get_data(
-                self.mesh.perm_tag, a_volume
-            ).reshape([3, 3])
+            vol_perm = self.mesh.mb.tag_get_data(self.mesh.perm_tag, a_volume).reshape(
+                [3, 3]
+            )
             x, y, z = vol_centroid
             grad_p_bar = self.calculate_gradient(x, y, z, bmk)
             grads_p.append(np.dot(grad_p_bar, grad_p_bar))
@@ -126,9 +112,7 @@ class TestCasesMGE:
                 area_vect = geo._area_vector(
                     face_nodes_crds.reshape([3, 3]), vol_centroid
                 )[0]
-                unit_area_vec = area_vect / np.sqrt(
-                    np.dot(area_vect, area_vect)
-                )
+                unit_area_vec = area_vect / np.sqrt(np.dot(area_vect, area_vect))
                 k_grad_p = np.dot(vol_perm, grad_p[0])
                 vel = -np.dot(k_grad_p, unit_area_vec)
                 calc_vel = -np.dot(
@@ -167,15 +151,9 @@ class TestCasesMGE:
         return results
 
     def calculate_gradient(self, x, y, z, benchmark, delta=0.00001):
-        grad_x = (
-            benchmark(x + delta, y, z)[1] - benchmark(x, y, z)[1]
-        ) / delta
-        grad_y = (
-            benchmark(x, y + delta, z)[1] - benchmark(x, y, z)[1]
-        ) / delta
-        grad_z = (
-            benchmark(x, y, z + delta)[1] - benchmark(x, y, z)[1]
-        ) / delta
+        grad_x = (benchmark(x + delta, y, z)[1] - benchmark(x, y, z)[1]) / delta
+        grad_y = (benchmark(x, y + delta, z)[1] - benchmark(x, y, z)[1]) / delta
+        grad_z = (benchmark(x, y, z + delta)[1] - benchmark(x, y, z)[1]) / delta
         grad = np.array([grad_x, grad_y, grad_z])
         return grad
 
@@ -200,38 +178,32 @@ class TestCasesMGE:
         return -np.sum(k_grad_x + k_grad_y + k_grad_z)
 
     def mge_test_case_1(self, x, y, z):
-        K = [
-            1.0, 0.0, 0.0,
-            0.0, 1.0, 0.0,
-            0.0, 0.0, 1.0
-        ]
+        K = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
         u = np.sin(sqrt(2) * pi * x) * np.sinh(pi * y) * np.sinh(pi * z)
 
         return K, u
 
     def mge_test_case_2(self, x, y, z):
         if x <= 0.5:
-            K = [
-                1.0, 0.0, 0.0,
-                0.0, 1.0, 0.0,
-                0.0, 0.0, 1.0
-            ]
+            K = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
             u = (x - 0.5) * (2 * np.sin(y) + np.cos(y)) + np.sin(y) + z
         else:
-            K = [
-                2.0, 1.0, 0.0,
-                1.0, 2.0, 0.0,
-                0.0, 0.0, 1.0
-            ]
+            K = [2.0, 1.0, 0.0, 1.0, 2.0, 0.0, 0.0, 0.0, 1.0]
             u = np.exp(x) - 0.5 * np.sin(y) + z
         return K, u
 
     def mge_test_case_3(self, x, y, z):
         eps = 50
         K = [
-            (1 + 10 * x ** 2 + y ** 2 + z ** 2), 0.0, 0.0,
-            0.0, (1 + x ** 2 + 10 * y ** 2 + z ** 2), 0.0,
-            0.0, 0.0, eps * (1 + x ** 2 + y ** 2 + 10 * z ** 2)
+            (1 + 10 * x ** 2 + y ** 2 + z ** 2),
+            0.0,
+            0.0,
+            0.0,
+            (1 + x ** 2 + 10 * y ** 2 + z ** 2),
+            0.0,
+            0.0,
+            0.0,
+            eps * (1 + x ** 2 + y ** 2 + 10 * z ** 2),
         ]
         u = x * (1 - x) * y * (1 - y) * z * (1 - z)
         return K, u
@@ -248,7 +220,7 @@ class TestCasesMGE:
             0.0,
             0.0,
             0.0,
-            eps2 * (1 + x + y + z)
+            eps2 * (1 + x + y + z),
         ]
         u = np.sin(pi * x) * np.sin(pi * y) * np.sin(pi * z)
 
@@ -260,10 +232,12 @@ class TestCasesMGE:
 
         Test case 2.
         """
-        func = {'mge_test_case_1': self.mge_test_case_1,
-                'mge_test_case_2': self.mge_test_case_2,
-                'mge_test_case_3': self.mge_test_case_3,
-                'mge_test_case_4': self.mge_test_case_4}
+        func = {
+            "mge_test_case_1": self.mge_test_case_1,
+            "mge_test_case_2": self.mge_test_case_2,
+            "mge_test_case_3": self.mge_test_case_3,
+            "mge_test_case_4": self.mge_test_case_4,
+        }
         for node in self.mesh.get_boundary_nodes():
             x, y, z = self.mesh.mb.get_coords([node])
             g_D = func[test_case](x, y, z)[1]
@@ -271,9 +245,7 @@ class TestCasesMGE:
         volumes = self.mesh.all_volumes
         vols = []
         for volume in volumes:
-            x, y, z = self.mesh.mb.tag_get_data(
-                self.mesh.volume_centre_tag, volume
-            )[0]
+            x, y, z = self.mesh.mb.tag_get_data(self.mesh.volume_centre_tag, volume)[0]
             self.mesh.mb.tag_set_data(
                 self.mesh.perm_tag, volume, func[test_case](x, y, z)[0]
             )
@@ -282,9 +254,7 @@ class TestCasesMGE:
             vol_nodes_crds = np.reshape(vol_nodes_crds, (4, 3))
             tetra_vol = self.mesh.get_tetra_volume(vol_nodes_crds)
             vols.append(tetra_vol)
-            source_term = self.calculate_divergent(
-                x, y, z, func[test_case]
-            )
+            source_term = self.calculate_divergent(x, y, z, func[test_case])
             self.mesh.mb.tag_set_data(
                 self.mesh.source_tag, volume, source_term * tetra_vol
             )
@@ -292,23 +262,15 @@ class TestCasesMGE:
         err = []
         u = []
         for volume in volumes:
-            x, y, z = self.mesh.mb.tag_get_data(
-                self.mesh.volume_centre_tag, volume
-            )[0]
+            x, y, z = self.mesh.mb.tag_get_data(self.mesh.volume_centre_tag, volume)[0]
             analytical_solution = func[test_case](x, y, z)[1]
             calculated_solution = self.mpfad.mb.tag_get_data(
                 self.mpfad.pressure_tag, volume
             )[0][0]
-            err.append(
-                np.absolute((analytical_solution - calculated_solution))
-            )
+            err.append(np.absolute((analytical_solution - calculated_solution)))
             u.append(analytical_solution)
-        u_max = max(
-            self.mpfad.mb.tag_get_data(self.mpfad.pressure_tag, volumes)
-        )
-        u_min = min(
-            self.mpfad.mb.tag_get_data(self.mpfad.pressure_tag, volumes)
-        )
+        u_max = max(self.mpfad.mb.tag_get_data(self.mpfad.pressure_tag, volumes))
+        u_min = min(self.mpfad.mb.tag_get_data(self.mpfad.pressure_tag, volumes))
         results = self.norms_calculator(err, vols, u)
         non_zero_mat = self.mpfad.T.NumGlobalNonzeros()
         norm_vel, norm_grad = self.get_velocity(func[test_case])

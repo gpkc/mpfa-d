@@ -7,20 +7,19 @@ from oblique_drain import ObliqueDrain
 from discrete_maximum_principle import DiscreteMaxPrinciple
 from mpfad_mge_tests import TestCasesMGE
 
-interpolations = [LPEW3]
-benchmark_fvca_cases = [1, 2, 3, 4, 5, 6]
+interpolations = [LSW]
+benchmark_fvca_cases = [5, 6]
 fvcaMeshesB = [
-    BenchMeshGenerator(str(case)).generate_mesh()
-    for case in benchmark_fvca_cases
+    BenchMeshGenerator(str(case)).generate_mesh() for case in benchmark_fvca_cases
 ]
 for mesh in fvcaMeshesB:
     for im in interpolations:
-        log_name_1 = ("test_case_4_" + im.__name__ + "_" + mesh).strip(".h5m")
+        log_name_1 = ("test_case_3_" + im.__name__ + "_" + mesh).strip(".h5m")
         # log_name_2 = ('test_case_2_' + im.__name__ + '_'
         #               + mesh).strip('.h5m')
         # BenchmarkFVCA(mesh, im).benchmark_case_1(log_name_1)
         # BenchmarkFVCA(mesh, im).benchmark_case_2(log_name_2)
-        TestCasesMGE(mesh, im).run_case(log_name_1, 'mge_test_case_4')
+        TestCasesMGE(mesh, im).run_case(log_name_1, "mge_test_case_3")
 
 
 # meshes = []
