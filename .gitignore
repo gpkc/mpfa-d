@@ -126,3 +126,5 @@ my_file.vtk
 myfile.vtk
 paper_mpfad_tests/
 run_enchmark.cprof
+galileo/
+.vscode/
