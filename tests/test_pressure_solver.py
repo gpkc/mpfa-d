@@ -65,7 +65,7 @@ class MeshManagerTest(unittest.TestCase):
         self.od_mpfad = MpfaD3D(self.od)
 
         self.perm = np.array([2.0, 1.0, 0.0, 1.0, 2.0, 1.0, 0.0, 1.0, 2.0])
-        self.m = MeshManager("test_mesh_5_vols.h5m", dim=3)
+        self.m = MeshManager("meshes/test_mesh_5_vols.h5m", dim=3)
         self.m.set_boundary_condition(
             "Dirichlet", {101: None}, dim_target=2, set_nodes=True
         )

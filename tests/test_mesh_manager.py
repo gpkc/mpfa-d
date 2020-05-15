@@ -22,7 +22,6 @@ class MeshManagerTest(unittest.TestCase):
         self.mesh_1 = MeshManager("meshes/mesh_test_1.msh")
 
         self.mesh_2 = MeshManager("meshes/mesh_test_2.msh", dim=3)
-        self.mesh_2 = MeshManager("meshes/mesh_test_2.msh", dim=3)
         self.mesh_2.set_media_property("Permeability", {1: K_1}, dim_target=3)
         self.mesh_2.set_boundary_condition(
             "Dirichlet", {102: 1.0, 101: 0.0}, dim_target=2, set_nodes=True

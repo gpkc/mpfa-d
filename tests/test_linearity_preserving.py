@@ -39,7 +39,9 @@ class LinearityPreservingTests(unittest.TestCase):
             1.0,
         ]
 
-        self.mesh_homogeneous = MeshManager("test_mesh_5_vols.h5m", dim=3)
+        self.mesh_homogeneous = MeshManager(
+            "meshes/test_mesh_5_vols.h5m", dim=3
+        )
         self.mesh_homogeneous.set_boundary_condition(
             "Dirichlet", {101: 0.0}, dim_target=2, set_nodes=True
         )
