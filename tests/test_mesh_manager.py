@@ -1,10 +1,9 @@
 import unittest
 import numpy as np
-from mpfad.MpfaD import MpfaD3D
-from mpfad.interpolation.LPEW3 import LPEW3
-from mesh_preprocessor import MeshManager
-from pymoab import types
+
 import mpfad.helpers.geometric as geo
+from mpfad.MpfaD import MpfaD3D
+from preprocessor.mesh_preprocessor import MeshManager
 
 
 class MeshManagerTest(unittest.TestCase):

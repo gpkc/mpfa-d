@@ -7,11 +7,10 @@ from mpfad.MpfaD import MpfaD3D
 # from mpfad.interpolation.LSW import LSW
 from mpfad.interpolation.LPEW3 import LPEW3
 
-# from mpfad.interpolation.LPEW2 import LPEW2
-from mesh_preprocessor import MeshManager
+from preprocessor.mesh_preprocessor import MeshManager
 
 
-class InterpMethodTest(unittest.TestCase):
+class InterpolationMethodTest(unittest.TestCase):
     """Test suite for interpolation."""
 
     def setUp(self):

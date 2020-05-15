@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from mpfad.MpfaD import MpfaD3D
 from mpfad.interpolation.LPEW3 import LPEW3
-from mesh_preprocessor import MeshManager
+from preprocessor.mesh_preprocessor import MeshManager
 
 
 class LinearityPreservingTests(unittest.TestCase):
@@ -212,7 +212,6 @@ class LinearityPreservingTests(unittest.TestCase):
 
             self.assertAlmostEqual(u_calc, u, delta=1e-15)
 
-    # @unittest.skip('debugging other tests')
     def test_schneider_linear_preserving(self):
         """Test if mesh_homogeneous with tensor K_3 and solution 1."""
         mb = self.mesh_homogeneous.mb

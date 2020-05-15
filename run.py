@@ -1,16 +1,19 @@
-from benchmark_mesh_generator import BenchMeshGenerator
+import os
+
+from preprocessor.benchmark_mesh_generator import BenchMeshGenerator
 from mpfad.interpolation.IDW import IDW
 from mpfad.interpolation.LPEW3 import LPEW3
 from mpfad.interpolation.LSW import LSW
-from benchmark_fvca import BenchmarkFVCA
-from oblique_drain import ObliqueDrain
-from discrete_maximum_principle import DiscreteMaxPrinciple
-from mpfad_mge_tests import TestCasesMGE
+from cases.benchmark_fvca import BenchmarkFVCA
+from cases.oblique_drain import ObliqueDrain
+from cases.discrete_maximum_principle import DiscreteMaxPrinciple
+from cases.mpfad_mge_tests import TestCasesMGE
 
 interpolations = [LSW]
-benchmark_fvca_cases = [5, 6]
+benchmark_fvca_cases = [2]
 fvcaMeshesB = [
-    BenchMeshGenerator(str(case)).generate_mesh() for case in benchmark_fvca_cases
+    BenchMeshGenerator(str(case)).generate_mesh()
+    for case in benchmark_fvca_cases
 ]
 for mesh in fvcaMeshesB:
     for im in interpolations:
@@ -20,7 +23,7 @@ for mesh in fvcaMeshesB:
         # BenchmarkFVCA(mesh, im).benchmark_case_1(log_name_1)
         # BenchmarkFVCA(mesh, im).benchmark_case_2(log_name_2)
         TestCasesMGE(mesh, im).run_case(log_name_1, "mge_test_case_3")
-
+        os.remove(mesh)
 
 # meshes = []
 # mesh_filipe = 'test_mesh_5_vols.h5m'
