@@ -88,13 +88,6 @@ class DiscreteMaxPrinciple:
             oversh.append(eps_mx * tetra_vol)
             eps_mn = min(pressure - self.mn, 0.0) ** 2
             undersh.append(eps_mn * tetra_vol)
-            # if pressure == max_p:
-            #     for vert in vol_nodes:
-            #         try:
-            #             print(self.mpfad.nodes_ws[vert])
-            #         except:
-            #             print(self.mesh.mb.tag_get_data(self.mesh.dirichlet_tag, vert))
-
         overshooting = sum(oversh) ** (1 / 2.0)
         undershooting = sum(undersh) ** (1 / 2.0)
         print(
@@ -114,29 +107,42 @@ class DiscreteMaxPrinciple:
             )
         self.mpfad.record_data(path + ".vtk")
 
-    # def perm_tensor_lai(self, x, y, z):
-    #     e = 5E-3
-    #
-    #     k = np.asarray([y ** 2 + e * x ** 2, -(1 - e) * x * y, 0,
-    #                    -(1 - e) * x * y, x **2 + e * y ** 2, 0,
-    #                    0., 0., 1.])
-    #     return k
-    #
-    # def run_lai_sheng_dmp_test(self):
-    #     all_volumes = self.mesh.all_volumes
-    #     for volume in all_volumes:
-    #         x, y, z = self.mesh.mb.get_coords(volume)
-    #         perm = self.perm_tensor_lai(x, y, z)
-    #         self.mesh.mb.tag_set_data(self.mesh.perm_tag, volume, perm)
-    #         if x < 5 / 8 and x > 3 / 8 and y < 5 / 8 and y > 3 / 8:
-    #             source_term = 1.0
-    #             self.mesh.mb.tag_set_data(self.mesh.source_tag, volume,
-    #                                       source_term)
-    #         else:
-    #             source_term = 0.0
-    #             self.mesh.mb.tag_set_data(self.mesh.source_tag, volume,
-    #                                       source_term)
-    #     self.mpfad.run_solver(self.im.interpolate)
-    #     solution = self.mesh.mb.tag_get_data(self.mesh.pressure_tag,
-    #                                          all_volumes)
-    #     print('min: ', min(solution), 'max: ', max(solution))
+    def perm_tensor_lai(self, x, y, z):
+        e = 5e-3
+
+        k = np.asarray(
+            [
+                y ** 2 + e * x ** 2,
+                -(1 - e) * x * y,
+                0,
+                -(1 - e) * x * y,
+                x ** 2 + e * y ** 2,
+                0,
+                0.0,
+                0.0,
+                1.0,
+            ]
+        )
+        return k
+
+    def run_lai_sheng_dmp_test(self):
+        all_volumes = self.mesh.all_volumes
+        for volume in all_volumes:
+            x, y, z = self.mesh.mb.get_coords(volume)
+            perm = self.perm_tensor_lai(x, y, z)
+            self.mesh.mb.tag_set_data(self.mesh.perm_tag, volume, perm)
+            if x < 5 / 8 and x > 3 / 8 and y < 5 / 8 and y > 3 / 8:
+                source_term = 1.0
+                self.mesh.mb.tag_set_data(
+                    self.mesh.source_tag, volume, source_term
+                )
+            else:
+                source_term = 0.0
+                self.mesh.mb.tag_set_data(
+                    self.mesh.source_tag, volume, source_term
+                )
+        self.mpfad.run_solver(self.im.interpolate)
+        solution = self.mesh.mb.tag_get_data(
+            self.mesh.pressure_tag, all_volumes
+        )
+        print("min: ", min(solution), "max: ", max(solution))

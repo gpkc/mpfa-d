@@ -28,7 +28,7 @@ class TestCasesMGE:
                     self.mpfad.dirichlet_tag, node
                 )
                 p_verts.append(p_vert[0])
-            except:
+            except Exception:
                 p_vert = 0.0
                 p_tag = self.mpfad.pressure_tag
                 nd_weights = self.mpfad.nodes_ws[node]
