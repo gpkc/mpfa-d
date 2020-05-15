@@ -12,7 +12,7 @@ class TwoPhaseFlow:
     ):  # fluid_props = iOilSat, iWaterSat, visOil, visWater
         self.mesh = MeshManager(filename, dim=3)
         self.mesh.set_boundary_condition(
-            "WaterSat", {1: 0.2}, dim_target=3, set_nodes=True
+            "WaterSat", {301: 0.2}, dim_target=3, set_nodes=True
         )
 
     def add_wells(

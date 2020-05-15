@@ -34,6 +34,10 @@ class MeshManager:
             "Neumann", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
         )
 
+        self.water_sat_bc_tag = self.mb.tag_get_handle(
+            "SW", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True,
+        )
+
         self.rel_perm_w_tag = self.mb.tag_get_handle(
             "krW", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True,
         )
