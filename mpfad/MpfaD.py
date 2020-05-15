@@ -174,9 +174,9 @@ class MpfaD3D:
 
         try:
             for volume in self.volumes:
-                volume_id = self.mb.tag_get_data(
-                    self.global_id_tag, volume
-                )[0][0]
+                volume_id = self.mb.tag_get_data(self.global_id_tag, volume)[
+                    0
+                ][0]
                 RHS = self.mb.tag_get_data(self.source_tag, volume)[0][0]
                 self.Q[volume_id] += RHS
                 # self.Q[volume_id, 0] += RHS

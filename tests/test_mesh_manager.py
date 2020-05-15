@@ -1,10 +1,9 @@
 import unittest
 import numpy as np
-from mpfad.MpfaD import MpfaD3D
-from mpfad.interpolation.LPEW3 import LPEW3
-from mesh_preprocessor import MeshManager
-from pymoab import types
+
 import mpfad.helpers.geometric as geo
+from mpfad.MpfaD import MpfaD3D
+from preprocessor.mesh_preprocessor import MeshManager
 
 
 class MeshManagerTest(unittest.TestCase):
@@ -21,7 +20,6 @@ class MeshManagerTest(unittest.TestCase):
 
         self.mesh_1 = MeshManager("meshes/mesh_test_1.msh")
 
-        self.mesh_2 = MeshManager("meshes/mesh_test_2.msh", dim=3)
         self.mesh_2 = MeshManager("meshes/mesh_test_2.msh", dim=3)
         self.mesh_2.set_media_property("Permeability", {1: K_1}, dim_target=3)
         self.mesh_2.set_boundary_condition(
