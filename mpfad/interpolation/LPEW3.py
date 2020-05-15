@@ -3,9 +3,6 @@ import mpfad.helpers.geometric as geo
 from .InterpolationMethod import InterpolationMethodBase
 from functools import lru_cache
 
-# from mpfad.helpers.geometric import get_tetra_volume
-# from mpfad.helpers.geometric import _area_vector
-
 
 class LPEW3(InterpolationMethodBase):
     def flux_term(self, vector_1st, permeab, vector_2nd, face_area=1.0):

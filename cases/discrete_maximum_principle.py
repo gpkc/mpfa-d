@@ -1,6 +1,6 @@
 import numpy as np
 from mpfad.MpfaD import MpfaD3D
-from mesh_preprocessor import MeshManager
+from preprocessor.mesh_preprocessor import MeshManager
 from mpfad.interpolation.LSW import LSW
 
 

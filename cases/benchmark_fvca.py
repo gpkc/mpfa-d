@@ -2,7 +2,7 @@ import numpy as np
 from math import pi
 import mpfad.helpers.geometric as geo
 from mpfad.MpfaD import MpfaD3D
-from mesh_preprocessor import MeshManager
+from preprocessor.mesh_preprocessor import MeshManager
 from pymoab import types
 
 
