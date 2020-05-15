@@ -1,12 +1,14 @@
 import os
 
 from preprocessor.benchmark_mesh_generator import BenchMeshGenerator
-from mpfad.interpolation.IDW import IDW
-from mpfad.interpolation.LPEW3 import LPEW3
+
+# from mpfad.interpolation.IDW import IDW
+# from mpfad.interpolation.LPEW3 import LPEW3
 from mpfad.interpolation.LSW import LSW
-from cases.benchmark_fvca import BenchmarkFVCA
-from cases.oblique_drain import ObliqueDrain
-from cases.discrete_maximum_principle import DiscreteMaxPrinciple
+
+# from cases.benchmark_fvca import BenchmarkFVCA
+# from cases.oblique_drain import ObliqueDrain
+# from cases.discrete_maximum_principle import DiscreteMaxPrinciple
 from cases.mpfad_mge_tests import TestCasesMGE
 
 interpolations = [LSW]
@@ -17,7 +19,9 @@ fvcaMeshesB = [
 ]
 for mesh in fvcaMeshesB:
     for im in interpolations:
-        log_name_1 = ("test_case_3_" + im.__name__ + "_" + mesh).strip(".h5m")
+        log_name_1 = ("test_case_3_" + im.__name__ + "_" + mesh).replace(
+            ".h5m", ""
+        )
         # log_name_2 = ('test_case_2_' + im.__name__ + '_'
         #               + mesh).strip('.h5m')
         # BenchmarkFVCA(mesh, im).benchmark_case_1(log_name_1)
@@ -39,7 +43,8 @@ for mesh in fvcaMeshesB:
 #         DiscreteMaxPrinciple(mesh_dmp, im).run_dmp(log_name)
 # BenchmarkFVCA(test_mesh, LPEW3).benchmark_case_1('log_name_1')
 # DiscreteMaxPrinciple(test_mesh, LPEW3).run_lai_sheng_dmp_test()
-# meshes = {'meshes/oblique-drain-new.msh': 'distort'} # 'meshes/mesh_slanted_mesh.h5m': 'coarse_mesh',
+# meshes = {'meshes/oblique-drain-new.msh': 'distort'}
+# 'meshes/mesh_slanted_mesh.h5m': 'coarse_mesh',
 # for setCase, logName in meshes.items():
 #     for im in interpolations:
 #         print(setCase, logName)

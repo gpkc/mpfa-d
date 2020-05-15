@@ -1,1 +1,17 @@
 version: "3"
+
+services:
+  test:
+    build:
+      context: .
+    working_dir: /elliptic
+    command: >
+      sh -c "python -m unittest && flake8"
+    volumes:
+      - ./:/elliptic
+  benchmarks:
+    image: padmec/pymoab-pytrilinos:3.6
+    working_dir: /elliptic
+    command: python run.py
+    volumes:
+    - ./:/elliptic

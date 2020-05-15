@@ -1,6 +1,6 @@
-from pymoab import types
-import mpfad.helpers.geometric as geo
-import numpy as np
+# from pymoab import types
+# import mpfad.helpers.geometric as geo
+# import numpy as np
 from mpfad.MpfaD import MpfaD3D
 from mpfad.interpolation.LPEW3 import LPEW3
 from mesh_preprocessor import MeshManager
@@ -8,7 +8,7 @@ from mesh_preprocessor import MeshManager
 
 class tFlow:
     def __init__(
-        self, mesh_data, fluid_props, numericals
+        self, filename, fluid_props, numericals
     ):  # fluid_props = iOilSat, iWaterSat, visOil, visWater
         self.mesh = MeshManager(filename, dim=3)
         self.mesh.set_boundary_condition(

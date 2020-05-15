@@ -2,7 +2,7 @@ import numpy as np
 from mpfad.MpfaD import MpfaD3D
 
 # from mpfad.interpolation.LPEW3 import LPEW3
-from mesh_preprocessor import MeshManager
+from preprocessor.mesh_preprocessor import MeshManager
 
 
 class ObliqueDrain:

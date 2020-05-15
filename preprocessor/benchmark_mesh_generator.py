@@ -1,4 +1,4 @@
-from mesh_generator import GenerateMesh
+from preprocessor.mesh_generator import GenerateMesh
 
 
 class BenchMeshGenerator:

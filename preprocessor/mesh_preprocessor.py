@@ -1,11 +1,11 @@
 import numpy as np
-import mpfad.helpers.geometric as geo
+
+# import mpfad.helpers.geometric as geo
 
 # import mpfad.helpers.cgeom as cgeo
 from pymoab import core
 from pymoab import types
 from pymoab import topo_util
-from itertools import cycle
 
 
 class MeshManager:
@@ -108,7 +108,7 @@ class MeshManager:
         try:
             information_tag = self.mb.tag_get_handle(information_name)
 
-        except:
+        except Exception:
             information_tag = self.mb.tag_get_handle(
                 information_name,
                 1,
@@ -201,13 +201,9 @@ class MeshManager:
         verts = []
         for face in self.dirichlet_faces:
             I, J, K = self.mtu.get_bridge_adjacencies(face, 2, 0)
-            print(I, J, K)
             left_volume = np.asarray(
                 self.mtu.get_bridge_adjacencies(face, 2, 3), dtype="uint64"
             )
-            id_volume = self.mb.tag_get_data(self.global_id_tag, left_volume)[
-                0
-            ][0]
 
             JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
             JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
@@ -222,11 +218,11 @@ class MeshManager:
                 JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
                 JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
                 N_IJK = np.cross(JI, JK) / 2.0
-            tan_JI = np.cross(N_IJK, JI)
-            tan_JK = np.cross(N_IJK, JK)
-
-            face_area = np.sqrt(np.dot(N_IJK, N_IJK))
-            h_L = geo.get_height(N_IJK, LJ)
+            # tan_JI = np.cross(N_IJK, JI)
+            # tan_JK = np.cross(N_IJK, JK)
+            #
+            # face_area = np.sqrt(np.dot(N_IJK, N_IJK))
+            # h_L = geo.get_height(N_IJK, LJ)
             verts.append(I, J, K)
 
     def get_redefine_centre(self):
@@ -267,16 +263,16 @@ class MeshManager:
                 self.add_entities(
                     self.adj_volumes_ms, volumes_sharing_face_and_node
                 )
-                aux_verts = list(
-                    set(
-                        self.mtu.get_bridge_adjacencies(volume, 3, 0)
-                    ).difference(set([node]))
-                )
-                aux_var_edge = [
-                    tao * self.mb.get_coords(node)
-                    + (1 - tao) * self.mb.get_coords(aux_vert)
-                    for aux_vert in aux_verts
-                ]
+                # aux_verts = list(
+                #     set(
+                #         self.mtu.get_bridge_adjacencies(volume, 3, 0)
+                #     ).difference(set([node]))
+                # )
+                # aux_var_edge = [
+                #     tao * self.mb.get_coords(node)
+                #     + (1 - tao) * self.mb.get_coords(aux_vert)
+                #     for aux_vert in aux_verts
+                # ]
 
     def get_node_cascade_lpew3(self, tao):
         for node in self.all_nodes:

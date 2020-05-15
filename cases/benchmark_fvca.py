@@ -2,7 +2,7 @@ import numpy as np
 from math import pi
 import mpfad.helpers.geometric as geo
 from mpfad.MpfaD import MpfaD3D
-from mesh_preprocessor import MeshManager
+from preprocessor.mesh_preprocessor import MeshManager
 from pymoab import types
 
 
@@ -28,7 +28,7 @@ class BenchmarkFVCA:
                     self.mpfad.dirichlet_tag, node
                 )
                 p_verts.append(p_vert[0])
-            except:
+            except Exception:
                 p_vert = 0.0
                 p_tag = self.mpfad.pressure_tag
                 nd_weights = self.mpfad.nodes_ws[node]
@@ -138,9 +138,7 @@ class BenchmarkFVCA:
                 areas.append(np.sqrt(np.dot(area_vect, area_vect)))
                 all_vels.append(calc_vel ** 2)
         norm_vel = np.sqrt(np.dot(err, areas) / np.dot(all_vels, areas))
-        # print(len(err_norm), len(vols))
         norm_grad = np.sqrt(np.dot(err_grad, vols) / np.dot(grads_p, vols))
-        # print(norm_grad)
         return norm_vel, norm_grad
 
     def norms_calculator(self, error_vector, volumes_vector, u_vector):
@@ -180,10 +178,7 @@ class BenchmarkFVCA:
         return grad
 
     def calculate_K_gradient(self, x, y, z, benchmark):
-        try:
-            perm = np.array(benchmark(x, y, z)[0]).reshape([3, 3])
-        except:
-            perm = np.array(K).reshape([3, 3])
+        perm = np.array(benchmark(x, y, z)[0]).reshape([3, 3])
         grad = self.calculate_gradient(x, y, z, benchmark)
         return np.dot(perm, grad)
 
