@@ -1,9 +1,9 @@
 """Mesh manager tests."""
 import unittest
 import numpy as np
-import mpfad.helpers.geometric as geo
-from mpfad.MpfaD import MpfaD3D
-from mpfad.interpolation.LPEW3 import LPEW3
+import solvers.helpers.geometric as geo
+from solvers.MpfaD import MpfaD3D
+from solvers.interpolation.LPEW3 import LPEW3
 from preprocessor.mesh_preprocessor import MeshManager
 from pymoab import types
 

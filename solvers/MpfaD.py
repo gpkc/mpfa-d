@@ -1,7 +1,7 @@
 """This is the begin."""
 from pymoab import types
 from PyTrilinos import Epetra, AztecOO, Amesos
-import mpfad.helpers.geometric as geo
+import solvers.helpers.geometric as geo
 import numpy as np
 import time
 
@@ -14,7 +14,7 @@ import time
 class MpfaD3D:
     """Implement the MPFAD method."""
 
-    def __init__(self, mesh_data, x=None):
+    def __init__(self, mesh_data, x=None, mobility=None):
         """Init class."""
         self.mesh_data = mesh_data
         self.mb = mesh_data.mb
@@ -29,7 +29,6 @@ class MpfaD3D:
         self.global_id_tag = mesh_data.global_id_tag
         self.volume_centre_tag = mesh_data.volume_centre_tag
         self.pressure_tag = mesh_data.pressure_tag
-        # self.sw = two_phase.water_saturation
 
         self.flux_info_tag = self.mb.tag_get_handle(
             "flux info", 7, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
@@ -114,6 +113,7 @@ class MpfaD3D:
             b_cross_difusion_term = (dot_term + cdf_term) / (2 * h1 * S)
             return b_cross_difusion_term
 
+    # @celery.task
     def get_nodes_weights(self, method):
         """Return the node weights."""
         self.nodes_ws = {}
@@ -352,6 +352,7 @@ class MpfaD3D:
             all_cols.append(col_ids)
             all_rows.append(row_ids)
             all_values.append(values)
+            # wait for interpolation to be done
             self._node_treatment(I, id_left, id_right, K_eq, D_JK=D_JK)
             self._node_treatment(
                 J, id_left, id_right, K_eq, D_JI=D_JI, D_JK=-D_JK

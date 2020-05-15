@@ -1,7 +1,7 @@
 import numpy as np
 from math import pi, sqrt
-import mpfad.helpers.geometric as geo
-from mpfad.MpfaD import MpfaD3D
+import solvers.helpers.geometric as geo
+from solvers.MpfaD import MpfaD3D
 from preprocessor.mesh_preprocessor import MeshManager
 from pymoab import types
 

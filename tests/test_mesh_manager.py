@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from mpfad.MpfaD import MpfaD3D
+from solvers.MpfaD import MpfaD3D
 from preprocessor.mesh_preprocessor import MeshManager
 
 

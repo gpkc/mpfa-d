@@ -1,8 +1,8 @@
 """Tests for linearity preserving solutions."""
 import unittest
 import numpy as np
-from mpfad.MpfaD import MpfaD3D
-from mpfad.interpolation.LPEW3 import LPEW3
+from solvers.MpfaD import MpfaD3D
+from solvers.interpolation.LPEW3 import LPEW3
 from preprocessor.mesh_preprocessor import MeshManager
 
 
