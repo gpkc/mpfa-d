@@ -1,8 +1,5 @@
 import numpy as np
 
-# import mpfad.helpers.geometric as geo
-
-# import mpfad.helpers.cgeom as cgeo
 from pymoab import core
 from pymoab import types
 from pymoab import topo_util
@@ -64,6 +61,9 @@ class MeshManager:
         self.face_mobility_tag = self.mb.tag_get_handle(
             "Mobility", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True,
         )
+        self.node_pressure_tag = self.mb.tag_get_handle(
+            "Node Pressure", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
+        )
 
         # Iniciate material props
         self.perm_tag = self.mb.tag_get_handle(
@@ -80,6 +80,14 @@ class MeshManager:
 
         self.volume_centre_tag = self.mb.tag_get_handle(
             "Volume centre", 3, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
+        )
+
+        self.velocity_tag = self.mb.tag_get_handle(
+            "Velocity vector",
+            1,
+            types.MB_TYPE_DOUBLE,
+            types.MB_TAG_SPARSE,
+            True,
         )
 
         self.global_id_tag = self.mb.tag_get_handle(

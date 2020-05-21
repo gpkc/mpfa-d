@@ -283,3 +283,13 @@ class MeshManagerTest(unittest.TestCase):
             self.m.mb.tag_set_data(self.m.source_tag, volume, source[c])
             c += 1
         self.m_mpfad.run_solver(LPEW3(self.m).interpolate)
+
+    def test_mobility_tag_is_created_in_single_phase(self):
+        self.m_mpfad.get_mobility()
+        for face in self.m_mpfad.intern_faces:
+            self.assertEqual(
+                self.m_mpfad.mb.tag_get_data(
+                    self.m_mpfad.face_mobility_tag, face
+                )[0][0],
+                1.0,
+            )
