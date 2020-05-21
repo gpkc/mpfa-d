@@ -83,11 +83,11 @@ class MeshManager:
         )
 
         self.velocity_tag = self.mb.tag_get_handle(
-            "Velocity vector",
-            1,
-            types.MB_TYPE_DOUBLE,
-            types.MB_TAG_SPARSE,
-            True,
+            "Velocity", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True,
+        )
+
+        self.left_volume_tag = self.mb.tag_get_handle(
+            "left volume", 1, types.MB_TYPE_INTEGER, types.MB_TAG_SPARSE, True,
         )
 
         self.global_id_tag = self.mb.tag_get_handle(

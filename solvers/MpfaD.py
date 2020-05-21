@@ -32,6 +32,7 @@ class MpfaD3D:
         self.velocity_tag = mesh_data.velocity_tag
         self.node_pressure_tag = mesh_data.node_pressure_tag
         self.face_mobility_tag = mesh_data.face_mobility_tag
+        self.left_volume_tag = mesh_data.left_volume_tag
 
         self.flux_info_tag = self.mb.tag_get_handle(
             "flux info", 7, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
@@ -82,7 +83,7 @@ class MpfaD3D:
         # self.mb.add_entities(ms, faces)
         self.mb.write_file(file_name, [ms])
 
-    def get_velocity(self):
+    def tag_verts_pressure(self):
         p_verts = []
         for node in self.mesh_data.all_nodes:
             try:
@@ -99,91 +100,182 @@ class MpfaD3D:
         self.mb.tag_set_data(
             self.node_pressure_tag, self.mesh_data.all_nodes, p_verts
         )
-        vols = []
-        for a_volume in self.volumes:
-            vol_faces = self.mtu.get_bridge_adjacencies(a_volume, 2, 2)
-            vol_nodes = self.mtu.get_bridge_adjacencies(a_volume, 0, 0)
-            vol_crds = self.mb.get_coords(vol_nodes)
-            vol_crds = np.reshape(vol_crds, ([4, 3]))
-            vol_volume = self.mesh_data.get_tetra_volume(vol_crds)
-            vols.append(vol_volume)
-            I, J, K = self.mtu.get_bridge_adjacencies(vol_faces[0], 2, 0)
-            L = list(
-                set(vol_nodes).difference(
-                    set(
-                        self.mesh_data.mtu.get_bridge_adjacencies(
-                            vol_faces[0], 2, 0
-                        )
-                    )
-                )
+
+    def tag_velocity(self):
+        self.tag_verts_pressure()
+        velocities = []
+        for face in self.neumann_faces:
+            face_mobility = self.mb.tag_get_data(self.face_mobility_tag, face)[
+                0
+            ][0]
+            face_flow = self.mb.tag_get_data(self.neumann_tag, face)[0][0]
+            volume = self.mtu.get_bridge_adjacencies(face, 2, 3)
+            volume = np.asarray(volume, dtype="uint64")
+            face_nodes = self.mtu.get_bridge_adjacencies(face, 0, 0)
+            node_crds = self.mb.get_coords(face_nodes).reshape([3, 3])
+            face_area = geo._area_vector(node_crds, norma=True)
+            velocity = face_mobility * face_flow * face_area
+            velocities.append(velocity)
+        self.mb.tag_set_data(self.velocity_tag, self.neumann_faces, velocities)
+
+        velocities = []
+        dirichlet_faces = list(self.dirichlet_faces)
+        for face in dirichlet_faces:
+            face_mobility = self.mb.tag_get_data(self.face_mobility_tag, face)[
+                0
+            ][0]
+            # '2' argument was initially '0' but it's incorrect
+            I, J, K = self.mtu.get_bridge_adjacencies(face, 2, 0)
+
+            left_volume = np.asarray(
+                self.mtu.get_bridge_adjacencies(face, 2, 3), dtype="uint64"
             )
+
             JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
             JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
-            LJ = self.mb.get_coords([J]) - self.mb.get_coords(L)
+            LJ = (
+                self.mb.get_coords([J])
+                - self.mesh_data.mb.tag_get_data(
+                    self.volume_centre_tag, left_volume
+                )[0]
+            )
             N_IJK = np.cross(JI, JK) / 2.0
-            test = np.dot(LJ, N_IJK)
-            if test < 0.0:
+            _test = np.dot(LJ, N_IJK)
+            if _test < 0.0:
                 I, K = K, I
-                JI = self.mesh_data.mb.get_coords(
-                    [I]
-                ) - self.mesh_data.mb.get_coords([J])
-                JK = self.mesh_data.mb.get_coords(
-                    [K]
-                ) - self.mesh_data.mb.get_coords([J])
+                JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
+                JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
                 N_IJK = np.cross(JI, JK) / 2.0
-
             tan_JI = np.cross(N_IJK, JI)
             tan_JK = np.cross(N_IJK, JK)
-            face_area = np.sqrt(np.dot(N_IJK, N_IJK))
+            self.mb.tag_set_data(self.normal_tag, face, N_IJK)
 
+            face_area = np.sqrt(np.dot(N_IJK, N_IJK))
             h_L = geo.get_height(N_IJK, LJ)
 
+            g_I = self.mb.tag_get_data(self.node_pressure_tag, I)
+            g_J = self.mb.tag_get_data(self.node_pressure_tag, J)
+            g_K = self.mb.tag_get_data(self.node_pressure_tag, K)
+
+            K_L = self.mb.tag_get_data(self.perm_tag, left_volume).reshape(
+                [3, 3]
+            )
+            K_n_L = self.vmv_multiply(N_IJK, face_mobility * K_L, N_IJK)
+            K_L_JI = self.vmv_multiply(N_IJK, face_mobility * K_L, tan_JI)
+            K_L_JK = self.vmv_multiply(N_IJK, face_mobility * K_L, tan_JK)
+
+            D_JK = self.get_cross_diffusion_term(
+                tan_JK, LJ, face_area, h_L, K_n_L, K_L_JK, boundary=True
+            )
+            D_JI = self.get_cross_diffusion_term(
+                tan_JI, LJ, face_area, h_L, K_n_L, K_L_JI, boundary=True
+            )
+            K_eq = (1 / h_L) * (face_area * K_n_L)
+            p_vol = self.mb.tag_get_data(self.pressure_tag, left_volume)
+            velocity = (
+                D_JK * (g_I - g_J) - K_eq * (p_vol - g_J) + D_JI * (g_J - g_K)
+            )
+            velocities.append(velocity)
+        vels = np.asarray(velocities).flatten()
+        self.mb.tag_set_data(self.velocity_tag, dirichlet_faces, vels)
+        velocities = []
+        left_vols = []
+        intern_faces = list(self.intern_faces)
+        for face in intern_faces:
+            face_mobility = self.mb.tag_get_data(self.face_mobility_tag, face)[
+                0
+            ][0]
+            left_volume, right_volume = self.mtu.get_bridge_adjacencies(
+                face, 2, 3
+            )
+            L = self.mesh_data.mb.tag_get_data(
+                self.volume_centre_tag, left_volume
+            )[0]
+            R = self.mesh_data.mb.tag_get_data(
+                self.volume_centre_tag, right_volume
+            )[0]
+            dist_LR = R - L
+            I, J, K = self.mtu.get_bridge_adjacencies(face, 0, 0)
+            JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
+            JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
+
+            N_IJK = np.cross(JI, JK) / 2.0
+            test = np.dot(N_IJK, dist_LR)
+
+            if test < 0:
+                left_volume, right_volume = right_volume, left_volume
+                L = self.mesh_data.mb.tag_get_data(
+                    self.volume_centre_tag, left_volume
+                )[0]
+                R = self.mesh_data.mb.tag_get_data(
+                    self.volume_centre_tag, right_volume
+                )[0]
+                dist_LR = R - L
+
+            face_area = np.sqrt(np.dot(N_IJK, N_IJK))
+            tan_JI = np.cross(N_IJK, JI)
+            tan_JK = np.cross(N_IJK, JK)
+
+            K_R = self.mb.tag_get_data(self.perm_tag, right_volume).reshape(
+                [3, 3]
+            )
+            RJ = R - self.mb.get_coords([J])
+            h_R = geo.get_height(N_IJK, RJ)
+
+            K_R_n = self.vmv_multiply(N_IJK, face_mobility * K_R, N_IJK)
+            K_R_JI = self.vmv_multiply(N_IJK, face_mobility * K_R, tan_JI)
+            K_R_JK = self.vmv_multiply(N_IJK, face_mobility * K_R, tan_JK)
+
+            K_L = self.mb.tag_get_data(self.perm_tag, left_volume).reshape(
+                [3, 3]
+            )
+
+            LJ = L - self.mb.get_coords([J])
+            h_L = geo.get_height(N_IJK, LJ)
+
+            K_L_n = self.vmv_multiply(N_IJK, face_mobility * K_L, N_IJK)
+            K_L_JI = self.vmv_multiply(N_IJK, face_mobility * K_L, tan_JI)
+            K_L_JK = self.vmv_multiply(N_IJK, face_mobility * K_L, tan_JK)
+
+            D_JI = self.get_cross_diffusion_term(
+                tan_JI,
+                dist_LR,
+                face_area,
+                h_L,
+                K_L_n,
+                K_L_JI,
+                h_R,
+                K_R_JI,
+                K_R_n,
+            )
+            D_JK = self.get_cross_diffusion_term(
+                tan_JK,
+                dist_LR,
+                face_area,
+                h_L,
+                K_L_n,
+                K_L_JK,
+                h_R,
+                K_R_JK,
+                K_R_n,
+            )
+
+            K_eq = (K_R_n * K_L_n) / (K_R_n * h_L + K_L_n * h_R) * face_area
+            p_r = self.mb.tag_get_data(self.pressure_tag, right_volume)
+            p_l = self.mb.tag_get_data(self.pressure_tag, left_volume)
             p_I = self.mb.tag_get_data(self.node_pressure_tag, I)
             p_J = self.mb.tag_get_data(self.node_pressure_tag, J)
             p_K = self.mb.tag_get_data(self.node_pressure_tag, K)
-            p_L = self.mb.tag_get_data(self.node_pressure_tag, L)
-            grad_normal = -2 * (p_J - p_L) * N_IJK
-
-            grad_cross_I = (p_J - p_I) * (
-                (np.dot(tan_JK, LJ) / face_area ** 2) * N_IJK
-                - (h_L / (face_area)) * tan_JK
+            velocity = K_eq * (
+                p_r - p_l - D_JI * (p_I - p_J) - D_JK * (p_K - p_J)
             )
-            grad_cross_K = (p_K - p_J) * (
-                (np.dot(tan_JI, LJ) / face_area ** 2) * N_IJK
-                - (h_L / (face_area)) * tan_JI
-            )
-
-            grad_p = -(1 / (6 * vol_volume)) * (
-                grad_normal + grad_cross_I + grad_cross_K
-            )
-            vol_centroid = np.asarray(
-                self.mesh_data.mb.tag_get_data(
-                    self.mesh_data.volume_centre_tag, a_volume
-                )[0]
-            )
-            vol_perm = self.mesh_data.mb.tag_get_data(
-                self.mesh_data.perm_tag, a_volume
-            ).reshape([3, 3])
-            vels = []
-            for face in vol_faces:
-                face_mobility = self.mb.tag_get_data(
-                    self.face_mobility_tag, face
-                )[0][0]
-                face_nodes = self.mesh_data.mtu.get_bridge_adjacencies(
-                    face, 2, 0
-                )
-                face_nodes_crds = self.mesh_data.mb.get_coords(face_nodes)
-                area_vect = geo._area_vector(
-                    face_nodes_crds.reshape([3, 3]), vol_centroid
-                )[0]
-                unit_area_vec = area_vect / np.sqrt(
-                    np.dot(area_vect, area_vect)
-                )
-                k_grad_p = np.dot(face_mobility * vol_perm, grad_p[0])
-                vel = -np.dot(k_grad_p, unit_area_vec)
-                vels.append(vel)
-            vels = np.asarray(vels).flatten()
-            self.mb.tag_set_data(self.velocity_tag, vol_faces, vels)
+            velocities.append(velocity)
+            left_vols.append(left_volume)
+        velocities = np.asarray(velocities).flatten()
+        self.mb.tag_set_data(self.velocity_tag, intern_faces, velocities)
+        self.mb.tag_set_data(
+            self.left_volume_tag, left_vols, np.repeat(1, len(left_vols))
+        )
 
     def get_mobility(self):
         faces = self.mb.get_entities_by_dimension(0, 2)
@@ -542,4 +634,4 @@ class MpfaD3D:
         # self.x = spsolve(self.T, self.Q)
         # print(np.sum(self.T[50]), self.Q[50])
         self.mb.tag_set_data(self.pressure_tag, self.volumes, self.x)
-        self.get_velocity()
+        self.tag_velocity()
