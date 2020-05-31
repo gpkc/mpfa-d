@@ -5,6 +5,8 @@ import solvers.helpers.geometric as geo
 import numpy as np
 import time
 
+# from solvers.helpers import matrix_evaluation as eval
+
 # from scipy.sparse import lil_matrix
 # from scipy.sparse.linalg import spsolve
 # from scipy.sparse import lil_matrix
@@ -374,7 +376,7 @@ class MpfaD3D:
             ),
         )
         print("filling the transmissibility matrix...")
-        begin = time.time()
+        # begin = time.time()
 
         try:
             for volume in self.volumes:
@@ -587,8 +589,25 @@ class MpfaD3D:
         #     np.asarray(all_cols)[:, 0, 0, 0],
         #     np.asarray(all_rows)[:, 0, 0, 0]
         # ] = np.asarray(all_values)[:, 0]
+
         self.T.FillComplete()
-        mat_fill_time = time.time() - begin
+        # M = np.array(
+        #     [
+        #         [self.T[i, j] for i in range(len(self.volumes))]
+        #         for j in range(len(self.volumes))
+        #     ],
+        #     dtype="float64",
+        # )
+        # q = np.asarray(self.Q, dtype="float64")
+        # diagonal_dominance = [
+        #     eval.check_if_matrix_is_diagonal_dominant(i, row)
+        #     for i, row in enumerate(M)
+        # ]
+        # antidiffusive_matrix = [
+        #     eval.check_off_diagonal_nonpositiviness(i, row, q)
+        #     for (i, row), q in zip(enumerate(M), q)
+        # ]
+        mat_fill_time = time.time() - t0
         print("matrix fill took {0} seconds...".format(mat_fill_time))
         mesh_size = len(self.volumes)
         print("running solver...")
