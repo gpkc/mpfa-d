@@ -1,7 +1,9 @@
 import numpy as np
-import mpfad.helpers.geometric as geo
+import solvers.helpers.geometric as geo
 from .InterpolationMethod import InterpolationMethodBase
 from functools import lru_cache
+
+# import celery and add configs
 
 
 class LPEW3(InterpolationMethodBase):
@@ -208,8 +210,10 @@ class LPEW3(InterpolationMethodBase):
         weights = [
             self.partial_weight_lpew3(node, a_vol) for a_vol in vols_around
         ]
-        # weights = [max(0.0, self.partial_weight_lpew3(node, a_vol))
-        #            for a_vol in vols_around]  # for undershooting
+        # weights = [
+        #     max(0.0, self.partial_weight_lpew3(node, a_vol))
+        #     for a_vol in vols_around
+        # ]  # for undershooting
         weight_sum = np.sum(weights)
         weights = weights / weight_sum
         # for overshooting

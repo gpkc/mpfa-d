@@ -1,9 +1,9 @@
 """Mesh manager tests."""
 import unittest
 import numpy as np
-import mpfad.helpers.geometric as geo
-from mpfad.MpfaD import MpfaD3D
-from mpfad.interpolation.LPEW3 import LPEW3
+import solvers.helpers.geometric as geo
+from solvers.MpfaD import MpfaD3D
+from solvers.interpolation.LPEW3 import LPEW3
 from preprocessor.mesh_preprocessor import MeshManager
 from pymoab import types
 
@@ -283,3 +283,13 @@ class MeshManagerTest(unittest.TestCase):
             self.m.mb.tag_set_data(self.m.source_tag, volume, source[c])
             c += 1
         self.m_mpfad.run_solver(LPEW3(self.m).interpolate)
+
+    def test_mobility_tag_is_created_in_single_phase(self):
+        self.m_mpfad.get_mobility()
+        for face in self.m_mpfad.intern_faces:
+            self.assertEqual(
+                self.m_mpfad.mb.tag_get_data(
+                    self.m_mpfad.face_mobility_tag, face
+                )[0][0],
+                1.0,
+            )

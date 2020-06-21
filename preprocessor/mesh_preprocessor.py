@@ -1,8 +1,5 @@
 import numpy as np
 
-# import mpfad.helpers.geometric as geo
-
-# import mpfad.helpers.cgeom as cgeo
 from pymoab import core
 from pymoab import types
 from pymoab import topo_util
@@ -26,6 +23,7 @@ class MeshManager:
             np.array((None,)),
         )
 
+        # Initiate BC variables to the flux problem
         self.dirichlet_tag = self.mb.tag_get_handle(
             "Dirichlet", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
         )
@@ -34,6 +32,40 @@ class MeshManager:
             "Neumann", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
         )
 
+        # Initiate BC and IC variables to the transport problem
+        self.water_sat_tag = self.mb.tag_get_handle(
+            "Water_Sat", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True,
+        )
+
+        self.water_sat_bc_tag = self.mb.tag_get_handle(
+            "SW_BC", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True,
+        )
+
+        # Iniciate props to the transport problem
+        self.oil_sat_i_tag = self.mb.tag_get_handle(
+            "Oil_Sat_i", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True,
+        )
+
+        self.water_sat_i_tag = self.mb.tag_get_handle(
+            "Water_Sat_i", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True,
+        )
+
+        self.rel_perm_w_tag = self.mb.tag_get_handle(
+            "krW", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True,
+        )
+
+        self.rel_perm_o_tag = self.mb.tag_get_handle(
+            "krO", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True,
+        )
+
+        self.face_mobility_tag = self.mb.tag_get_handle(
+            "Mobility", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True,
+        )
+        self.node_pressure_tag = self.mb.tag_get_handle(
+            "Node Pressure", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
+        )
+
+        # Iniciate material props
         self.perm_tag = self.mb.tag_get_handle(
             "Permeability", 9, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
         )
@@ -46,31 +78,20 @@ class MeshManager:
             "Source term", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
         )
 
-        self.regions_validation_tag = self.mb.tag_get_handle(
-            "regions", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
-        )
-
-        self.node_cascade_tag = self.mb.tag_get_handle(
-            "Node cascade", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
-        )
-
         self.volume_centre_tag = self.mb.tag_get_handle(
             "Volume centre", 3, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
         )
 
-        self.global_id_tag = self.mb.tag_get_handle(
-            "Volume id", 1, types.MB_TYPE_INTEGER, types.MB_TAG_DENSE, True
+        self.velocity_tag = self.mb.tag_get_handle(
+            "Velocity", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True,
         )
 
-        self.auxiliary_variables_lpew2_tag = self.mb.tag_get_handle(
-            "aux variables for lpew2",
-            1,
-            types.MB_TYPE_INTEGER,
-            types.MB_TAG_DENSE,
-            True,
+        self.left_volume_tag = self.mb.tag_get_handle(
+            "left volume", 1, types.MB_TYPE_INTEGER, types.MB_TAG_SPARSE, True,
         )
-        self.node_wts_tag = self.mb.tag_get_handle(
-            "Weights", 1, types.MB_TYPE_DOUBLE, types.MB_TAG_SPARSE, True
+
+        self.global_id_tag = self.mb.tag_get_handle(
+            "Volume id", 1, types.MB_TYPE_INTEGER, types.MB_TAG_DENSE, True
         )
 
         self.all_volumes = self.mb.get_entities_by_dimension(0, self.dimension)
@@ -84,6 +105,7 @@ class MeshManager:
 
         self.dirichlet_faces = set()
         self.neumann_faces = set()
+        self.sat_BC_faces = set()
 
     def create_vertices(self, coords):
         new_vertices = self.mb.create_vertices(coords)
@@ -135,6 +157,11 @@ class MeshManager:
 
                     if information_name == "Neumann":
                         self.neumann_faces = self.neumann_faces | set(
+                            group_elements
+                        )
+
+                    if information_name == "SW_BC":
+                        self.sat_BC_faces = self.sat_BC_faces | set(
                             group_elements
                         )
 
@@ -218,11 +245,6 @@ class MeshManager:
                 JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
                 JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
                 N_IJK = np.cross(JI, JK) / 2.0
-            # tan_JI = np.cross(N_IJK, JI)
-            # tan_JK = np.cross(N_IJK, JK)
-            #
-            # face_area = np.sqrt(np.dot(N_IJK, N_IJK))
-            # h_L = geo.get_height(N_IJK, LJ)
             verts.append(I, J, K)
 
     def get_redefine_centre(self):
@@ -263,16 +285,6 @@ class MeshManager:
                 self.add_entities(
                     self.adj_volumes_ms, volumes_sharing_face_and_node
                 )
-                # aux_verts = list(
-                #     set(
-                #         self.mtu.get_bridge_adjacencies(volume, 3, 0)
-                #     ).difference(set([node]))
-                # )
-                # aux_var_edge = [
-                #     tao * self.mb.get_coords(node)
-                #     + (1 - tao) * self.mb.get_coords(aux_vert)
-                #     for aux_vert in aux_verts
-                # ]
 
     def get_node_cascade_lpew3(self, tao):
         for node in self.all_nodes:

@@ -1,7 +1,7 @@
 import numpy as np
 from math import pi
-import mpfad.helpers.geometric as geo
-from mpfad.MpfaD import MpfaD3D
+import solvers.helpers.geometric as geo
+from solvers.MpfaD import MpfaD3D
 from preprocessor.mesh_preprocessor import MeshManager
 from pymoab import types
 
@@ -237,6 +237,11 @@ class BenchmarkFVCA:
         )
         return u5
 
+    def _benchmark_3(self, x, y, z):
+        K = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1000.0]
+        u3 = np.sin(2 * pi * x) * np.sin(2 * pi * y) * np.sin(2 * pi * z)
+        return K, u3
+
     def _benchmark_5(self, elems_in_set, material_set):
         # def set_props(self):
         #     # 1  2  3  4
@@ -301,7 +306,6 @@ class BenchmarkFVCA:
             tetra_vol = self.mesh.get_tetra_volume(vol_nodes_crds)
             vols.append(tetra_vol)
             source_term = self._benchmark_1(x, y, z)[2]
-            print(source_term, tetra_vol)
             self.mesh.mb.tag_set_data(
                 self.mesh.source_tag, volume, source_term * tetra_vol
             )
@@ -430,6 +434,81 @@ class BenchmarkFVCA:
         self.mpfad.record_data(path + log_name + ".vtk")
         print("END OF " + log_name + "!!!\n")
 
+    def benchmark_case_3(self, log_name):
+        """
+        Call the Finite Volume for Complex Applications Benchmark.
+
+        Test case 2.
+        """
+        for node in self.mesh.get_boundary_nodes():
+            x, y, z = self.mesh.mb.get_coords([node])
+            g_D = self._benchmark_3(x, y, z)[1]
+            self.mesh.mb.tag_set_data(self.mesh.dirichlet_tag, node, g_D)
+        volumes = self.mesh.all_volumes
+        vols = []
+        for volume in volumes:
+            x, y, z = self.mesh.mb.tag_get_data(
+                self.mesh.volume_centre_tag, volume
+            )[0]
+            self.mesh.mb.tag_set_data(
+                self.mesh.perm_tag, volume, self._benchmark_3(x, y, z)[0]
+            )
+            vol_nodes = self.mesh.mb.get_adjacencies(volume, 0)
+            vol_nodes_crds = self.mesh.mb.get_coords(vol_nodes)
+            vol_nodes_crds = np.reshape(vol_nodes_crds, (4, 3))
+            tetra_vol = self.mesh.get_tetra_volume(vol_nodes_crds)
+            vols.append(tetra_vol)
+            source_term = self.calculate_divergent(x, y, z, self._benchmark_3)
+            self.mesh.mb.tag_set_data(
+                self.mesh.source_tag, volume, source_term * tetra_vol
+            )
+        self.mpfad.run_solver(self.im.interpolate)
+        err = []
+        u = []
+        for volume in volumes:
+            x, y, z = self.mesh.mb.tag_get_data(
+                self.mesh.volume_centre_tag, volume
+            )[0]
+            analytical_solution = self._benchmark_3(x, y, z)[1]
+            calculated_solution = self.mpfad.mb.tag_get_data(
+                self.mpfad.pressure_tag, volume
+            )[0][0]
+            err.append(
+                np.absolute((analytical_solution - calculated_solution))
+            )
+            u.append(analytical_solution)
+        u_max = max(
+            self.mpfad.mb.tag_get_data(self.mpfad.pressure_tag, volumes)
+        )
+        u_min = min(
+            self.mpfad.mb.tag_get_data(self.mpfad.pressure_tag, volumes)
+        )
+        results = self.norms_calculator(err, vols, u)
+        non_zero_mat = self.mpfad.T.NumGlobalNonzeros()
+        norm_vel, norm_grad = self.get_velocity(self._benchmark_3)
+        path = (
+            "paper_mpfad_tests/benchmark_fvca_cases/benchmark_case_3/"
+            + log_name
+            + "_log"
+        )
+        with open(path, "w") as f:
+            f.write("TEST CASE 2\n\nUnknowns:\t %.6f\n" % (len(volumes)))
+            f.write("Non-zero matrix:\t %.6f\n" % (non_zero_mat))
+            f.write("Umin:\t %.6f\n" % (u_min))
+            f.write("Umax:\t %.6f\n" % (u_max))
+            f.write("L2 norm:\t %.6f\n" % (results[0]))
+            f.write("l2 norm volume weighted:\t %.6f\n" % (results[1]))
+            f.write("Relative L2 norm:\t %.6f\n" % (results[2]))
+            f.write("average error:\t %.6f\n" % (results[3]))
+            f.write("maximum error:\t %.6f\n" % (results[4]))
+            f.write("minimum error:\t %.6f\n" % (results[5]))
+            f.write("velocity norm: \t %.6g\n" % norm_vel)
+            f.write("gradient norm: \t %.6g\n" % norm_grad)
+        print("max error: ", max(err), "l-2 relative norm: ", results[2])
+        path = "paper_mpfad_tests/benchmark_fvca_cases/benchmark_case_3/"
+        self.mpfad.record_data(path + log_name + ".vtk")
+        print("END OF " + log_name + "!!!\n")
+
     def benchmark_case_5(self, log_name):
         """
         Call the Finite Volumes for Complex Applications Benchmark.
@@ -482,7 +561,7 @@ class BenchmarkFVCA:
         results = self.norms_calculator(err, vols, u)
         # non_zero_mat = self.mpfad.T.NumGlobalNonzeros()
         path = (
-            "paper_mpfad_tests/benchmark_fvca_cases/benchmark_case_5/"
+            "results/benchmark_fvca_cases/benchmark_case_5/"
             + log_name
             + "_log"
         )
