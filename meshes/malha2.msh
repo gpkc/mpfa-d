@@ -1,0 +1,400 @@
+-------------------------------------------------------
+Version       : 4.6.0
+License       : GNU General Public License
+Build OS      : Linux64
+Build date    : 20200622
+Build host    : gmsh.info
+Build options : 64Bit ALGLIB Ann Bamg Blas[custom] Blossom Cgns DIntegration Dlopen DomHex Fltk Gmm Hxt Jpeg[fltk] Kbipack Lapack[custom] LinuxJoystick MathEx Med Mesh Metis Mmg3d Mpeg Netgen ONELAB ONELABMetamodel OpenCASCADE OpenCASCADE-CAF OpenGL OptHom PETSc Parser Plugins Png[fltk] Post QuadTri Solver TetGen/BR Voro++ Zlib[fltk]
+FLTK version  : 1.4.0
+PETSc version : 3.10.2 (real arithmtic)
+OCC version   : 7.4.0
+MED version   : 4.0.0
+Packaged by   : geuzaine
+Web site      : https://gmsh.info
+Issue tracker : https://gitlab.onelab.info/gmsh/gmsh/issues
+-------------------------------------------------------
+Info    : Running './gmsh' [Gmsh 4.6.0, 1 node, max. 1 thread]
+Info    : Started on Sat Aug 29 11:53:13 2020
+Info    : Reading '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.geo'...
+Info    : Done reading '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.geo'
+Info    : Meshing 1D...
+Info    : Meshing curve 1 (Line)
+Info    : Meshing curve 2 (Line)
+Info    : Meshing curve 3 (Line)
+Info    : Meshing curve 4 (Line)
+Info    : Meshing curve 5 (Line)
+Info    : Meshing curve 6 (Line)
+Info    : Meshing curve 7 (Line)
+Info    : Meshing curve 8 (Line)
+Info    : Meshing curve 9 (Line)
+Info    : Meshing curve 10 (Line)
+Info    : Meshing curve 11 (Line)
+Info    : Meshing curve 12 (Line)
+Info    : Meshing curve 13 (Line)
+Info    : Meshing curve 14 (Line)
+Info    : Meshing curve 15 (Line)
+Info    : Meshing curve 16 (Line)
+Info    : Meshing curve 17 (Line)
+Info    : Meshing curve 18 (Line)
+Info    : Meshing curve 19 (Line)
+Info    : Meshing curve 20 (Line)
+Info    : Meshing curve 21 (Line)
+Info    : Meshing curve 22 (Line)
+Info    : Meshing curve 23 (Line)
+Info    : Meshing curve 24 (Line)
+Info    : Done meshing 1D (Wall 0.00336981s, CPU 0.002365s)
+Info    : Meshing 2D...
+Info    : Meshing surface 26 (Transfinite)
+Info    : Meshing surface 28 (Transfinite)
+Info    : Meshing surface 30 (Transfinite)
+Info    : Meshing surface 32 (Transfinite)
+Info    : Meshing surface 34 (Transfinite)
+Info    : Meshing surface 36 (Transfinite)
+Info    : Meshing surface 40 (Transfinite)
+Info    : Meshing surface 42 (Transfinite)
+Info    : Meshing surface 44 (Transfinite)
+Info    : Meshing surface 46 (Transfinite)
+Info    : Meshing surface 48 (Transfinite)
+Info    : Meshing surface 50 (Transfinite)
+Info    : Done meshing 2D (Wall 0.00351882s, CPU 0.001975s)
+Info    : Meshing 3D...
+Info    : 3D Meshing 1 volume with 1 connected component
+Info    : Tetrahedrizing 1594 nodes...
+Info    : Done tetrahedrizing 1602 nodes (Wall 0.0686181s, CPU 0.058037s)
+Info    : Reconstructing mesh...
+Info    :  - Creating surface mesh
+Info    :  - Identifying boundary edges
+Info    :  - Recovering boundary
+Info    :  - Added 104 Steiner points
+Info    : Done reconstructing mesh (Wall 0.387397s, CPU 0.270235s)
+Info    : Found volume 1
+Info    : Found void region
+Info    : It. 0 - 0 nodes created - worst tet radius 5.424 (nodes removed 0 0)
+Info    : It. 500 - 344 nodes created - worst tet radius 1.32554 (nodes removed 0 156)
+Info    : It. 1000 - 819 nodes created - worst tet radius 1.01363 (nodes removed 0 181)
+Info    : 3D refinement terminated (2563 nodes total):
+Info    :  - 134 Delaunay cavities modified for star shapeness
+Info    :  - 181 nodes could not be inserted
+Info    :  - 10869 tetrahedra created in 0.0724611 sec. (149997 tets/s)
+Info    : Done meshing 3D (Wall 0.542224s, CPU 0.389304s)
+Info    : Optimizing mesh...
+Info    : Optimizing volume 1
+Info    : Optimization starts (volume = 0.992) with worst = 0.000497476 / average = 0.693093:
+Info    : 0.00 < quality < 0.10 :        37 elements
+Info    : 0.10 < quality < 0.20 :       107 elements
+Info    : 0.20 < quality < 0.30 :       303 elements
+Info    : 0.30 < quality < 0.40 :       400 elements
+Info    : 0.40 < quality < 0.50 :       521 elements
+Info    : 0.50 < quality < 0.60 :      1256 elements
+Info    : 0.60 < quality < 0.70 :      2252 elements
+Info    : 0.70 < quality < 0.80 :      2688 elements
+Info    : 0.80 < quality < 0.90 :      2333 elements
+Info    : 0.90 < quality < 1.00 :       972 elements
+Info    : 300 edge swaps, 117 node relocations (volume = 0.992): worst = 0.066121 / average = 0.711831 (Wall 0.012295s, CPU 0.012295s)
+Info    : 320 edge swaps, 125 node relocations (volume = 0.992): worst = 0.066121 / average = 0.713125 (Wall 0.0156751s, CPU 0.015676s)
+Info    : No ill-shaped tets in the mesh :-)
+Info    : 0.00 < quality < 0.10 :         2 elements
+Info    : 0.10 < quality < 0.20 :         7 elements
+Info    : 0.20 < quality < 0.30 :        45 elements
+Info    : 0.30 < quality < 0.40 :       362 elements
+Info    : 0.40 < quality < 0.50 :       541 elements
+Info    : 0.50 < quality < 0.60 :      1285 elements
+Info    : 0.60 < quality < 0.70 :      2247 elements
+Info    : 0.70 < quality < 0.80 :      2752 elements
+Info    : 0.80 < quality < 0.90 :      2418 elements
+Info    : 0.90 < quality < 1.00 :       985 elements
+Info    : Done optimizing mesh (Wall 0.0283298s, CPU 0.028329s)
+Info    : 2560 nodes 14087 elements
+Info    : Reading '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.geo'...
+Info    : Done reading '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.geo'
+Info    : Meshing 1D...
+Info    : Meshing curve 1 (Line)
+Info    : Meshing curve 2 (Line)
+Info    : Meshing curve 3 (Line)
+Info    : Meshing curve 4 (Line)
+Info    : Meshing curve 5 (Line)
+Info    : Meshing curve 6 (Line)
+Info    : Meshing curve 7 (Line)
+Info    : Meshing curve 8 (Line)
+Info    : Meshing curve 9 (Line)
+Info    : Meshing curve 10 (Line)
+Info    : Meshing curve 11 (Line)
+Info    : Meshing curve 12 (Line)
+Info    : Meshing curve 13 (Line)
+Info    : Meshing curve 14 (Line)
+Info    : Meshing curve 15 (Line)
+Info    : Meshing curve 16 (Line)
+Info    : Meshing curve 17 (Line)
+Info    : Meshing curve 18 (Line)
+Info    : Meshing curve 19 (Line)
+Info    : Meshing curve 20 (Line)
+Info    : Meshing curve 21 (Line)
+Info    : Meshing curve 22 (Line)
+Info    : Meshing curve 23 (Line)
+Info    : Meshing curve 24 (Line)
+Info    : Done meshing 1D (Wall 0.002738s, CPU 0.002698s)
+Info    : Meshing 2D...
+Info    : Meshing surface 26 (Transfinite)
+Info    : Meshing surface 28 (Transfinite)
+Info    : Meshing surface 30 (Transfinite)
+Info    : Meshing surface 32 (Transfinite)
+Info    : Meshing surface 34 (Transfinite)
+Info    : Meshing surface 36 (Transfinite)
+Info    : Meshing surface 40 (Transfinite)
+Info    : Meshing surface 42 (Transfinite)
+Info    : Meshing surface 44 (Transfinite)
+Info    : Meshing surface 46 (Transfinite)
+Info    : Meshing surface 48 (Transfinite)
+Info    : Meshing surface 50 (Transfinite)
+Info    : Done meshing 2D (Wall 0.00102806s, CPU 0.000873s)
+Info    : Meshing 3D...
+Info    : 3D Meshing 1 volume with 1 connected component
+Info    : Tetrahedrizing 154 nodes...
+Info    : Done tetrahedrizing 162 nodes (Wall 0.00410318s, CPU 0.003893s)
+Info    : Reconstructing mesh...
+Info    :  - Creating surface mesh
+Info    :  - Identifying boundary edges
+Info    :  - Recovering boundary
+Info    :  - Added 5 Steiner points
+Info    : Done reconstructing mesh (Wall 0.019655s, CPU 0.018377s)
+Info    : Found volume 1
+Info    : Found void region
+Info    : It. 0 - 0 nodes created - worst tet radius 1.40346 (nodes removed 0 0)
+Info    : 3D refinement terminated (203 nodes total):
+Info    :  - 0 Delaunay cavities modified for star shapeness
+Info    :  - 0 nodes could not be inserted
+Info    :  - 756 tetrahedra created in 0.00305295 sec. (247629 tets/s)
+Info    : Done meshing 3D (Wall 0.0350058s, CPU 0.030063s)
+Info    : Optimizing mesh...
+Info    : Optimizing volume 1
+Info    : Optimization starts (volume = 0.992) with worst = 0 / average = 0.657:
+Info    : 0.00 < quality < 0.10 :         6 elements
+Info    : 0.10 < quality < 0.20 :         2 elements
+Info    : 0.20 < quality < 0.30 :        17 elements
+Info    : 0.30 < quality < 0.40 :        14 elements
+Info    : 0.40 < quality < 0.50 :        56 elements
+Info    : 0.50 < quality < 0.60 :       140 elements
+Info    : 0.60 < quality < 0.70 :       190 elements
+Info    : 0.70 < quality < 0.80 :       193 elements
+Info    : 0.80 < quality < 0.90 :       124 elements
+Info    : 0.90 < quality < 1.00 :        14 elements
+Info    : 15 edge swaps, 6 node relocations (volume = 0.992): worst = 0.289122 / average = 0.671476 (Wall 0.000459909s, CPU 0.000375s)
+Info    : 16 edge swaps, 6 node relocations (volume = 0.992): worst = 0.302317 / average = 0.672517 (Wall 0.000527859s, CPU 0.000431s)
+Info    : No ill-shaped tets in the mesh :-)
+Info    : 0.00 < quality < 0.10 :         0 elements
+Info    : 0.10 < quality < 0.20 :         0 elements
+Info    : 0.20 < quality < 0.30 :         0 elements
+Info    : 0.30 < quality < 0.40 :         7 elements
+Info    : 0.40 < quality < 0.50 :        54 elements
+Info    : 0.50 < quality < 0.60 :       139 elements
+Info    : 0.60 < quality < 0.70 :       228 elements
+Info    : 0.70 < quality < 0.80 :       183 elements
+Info    : 0.80 < quality < 0.90 :       116 elements
+Info    : 0.90 < quality < 1.00 :        15 elements
+Info    : Done optimizing mesh (Wall 0.00143981s, CPU 0.001167s)
+Info    : 202 nodes 1142 elements
+Info    : Reading '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.geo'...
+Info    : Done reading '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.geo'
+Info    : Meshing 1D...
+Info    : Meshing curve 1 (Line)
+Info    : Meshing curve 2 (Line)
+Info    : Meshing curve 3 (Line)
+Info    : Meshing curve 4 (Line)
+Info    : Meshing curve 5 (Line)
+Info    : Meshing curve 6 (Line)
+Info    : Meshing curve 7 (Line)
+Info    : Meshing curve 8 (Line)
+Info    : Meshing curve 9 (Line)
+Info    : Meshing curve 10 (Line)
+Info    : Meshing curve 11 (Line)
+Info    : Meshing curve 12 (Line)
+Info    : Meshing curve 13 (Line)
+Info    : Meshing curve 14 (Line)
+Info    : Meshing curve 15 (Line)
+Info    : Meshing curve 16 (Line)
+Info    : Meshing curve 17 (Line)
+Info    : Meshing curve 18 (Line)
+Info    : Meshing curve 19 (Line)
+Info    : Meshing curve 20 (Line)
+Info    : Meshing curve 21 (Line)
+Info    : Meshing curve 22 (Line)
+Info    : Meshing curve 23 (Line)
+Info    : Meshing curve 24 (Line)
+Info    : Done meshing 1D (Wall 0.00485992s, CPU 0.004497s)
+Info    : 52 nodes 76 elements
+Info    : Meshing 2D...
+Info    : Meshing surface 26 (Transfinite)
+Info    : Meshing surface 28 (Transfinite)
+Info    : Meshing surface 30 (Transfinite)
+Info    : Meshing surface 32 (Transfinite)
+Info    : Meshing surface 34 (Transfinite)
+Info    : Meshing surface 36 (Transfinite)
+Info    : Meshing surface 40 (Transfinite)
+Info    : Meshing surface 42 (Transfinite)
+Info    : Meshing surface 44 (Transfinite)
+Info    : Meshing surface 46 (Transfinite)
+Info    : Meshing surface 48 (Transfinite)
+Info    : Meshing surface 50 (Transfinite)
+Info    : Done meshing 2D (Wall 0.00137591s, CPU 0.001186s)
+Info    : 106 nodes 280 elements
+Info    : Meshing 3D...
+Info    : 3D Meshing 1 volume with 1 connected component
+Info    : Tetrahedrizing 106 nodes...
+Info    : Done tetrahedrizing 114 nodes (Wall 0.00361896s, CPU 0.003594s)
+Info    : Reconstructing mesh...
+Info    :  - Creating surface mesh
+Info    :  - Identifying boundary edges
+Info    :  - Recovering boundary
+Info    :  - Added 5 Steiner points
+Info    : Done reconstructing mesh (Wall 0.0316899s, CPU 0.030979s)
+Info    : Found volume 1
+Info    : Found void region
+Info    : It. 0 - 0 nodes created - worst tet radius 1.14097 (nodes removed 0 0)
+Info    : 3D refinement terminated (116 nodes total):
+Info    :  - 0 Delaunay cavities modified for star shapeness
+Info    :  - 0 nodes could not be inserted
+Info    :  - 330 tetrahedra created in 0.000947952 sec. (348118 tets/s)
+Info    : Done meshing 3D (Wall 0.047009s, CPU 0.046101s)
+Info    : Optimizing mesh...
+Info    : Optimizing volume 1
+Info    : Optimization starts (volume = 0.992) with worst = 0.179561 / average = 0.680066:
+Info    : 0.00 < quality < 0.10 :         0 elements
+Info    : 0.10 < quality < 0.20 :         8 elements
+Info    : 0.20 < quality < 0.30 :        16 elements
+Info    : 0.30 < quality < 0.40 :        17 elements
+Info    : 0.40 < quality < 0.50 :        20 elements
+Info    : 0.50 < quality < 0.60 :         5 elements
+Info    : 0.60 < quality < 0.70 :        44 elements
+Info    : 0.70 < quality < 0.80 :       146 elements
+Info    : 0.80 < quality < 0.90 :        62 elements
+Info    : 0.90 < quality < 1.00 :        12 elements
+Info    : 13 edge swaps, 5 node relocations (volume = 0.992): worst = 0.179561 / average = 0.702641 (Wall 0.00197911s, CPU 0.001976s)
+Info    : 17 edge swaps, 6 node relocations (volume = 0.992): worst = 0.179561 / average = 0.696248 (Wall 0.00316s, CPU 0.003158s)
+Info    : No ill-shaped tets in the mesh :-)
+Info    : 0.00 < quality < 0.10 :         0 elements
+Info    : 0.10 < quality < 0.20 :         1 elements
+Info    : 0.20 < quality < 0.30 :         6 elements
+Info    : 0.30 < quality < 0.40 :         7 elements
+Info    : 0.40 < quality < 0.50 :         9 elements
+Info    : 0.50 < quality < 0.60 :        12 elements
+Info    : 0.60 < quality < 0.70 :        55 elements
+Info    : 0.70 < quality < 0.80 :       155 elements
+Info    : 0.80 < quality < 0.90 :        47 elements
+Info    : 0.90 < quality < 1.00 :        11 elements
+Info    : Done optimizing mesh (Wall 0.00423694s, CPU 0.004129s)
+Info    : 116 nodes 608 elements
+Info    : Writing '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.msh'...
+Info    : Done writing '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.msh'
+Info    : Writing '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.msh'...
+Info    : Done writing '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.msh'
+Info    : Writing '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.geo.opt'...
+Info    : Done writing '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.geo.opt'
+Info    : Writing '/home/ricardo/.gmsh-options'...
+Info    : Done writing '/home/ricardo/.gmsh-options'
+Info    : Writing '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.msh'...
+Info    : Done writing '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.msh'
+Info    : Listening on socket '/home/ricardo/.gmshsock2'
+Info    : Done
+Info    : Reading '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.geo'...
+Info    : Done reading '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.geo'
+Info    : Reading '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.geo.opt'...
+Info    : Done reading '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.geo.opt'
+Info    : Listening on socket '/home/ricardo/.gmshsock2'
+Info    : Done
+Info    : Meshing 1D...
+Info    : Meshing curve 1 (Line)
+Info    : Meshing curve 2 (Line)
+Info    : Meshing curve 3 (Line)
+Info    : Meshing curve 4 (Line)
+Info    : Meshing curve 5 (Line)
+Info    : Meshing curve 6 (Line)
+Info    : Meshing curve 7 (Line)
+Info    : Meshing curve 8 (Line)
+Info    : Meshing curve 9 (Line)
+Info    : Meshing curve 10 (Line)
+Info    : Meshing curve 11 (Line)
+Info    : Meshing curve 12 (Line)
+Info    : Meshing curve 13 (Line)
+Info    : Meshing curve 14 (Line)
+Info    : Meshing curve 15 (Line)
+Info    : Meshing curve 16 (Line)
+Info    : Meshing curve 17 (Line)
+Info    : Meshing curve 18 (Line)
+Info    : Meshing curve 19 (Line)
+Info    : Meshing curve 20 (Line)
+Info    : Meshing curve 21 (Line)
+Info    : Meshing curve 22 (Line)
+Info    : Meshing curve 23 (Line)
+Info    : Meshing curve 24 (Line)
+Info    : Done meshing 1D (Wall 0.00317311s, CPU 0.002872s)
+Info    : Meshing 2D...
+Info    : Meshing surface 26 (Transfinite)
+Info    : Meshing surface 28 (Transfinite)
+Info    : Meshing surface 30 (Transfinite)
+Info    : Meshing surface 32 (Transfinite)
+Info    : Meshing surface 34 (Transfinite)
+Info    : Meshing surface 36 (Transfinite)
+Info    : Meshing surface 40 (Transfinite)
+Info    : Meshing surface 42 (Transfinite)
+Info    : Meshing surface 44 (Transfinite)
+Info    : Meshing surface 46 (Transfinite)
+Info    : Meshing surface 48 (Transfinite)
+Info    : Meshing surface 50 (Transfinite)
+Info    : Done meshing 2D (Wall 0.000780821s, CPU 0.000778s)
+Info    : Meshing 3D...
+Info    : 3D Meshing 1 volume with 1 connected component
+Info    : Tetrahedrizing 106 nodes...
+Info    : Done tetrahedrizing 114 nodes (Wall 0.00336695s, CPU 0.003319s)
+Info    : Reconstructing mesh...
+Info    :  - Creating surface mesh
+Info    :  - Identifying boundary edges
+Info    :  - Recovering boundary
+Info    :  - Added 5 Steiner points
+Info    : Done reconstructing mesh (Wall 0.0365241s, CPU 0.028701s)
+Info    : Found volume 1
+Info    : Found void region
+Info    : It. 0 - 0 nodes created - worst tet radius 1.14097 (nodes removed 0 0)
+Info    : 3D refinement terminated (116 nodes total):
+Info    :  - 0 Delaunay cavities modified for star shapeness
+Info    :  - 0 nodes could not be inserted
+Info    :  - 330 tetrahedra created in 0.000708818 sec. (465563 tets/s)
+Info    : Done meshing 3D (Wall 0.0645831s, CPU 0.039398s)
+Info    : Optimizing mesh...
+Info    : Optimizing volume 1
+Info    : Optimization starts (volume = 0.992) with worst = 0.179561 / average = 0.680066:
+Info    : 0.00 < quality < 0.10 :         0 elements
+Info    : 0.10 < quality < 0.20 :         8 elements
+Info    : 0.20 < quality < 0.30 :        16 elements
+Info    : 0.30 < quality < 0.40 :        17 elements
+Info    : 0.40 < quality < 0.50 :        20 elements
+Info    : 0.50 < quality < 0.60 :         5 elements
+Info    : 0.60 < quality < 0.70 :        44 elements
+Info    : 0.70 < quality < 0.80 :       146 elements
+Info    : 0.80 < quality < 0.90 :        62 elements
+Info    : 0.90 < quality < 1.00 :        12 elements
+Info    : 13 edge swaps, 5 node relocations (volume = 0.992): worst = 0.179561 / average = 0.702641 (Wall 0.000832796s, CPU 0.000715s)
+Info    : 17 edge swaps, 6 node relocations (volume = 0.992): worst = 0.179561 / average = 0.696248 (Wall 0.00131989s, CPU 0.001133s)
+Info    : No ill-shaped tets in the mesh :-)
+Info    : 0.00 < quality < 0.10 :         0 elements
+Info    : 0.10 < quality < 0.20 :         1 elements
+Info    : 0.20 < quality < 0.30 :         6 elements
+Info    : 0.30 < quality < 0.40 :         7 elements
+Info    : 0.40 < quality < 0.50 :         9 elements
+Info    : 0.50 < quality < 0.60 :        12 elements
+Info    : 0.60 < quality < 0.70 :        55 elements
+Info    : 0.70 < quality < 0.80 :       155 elements
+Info    : 0.80 < quality < 0.90 :        47 elements
+Info    : 0.90 < quality < 1.00 :        11 elements
+Info    : Done optimizing mesh (Wall 0.00185609s, CPU 0.001594s)
+Info    : 116 nodes 608 elements
+Info    : Writing '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.msh'...
+Info    : Done writing '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.msh'
+Info    : Listening on socket '/home/ricardo/.gmshsock2'
+Info    : Saving database '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.db'...
+Info    : Done saving database '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.db'
+Info    : Done
+Info    : Listening on socket '/home/ricardo/.gmshsock2'
+Info    : Saving database '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.db'...
+Info    : Done saving database '/home/ricardo/Projects/padmec/mpfa-d/meshes/cube.db'
+Info    : Done
+Info    : Writing '/home/ricardo/Projects/padmec/mpfa-d/meshes/malha2.msh'...

@@ -1,2 +1,4 @@
 flake8>=3.6.0,<3.7.0
 scipy
+pandas==0.24.2
+openpyxl

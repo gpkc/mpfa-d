@@ -1,5 +1,5 @@
 import numpy as np
-from solvers.MpfaD import MpfaD3D
+from solvers.nMpfaD import MpfaD3D
 from preprocessor.mesh_preprocessor import MeshManager
 from solvers.interpolation.LSW import LSW
 

@@ -4,13 +4,14 @@ from PyTrilinos import Epetra, AztecOO, Amesos
 import solvers.helpers.geometric as geo
 import numpy as np
 import time
+from collections import OrderedDict
+
 
 # from solvers.helpers import matrix_evaluation as eval
 
-# from scipy.sparse import lil_matrix
-# from scipy.sparse.linalg import spsolve
-# from scipy.sparse import lil_matrix
-# from scipy.sparse.linalg import spsolve
+from scipy.sparse import lil_matrix
+from scipy.sparse.linalg import spsolve
+from scipy.sparse import find
 
 
 class MpfaD3D:
@@ -67,14 +68,21 @@ class MpfaD3D:
 
         std_map = Epetra.Map(len(self.volumes), 0, self.comm)
         self.T = Epetra.CrsMatrix(Epetra.Copy, std_map, 0)
-        self.Q = Epetra.Vector(std_map)
+        self.Q = lil_matrix((len(self.volumes), 1), dtype=np.float)
         if x is None:
             self.x = Epetra.Vector(std_map)
+            self.dx = Epetra.Vector(std_map)
         else:
             self.x = x
-        # self.T = lil_matrix((len(self.volumes), len(self.volumes)),
-        #                     dtype=np.float)
-        # self.Q = lil_matrix((len(self.volumes), 1), dtype=np.float)
+        self.T_plus = lil_matrix((len(self.volumes), len(self.volumes)),
+                            dtype=np.float)
+        self._T = lil_matrix((len(self.volumes), len(self.volumes)),
+                            dtype=np.float)
+        self._T_plus = lil_matrix((len(self.volumes), len(self.volumes)),
+                            dtype=np.float)
+        self.T_minus = lil_matrix((len(self.volumes), len(self.volumes)),
+                            dtype=np.float)
+
 
     def record_data(self, file_name):
         """Record data to file."""
@@ -336,10 +344,10 @@ class MpfaD3D:
         RHS = 0.5 * K_eq * (D_JK + D_JI)
         if node in self.dirichlet_nodes:
             pressure = self.get_boundary_node_pressure(node)
-            self.Q[id_left] += RHS * pressure
-            self.Q[id_right] += -RHS * pressure
-            # self.Q[id_left[0], 0] += RHS * pressure
-            # self.Q[id_right[0], 0] += - RHS * pressure
+            # self.Q[id_left] += RHS * pressure
+            # self.Q[id_right] += -RHS * pressure
+            self.Q[id_left[0], 0] += RHS * pressure
+            self.Q[id_right[0], 0] += - RHS * pressure
 
         if node in self.intern_nodes:
             for volume, weight in self.nodes_ws[node].items():
@@ -350,16 +358,88 @@ class MpfaD3D:
 
         if node in self.neumann_nodes:
             neu_term = self.nodes_nts[node]
-            self.Q[id_right] += -RHS * neu_term
-            self.Q[id_left] += RHS * neu_term
-            # self.Q[id_right, 0] += - RHS * neu_term
-            # self.Q[id_left, 0] += RHS * neu_term
+            # self.Q[id_right] += -RHS * neu_term
+            # self.Q[id_left] += RHS * neu_term
+            self.Q[id_right, 0] += - RHS * neu_term
+            self.Q[id_left, 0] += RHS * neu_term
 
             for volume, weight_N in self.nodes_ws[node].items():
                 self.ids.append([id_left, id_right])
                 v_id = self.mb.tag_get_data(self.global_id_tag, volume)[0][0]
                 self.v_ids.append([v_id, v_id])
                 self.ivalues.append([-RHS * weight_N, RHS * weight_N])
+
+
+    def slip(self, mi=1):
+        rows, columns, _ = find(self.T_plus)
+        alfa = lil_matrix((len(self.volumes), len(self.volumes)), dtype=np.float)
+        for i, j in zip(rows, columns):
+            if i != j:
+                _i, _j, _ = find(self.T_plus)
+                # u_max_i = maximo entre zero e o maximo da diferenca das pressoes no patch
+                # u_min_i =  maximo entre zero e o maximo da diferenca das pressoes no patch
+                u_max_i = max(0, self.x[i] + max(self.x[_j] - self.x[_i]))
+                u_min_i = min(0, self.x[i] + min(self.x[_j] - self.x[_i]))
+                u_max_j = max(0, self.x[j] + max(self.x[_i] - self.x[_j]))
+                u_min_j = min(0, self.x[j] + min(self.x[_i] - self.x[_j]))
+                if j not in self.boundary_ids:
+                    if self.x[i] > self.x[j]:
+                        s_ij = min(
+                            2 * mi * (u_max_i - self.x[i]),
+                            self.x[i] - self.x[j],
+                            2 * mi * (self.x[j] - u_min_j)
+                        )
+                    else:
+                        s_ij = max(
+                            2 * mi * (u_min_i - self.x[i]),
+                            self.x[i] - self.x[j],
+                            2 * mi * (self.x[j] - u_max_j)
+                        )
+                else:
+                    if self.x[i] > self.x[j]:
+                        s_ij = min(
+                            2 * mi * (u_max_i - self.x[i]),
+                            self.x[i] - self.x[j]
+                        )
+                    else:
+                        s_ij = max(
+                            2 * mi * (u_min_i - self.x[i]),
+                            self.x[i] - self.x[j]
+                        )
+
+                alfa[i, j] = s_ij / (self.x[i] - self.x[j])
+        return alfa
+
+    def flux_limiter(self, antidiffusive_fluxes, mi=1):
+        for volume, vertices in antidiffusive_fluxes.items():
+            adjacent_volumes =  self.mtu.get_bridge_adjacencies(self.volumes[int(volume)], 2, 3)
+            adjacent_pressures = [
+                self.x[self.mb.tag_get_data(self.global_id_tag, volume)] for volume in adjacent_volumes
+            ]
+            p = self.x[volume]
+            for vertice, vertice_data in vertices[0].items():
+                g, source = vertice_data
+                adjacent_pressures.append(g)
+            u_max_i = max(np.array([0.]), p + max([u - p for u in adjacent_pressures]))
+            u_min_i = min(np.array([0.]), p + min([u - p for u in adjacent_pressures]))
+            for vertice, vertice_data in vertices[0].items():
+                g, source = vertice_data
+                if source < 0:
+                    if self.x[volume] > g:
+                        s_ij = min(
+                            2 * mi * (u_max_i - self.x[volume]),
+                            self.x[volume] - g
+                        )
+                    else:
+                        s_ij = max(
+                            2 * mi * (u_min_i - self.x[volume]),
+                            self.x[volume] - g
+                        )
+
+                    source = s_ij / (self.x[volume] - g) * source
+                antidiffusive_fluxes[volume][0][vertice][1] = source
+        return antidiffusive_fluxes
+
 
     def run_solver(self, interpolation_method):
         """Run solver."""
@@ -384,8 +464,8 @@ class MpfaD3D:
                     0
                 ][0]
                 RHS = self.mb.tag_get_data(self.source_tag, volume)[0][0]
-                self.Q[volume_id] += RHS
-                # self.Q[volume_id, 0] += RHS
+                # self.Q[volume_id] += RHS
+                self.Q[volume_id, 0] += RHS
         except Exception:
             pass
 
@@ -401,11 +481,12 @@ class MpfaD3D:
             node_crds = self.mb.get_coords(face_nodes).reshape([3, 3])
             face_area = geo._area_vector(node_crds, norma=True)
             RHS = face_mobility * face_flow * face_area
-            self.Q[id_volume] += -RHS
-            # self.Q[id_volume, 0] += - RHS
+            # self.Q[id_volume] += -RHS
+            self.Q[id_volume, 0] += - RHS
 
         id_volumes = []
         all_LHS = []
+        antidiffusive_flux = {}
         for face in self.dirichlet_faces:
             face_mobility = self.mb.tag_get_data(self.face_mobility_tag, face)[
                 0
@@ -465,9 +546,18 @@ class MpfaD3D:
             RHS = D_JK * (g_I - g_J) - K_eq * g_J + D_JI * (g_J - g_K)
             LHS = K_eq
             all_LHS.append(LHS)
-
-            self.Q[id_volume] += -RHS
-            # self.Q[id_volume, 0] += - RHS
+            if id_volume not in antidiffusive_flux.keys():
+                antidiffusive_flux[id_volume] = []
+            fluxes = OrderedDict(
+                {I: [g_I, -D_JK],
+                J: [g_J, +D_JK - D_JI + K_eq],
+                K: [g_K, D_JI]}
+            )
+            antidiffusive_flux[id_volume].append(
+                fluxes
+            )
+            # self.Q[id_volume] += -RHS
+            self.Q[id_volume, 0] += - RHS
             # self.mb.tag_set_data(self.flux_info_tag, face,
             #                      [D_JK, D_JI, K_eq, I, J, K, face_area])
 
@@ -567,93 +657,175 @@ class MpfaD3D:
             all_cols.append(col_ids)
             all_rows.append(row_ids)
             all_values.append(values)
-            # wait for interpolation to be done
             self._node_treatment(I, id_left, id_right, K_eq, D_JK=D_JK)
             self._node_treatment(
                 J, id_left, id_right, K_eq, D_JI=D_JI, D_JK=-D_JK
             )
             self._node_treatment(K, id_left, id_right, K_eq, D_JI=-D_JI)
-            # self.mb.tag_set_data(self.flux_info_tag, face,
-            #                      [D_JK, D_JI, K_eq, I, J, K, face_area])
 
         self.T.InsertGlobalValues(self.ids, self.v_ids, self.ivalues)
-        # self.T[
-        #     np.asarray(self.ids)[:, :, 0, 0], np.asarray(self.v_ids)
-        # ] = np.asarray(self.ivalues)
         self.T.InsertGlobalValues(id_volumes, id_volumes, all_LHS)
-        # self.T[
-        #     np.asarray(id_volumes), np.asarray(id_volumes)
-        # ] = np.asarray(all_LHS)
         self.T.InsertGlobalValues(all_cols, all_rows, all_values)
-        # self.T[
-        #     np.asarray(all_cols)[:, 0, 0, 0],
-        #     np.asarray(all_rows)[:, 0, 0, 0]
-        # ] = np.asarray(all_values)[:, 0]
-
         self.T.FillComplete()
-        # M = np.array(
-        #     [
-        #         [self.T[i, j] for i in range(len(self.volumes))]
-        #         for j in range(len(self.volumes))
-        #     ],
-        #     dtype="float64",
-        # )
-        # q = np.asarray(self.Q, dtype="float64")
-        # diagonal_dominance = [
-        #     eval.check_if_matrix_is_diagonal_dominant(i, row)
-        #     for i, row in enumerate(M)
-        # ]
-        # antidiffusive_matrix = [
-        #     eval.check_off_diagonal_nonpositiviness(i, row, q)
-        #     for (i, row), q in zip(enumerate(M), q)
-        # ]
-        mat_fill_time = time.time() - t0
-        print("matrix fill took {0} seconds...".format(mat_fill_time))
-        mesh_size = len(self.volumes)
-        print("running solver...")
-        USE_DIRECT_SOLVER = True
-        linearProblem = Epetra.LinearProblem(self.T, self.x, self.Q)
-        if USE_DIRECT_SOLVER:
-            solver = Amesos.Lapack(linearProblem)
-            print("1) Performing symbolic factorizations...")
-            solver.SymbolicFactorization()
-            print("2) Performing numeric factorizations...")
-            solver.NumericFactorization()
-            print("3) Solving the linear system...")
-            solver.Solve()
-            t = time.time() - t0
-            print(
-                "Solver took {0} seconds to run over {1} volumes".format(
-                    t, mesh_size
+
+        inner_ids = []
+        boundary_ids = []
+        [
+            inner_ids.append(self.mb.tag_get_data(self.global_id_tag, volume))
+            if len(self.mtu.get_bridge_adjacencies(volume, 2, 3)) == 4
+            else boundary_ids.append(
+                self.mb.tag_get_data(self.global_id_tag, volume)
+            ) for volume in self.volumes
+        ]
+        inner_adjacencies_ids = []
+        boundary_adjacencies_ids = []
+        [
+            inner_adjacencies_ids.append(
+                self.mb.tag_get_data(
+                    self.global_id_tag,
+                    self.mtu.get_bridge_adjacencies(volume, 2, 3)
                 )
             )
-        else:
-            solver = AztecOO.AztecOO(linearProblem)
-            solver.SetAztecOption(AztecOO.AZ_solver, AztecOO.AZ_gmres)
-            # solver.SetAztecOption(AztecOO.AZ_output, AztecOO.AZ_none)
-            solver.SetAztecOption(AztecOO.AZ_pre_calc, AztecOO.AZ_recalc)
-            solver.SetAztecOption(AztecOO.AZ_precond, AztecOO.AZ_dom_decomp)
-            solver.SetAztecOption(AztecOO.AZ_subdomain_solve, AztecOO.AZ_ilu)
-            solver.SetAztecOption(AztecOO.AZ_kspace, 50)
-            # solver.SetAztecOption(AztecOO.AZ_orthog, AztecOO.AZ_modified)
-            # solver.SetAztecOption(AztecOO.AZ_conv, AztecOO.AZ_Anorm)
-            solver.Iterate(10000, 1e-5)
-            t = time.time() - t0
-            its = solver.GetAztecStatus()[0]
-            solver_time = solver.GetAztecStatus()[6]
-            import pdb; pdb.set_trace()
-            print(
-                "Solver took {0} seconds to run over {1} volumes".format(
-                    t, mesh_size
+            if len(self.mtu.get_bridge_adjacencies(volume, 2, 3)) == 4
+            else boundary_adjacencies_ids.append(
+                self.mb.tag_get_data(
+                    self.global_id_tag,
+                    self.mtu.get_bridge_adjacencies(volume, 2, 3)
                 )
-            )
-            print(
-                "Solver converged at %.dth iteration in %3f seconds."
-                % (int(its), solver_time)
-            )
-        # self.T = self.T.tocsc()
-        # self.Q = self.Q.tocsc()
-        # self.x = spsolve(self.T, self.Q)
-        # print(np.sum(self.T[50]), self.Q[50])
+            ) for volume in self.volumes
+        ]
+        for row, columns in zip(inner_ids, inner_adjacencies_ids):
+            i = row[0][0]
+            for column in columns:
+                j = column[0]
+                if i != j:
+                    self.T_plus[i, j] = max(0, self.T[i][j])
+                elif i == j:
+                    self.T_plus[i, j] = -np.sum(
+                        [t for t in self.T[i]]
+                    )
+            self.T_minus[i, :] = self.T[i] - self.T_plus[i]
+            self._T[i, :] =  self.T[i]
+        for row, columns in zip(boundary_ids, boundary_adjacencies_ids):
+            i = row[0][0]
+            for column in columns:
+                j = column[0]
+                if i != j:
+                    self.T_plus[i, j] = max(0, self.T[i][j])
+                elif i == j:
+                    self.T_plus[i, j] = -np.sum(
+                        [t for t in self.T[i]]
+                    )
+            self.T_minus[i, :] = self.T[i] - self.T_plus[i]
+            self._T[i, :] =  self.T[i]
+        # from openpyxl import Workbook
+        # from openpyxl.styles import Color, Fill
+        # wb = Workbook()
+        # ws = wb.active
+        # ws.title = "RESULTS"
+        # rows, columns, values = find(self.T_minus)
+        # for i, j, v in zip(rows, columns, values):
+        #     ws.cell(row=i + 1, column=j + 1, value=v)
+
+
+
+        # ids = []
+        # boundary_ids = []
+        # [
+        #     ids.append(self.mb.tag_get_data(self.global_id_tag, volume))
+        #     for volume in self.volumes
+        # ]
+        # adjacencies_ids = []
+        # [
+        #     adjacencies_ids.append(
+        #         self.mb.tag_get_data(
+        #             self.global_id_tag,
+        #             self.mtu.get_bridge_adjacencies(volume, 2, 3)
+        #         )
+        #     )
+        #     for volume in self.volumes
+        # ]
+        # for row, columns in zip(ids, adjacencies_ids):
+        #     i = row[0][0]
+        #     for column in columns:
+        #         j = column[0]
+        #         if i != j:
+        #             self.T_plus[i, j] = max(0, self.T[i][j])
+        #         elif i == j:
+        #             self.T_plus[i, j] = -np.sum(
+        #                 [t for t in self.T[i]]
+        #             )
+        #     self.T_minus[i, :] = self.T[i] - self.T_plus[i]
+        #     self._T[i, :] =  self.T[i]
+        # from openpyxl import Workbook
+        # wb = Workbook()
+        # ws = wb.active
+        # ws.title = "RESULTS"
+        # rows, columns, values = find(self.T_minus)
+        # for i, j, v in zip(rows, columns, values):
+        #     ws.cell(row=i + 1, column=j + 1, value=v)
+        # wb.save('8x8x8_T_miuns.xlsx')
+        self.boundary_ids = [bid[0][0] for bid in boundary_ids]
+        self.q = self.Q.tocsc()
+        self.x = spsolve(self.T_minus, self.q)
+        f = (self.T_plus) * self.x
+        q = self.q.toarray()
+        residual = q[:, 0] + f - self.T_minus * self.x
+        antidiffusive_flux = self.flux_limiter(antidiffusive_flux)
+        for volume, vertices in antidiffusive_flux.items():
+            for vertice, vertice_data in vertices[0].items():
+                cumm = 0
+                g, source = vertice_data
+                cumm += g * source
+            q[volume] = - cumm
+        residual += 1
+        import pdb; pdb.set_trace()
+        while max(abs(residual)) > 1E-3:
+            self.dx = spsolve(self.T_minus, residual)
+            self.x += self.dx
+            # alfa = self.slip()
+            # for row, columns in zip(ids, adjacencies_ids):
+            #         i = row[0][0]
+            #         for column in columns:
+            #             j = column[0]
+            #             if i != j:
+            #                 self.T_plus[i, j] = alfa[i, j] * self.T_plus[i, j]
+            # f = self.T_plus * self.x
+            # rows, columns, values = find(alfa)
+            antidiffusive_flux = self.flux_limiter(antidiffusive_flux)
+            for volume, vertices in antidiffusive_flux.items():
+                for vertice, vertice_data in vertices[0].items():
+                    cumm = 0
+                    g, source = vertice_data
+                    cumm += g * source
+                q[volume] = - cumm
+            residual = q[:, 0] + f - self.T_minus * self.x
+            print(f"max res: {max(abs(residual))}")
+        # while max(abs(residual)) > 1E-3:
+        #     print('max residual :', max(abs(residual)))
+        #     alfa = self.slip()
+        #     for row, columns in zip(inner_ids, inner_adjacencies_ids):
+        #         i = row[0][0]
+        #         for column in columns:
+        #             j = column[0]
+        #             if i != j:
+        #                 self.T_plus[i, j] = alfa[i, j] * self.T_plus[i, j]
+        #     f = (-self.T_minus + self._T_plus) * self.x
+        #     residual = q[:, 0] + f
+        #     self.dx = spsolve(self.T_minus, residual)
+        #     self.x += self.dx
+        #     rows, columns, values = find(alfa)
+        #     vals = [value for value in values if value != 1.0]
+        #     print(vals)
         self.mb.tag_set_data(self.pressure_tag, self.volumes, self.x)
-        self.tag_velocity()
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        # self.mb.tag_set_data(self.pressure_tag, self.volumes, self.x)
+        # self.tag_velocity()

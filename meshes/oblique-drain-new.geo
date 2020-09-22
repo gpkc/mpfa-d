@@ -89,9 +89,9 @@ Physical Volume(2) = {2};
 Physical Volume(3) = {3};
 Transfinite Line {18, 65, 8, 2} = 6 Using Progression 1;
 Transfinite Line {20, 10, 63, 4} = 4 Using Progression 1;
-Transfinite Line {24, 28, 76, 72, 19, 9, 1, 64} = 5 Using Progression 1;
+Transfinite Line {24, 28, 76, 72, 19, 9, 1, 64} = 30 Using Progression 1;
 // the drain lines below
-Transfinite Line {21, 42, 32, 54, 6, 3, 23, 50} = 5 Using Progression 1;
+Transfinite Line {21, 42, 32, 54, 6, 3, 23, 50} = 30 Using Progression 1;
 //+
 //Transfinite Surface {37};
 //+

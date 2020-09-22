@@ -309,7 +309,6 @@ class BenchmarkFVCA:
             self.mesh.mb.tag_set_data(
                 self.mesh.source_tag, volume, source_term * tetra_vol
             )
-
         self.mpfad.run_solver(self.im.interpolate)
         u_err = []
         u = []

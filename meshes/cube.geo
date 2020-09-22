@@ -88,8 +88,8 @@ Physical Volume(1) = {1};	// MEIO HOMOGENEO
 
 
 
-Transfinite Line {9, 5, 10, 1, 8, 6, 7, 4, 2, 3, 12, 11} = 17 Using Progression 1;
-Transfinite Line {21, 17, 22, 13, 20, 18, 19, 24, 23, 15, 16, 14} = 4 Using Progression 1;
+Transfinite Line {9, 5, 10, 1, 8, 6, 7, 4, 2, 3, 12, 11} = 5 Using Progression 1;
+Transfinite Line {21, 17, 22, 13, 20, 18, 19, 24, 23, 15, 16, 14} = 2 Using Progression 1;
 
 Transfinite Surface {26};
 Transfinite Surface {28};

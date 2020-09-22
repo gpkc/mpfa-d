@@ -1,7 +1,7 @@
 import numpy as np
 
 from .InterpolationMethod import InterpolationMethodBase
-from mpfad.helpers.geometric import point_distance
+from solvers.helpers.geometric import point_distance
 
 
 class IDW(InterpolationMethodBase):

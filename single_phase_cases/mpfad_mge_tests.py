@@ -250,6 +250,25 @@ class TestCasesMGE:
 
         return K, u
 
+    def mge_test_case_5(self, x, y, z):
+        epsx = 1
+        epsy = 1E-3
+        epsz = 10
+        K = [
+            (epsx * x ** 2 + epsy * y ** 2)/(x ** 2 + y ** 2),
+            ((epsx - epsy) * x * y)/(x ** 2 + y ** 2),
+            0.0,
+            ((epsx - epsy) * x * y)/(x ** 2 + y ** 2),
+            (epsy * x ** 2 + epsx * y ** 2)/(x ** 2 + y ** 2),
+            0.0,
+            0.0,
+            0.0,
+            epsz * (z + 1)
+        ]
+        u = np.sin(2 * pi * x) * np.sin(2 * pi * y) * np.sin(2 * pi * z)
+
+        return K, u
+
     def run_case(self, log_name, test_case):
         """
         Call the Finite Volume for Complex Applications Benchmark.
@@ -261,6 +280,7 @@ class TestCasesMGE:
             "mge_test_case_2": self.mge_test_case_2,
             "mge_test_case_3": self.mge_test_case_3,
             "mge_test_case_4": self.mge_test_case_4,
+            "mge_test_case_5": self.mge_test_case_5,
         }
         for node in self.mesh.get_boundary_nodes():
             x, y, z = self.mesh.mb.get_coords([node])
@@ -284,6 +304,7 @@ class TestCasesMGE:
             self.mesh.mb.tag_set_data(
                 self.mesh.source_tag, volume, source_term * tetra_vol
             )
+
         self.mpfad.run_solver(self.im.interpolate)
         err = []
         u = []
@@ -327,6 +348,9 @@ class TestCasesMGE:
             f.write("velocity norm: \t %.6g\n" % norm_vel)
             f.write("gradient norm: \t %.6g\n" % norm_grad)
         print("max error: ", max(err), "l-2 relative norm: ", results[2])
-        path = "paper_mpfad_tests/mge_paper_cases/test_case_1/"
-        self.mpfad.record_data(path + log_name + ".vtk")
+        path = (
+            f"paper_mpfad_tests/mge_paper_cases/{func[test_case].__name__}/"
+            + log_name
+        )
+        self.mpfad.record_data(path + ".vtk")
         print("END OF " + log_name + "!!!\n")

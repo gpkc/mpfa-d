@@ -122,7 +122,7 @@ class ObliqueDrain:
         results = self.norms_calculator(err, vols, u)
         non_zero_mat = self.mpfad.T.NumGlobalNonzeros()
         path = (
-            "paper_mpfad_tests/oblique_drain_tests/"
+            "paper_mpfad_tests/oblique_drain"
             + log_name
             + "_"
             + interpolation_method.__name__
@@ -154,7 +154,7 @@ class ObliqueDrain:
             "ue max",
             max(u),
         )
-        path = "paper_mpfad_tests/oblique_drain_tests/oblique_drain_"
+        path = "paper_mpfad_tests/oblique_drain/oblique_drain_"
         self.mpfad.record_data(
             path + log_name + "_" + interpolation_method.__name__ + ".vtk"
         )
