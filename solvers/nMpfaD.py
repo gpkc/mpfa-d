@@ -82,6 +82,18 @@ class MpfaD3D:
                             dtype=np.float)
         self.T_minus = lil_matrix((len(self.volumes), len(self.volumes)),
                             dtype=np.float)
+        expanded_matrix = len(self.volumes) + len(boundary_nodes)
+        self.T_expanded = lil_matrix(
+            (expanded_matrix, expanded_matrix), dtype=np.float
+        )
+        self.expanded_matrix_node_ids = self.get_node_ids(boundary_nodes)
+
+    def get_node_ids(self, nodes):
+        max_volumes_ids = max(
+            self.mb.tag_get_data(self.global_id_tag, self.volumes)
+        )
+        return {node: max_volumes_ids + node for node in nodes}
+
 
 
     def record_data(self, file_name):
@@ -412,16 +424,23 @@ class MpfaD3D:
 
     def flux_limiter(self, antidiffusive_fluxes, mi=1):
         for volume, vertices in antidiffusive_fluxes.items():
-            adjacent_volumes =  self.mtu.get_bridge_adjacencies(self.volumes[int(volume)], 2, 3)
+            adjacent_volumes = self.mtu.get_bridge_adjacencies(
+                self.volumes[int(volume)], 2, 3
+            )
             adjacent_pressures = [
-                self.x[self.mb.tag_get_data(self.global_id_tag, volume)] for volume in adjacent_volumes
+                self.x[self.mb.tag_get_data(self.global_id_tag, volume)]
+                for volume in adjacent_volumes
             ]
             p = self.x[volume]
             for vertice, vertice_data in vertices[0].items():
                 g, source = vertice_data
                 adjacent_pressures.append(g)
-            u_max_i = max(np.array([0.]), p + max([u - p for u in adjacent_pressures]))
-            u_min_i = min(np.array([0.]), p + min([u - p for u in adjacent_pressures]))
+            u_max_i = max(
+                np.array([0.]), p + max([u - p for u in adjacent_pressures])
+            )
+            u_min_i = min(
+                np.array([0.]), p + min([u - p for u in adjacent_pressures])
+            )
             for vertice, vertice_data in vertices[0].items():
                 g, source = vertice_data
                 if source < 0:
@@ -435,11 +454,10 @@ class MpfaD3D:
                             2 * mi * (u_min_i - self.x[volume]),
                             self.x[volume] - g
                         )
-
                     source = s_ij / (self.x[volume] - g) * source
+                    print(s_ij / (self.x[volume] - g))
                 antidiffusive_fluxes[volume][0][vertice][1] = source
         return antidiffusive_fluxes
-
 
     def run_solver(self, interpolation_method):
         """Run solver."""
@@ -549,9 +567,11 @@ class MpfaD3D:
             if id_volume not in antidiffusive_flux.keys():
                 antidiffusive_flux[id_volume] = []
             fluxes = OrderedDict(
-                {I: [g_I, -D_JK],
-                J: [g_J, +D_JK - D_JI + K_eq],
-                K: [g_K, D_JI]}
+                {
+                    I: [g_I, D_JK],
+                    J: [g_J, -D_JK + D_JI - K_eq],
+                    K: [g_K, -D_JI]
+                }
             )
             antidiffusive_flux[id_volume].append(
                 fluxes
@@ -560,6 +580,18 @@ class MpfaD3D:
             self.Q[id_volume, 0] += - RHS
             # self.mb.tag_set_data(self.flux_info_tag, face,
             #                      [D_JK, D_JI, K_eq, I, J, K, face_area])
+            i_id = self.expanded_matrix_node_ids[I]
+            j_id = self.expanded_matrix_node_ids[J]
+            k_id = self.expanded_matrix_node_ids[K]
+            self.T_expanded[i_id, id_volume] = D_JK
+            self.T_expanded[id_volume, i_id] = D_JK
+            self.T_expanded[j_id, id_volume] = -D_JK + D_JI - K_eq
+            self.T_expanded[id_volume, j_id] = -D_JK + D_JI - K_eq
+            self.T_expanded[k_id, id_volume] = -D_JI
+            self.T_expanded[id_volume, k_id] = -D_JI
+            self.T_expanded[i_id, i_id] = 1.
+            self.T_expanded[j_id, j_id] = 1.
+            self.T_expanded[k_id, k_id] = 1.
 
         all_cols = []
         all_rows = []
@@ -667,7 +699,6 @@ class MpfaD3D:
         self.T.InsertGlobalValues(id_volumes, id_volumes, all_LHS)
         self.T.InsertGlobalValues(all_cols, all_rows, all_values)
         self.T.FillComplete()
-
         inner_ids = []
         boundary_ids = []
         [
@@ -705,7 +736,7 @@ class MpfaD3D:
                         [t for t in self.T[i]]
                     )
             self.T_minus[i, :] = self.T[i] - self.T_plus[i]
-            self._T[i, :] =  self.T[i]
+            self._T[i, :] = self.T[i]
         for row, columns in zip(boundary_ids, boundary_adjacencies_ids):
             i = row[0][0]
             for column in columns:
@@ -717,7 +748,7 @@ class MpfaD3D:
                         [t for t in self.T[i]]
                     )
             self.T_minus[i, :] = self.T[i] - self.T_plus[i]
-            self._T[i, :] =  self.T[i]
+            self._T[i, :] = self.T[i]
         # from openpyxl import Workbook
         # from openpyxl.styles import Color, Fill
         # wb = Workbook()
@@ -765,6 +796,7 @@ class MpfaD3D:
         # for i, j, v in zip(rows, columns, values):
         #     ws.cell(row=i + 1, column=j + 1, value=v)
         # wb.save('8x8x8_T_miuns.xlsx')
+
         self.boundary_ids = [bid[0][0] for bid in boundary_ids]
         self.q = self.Q.tocsc()
         self.x = spsolve(self.T_minus, self.q)
@@ -779,7 +811,6 @@ class MpfaD3D:
                 cumm += g * source
             q[volume] = - cumm
         residual += 1
-        import pdb; pdb.set_trace()
         while max(abs(residual)) > 1E-3:
             self.dx = spsolve(self.T_minus, residual)
             self.x += self.dx
@@ -798,7 +829,7 @@ class MpfaD3D:
                     cumm = 0
                     g, source = vertice_data
                     cumm += g * source
-                q[volume] = - cumm
+                q[volume] = -cumm
             residual = q[:, 0] + f - self.T_minus * self.x
             print(f"max res: {max(abs(residual))}")
         # while max(abs(residual)) > 1E-3:
