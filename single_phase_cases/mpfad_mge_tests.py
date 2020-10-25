@@ -252,18 +252,18 @@ class TestCasesMGE:
 
     def mge_test_case_5(self, x, y, z):
         epsx = 1
-        epsy = 1E-3
+        epsy = 1e-3
         epsz = 10
         K = [
-            (epsx * x ** 2 + epsy * y ** 2)/(x ** 2 + y ** 2),
-            ((epsx - epsy) * x * y)/(x ** 2 + y ** 2),
+            (epsx * x ** 2 + epsy * y ** 2) / (x ** 2 + y ** 2),
+            ((epsx - epsy) * x * y) / (x ** 2 + y ** 2),
             0.0,
-            ((epsx - epsy) * x * y)/(x ** 2 + y ** 2),
-            (epsy * x ** 2 + epsx * y ** 2)/(x ** 2 + y ** 2),
+            ((epsx - epsy) * x * y) / (x ** 2 + y ** 2),
+            (epsy * x ** 2 + epsx * y ** 2) / (x ** 2 + y ** 2),
             0.0,
             0.0,
             0.0,
-            epsz * (z + 1)
+            epsz * (z + 1),
         ]
         u = np.sin(2 * pi * x) * np.sin(2 * pi * y) * np.sin(2 * pi * z)
 

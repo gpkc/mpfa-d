@@ -9,8 +9,8 @@ class DiscreteMaxPrinciple:
         self.mesh = MeshManager(filename, dim=3)
         self.mesh.set_global_id()
         self.mesh.get_redefine_centre()
-        self.mx = 2.0
-        self.mn = 0.0
+        self.mx = 1.0
+        self.mn = -1.0
         self.mesh.set_boundary_condition(
             "Dirichlet",
             {51: self.mx, 10: self.mn},
@@ -46,11 +46,11 @@ class DiscreteMaxPrinciple:
         return R_matrix
 
     def get_perm_tensor(self):
-        R_x = self.rotation_matrix(-np.pi / 3, axis=0)
-        R_y = self.rotation_matrix(-np.pi / 4, axis=1)
+        R_x = self.rotation_matrix(-np.pi / 6, axis=0)
+        R_y = self.rotation_matrix(-np.pi / 6, axis=1)
         R_z = self.rotation_matrix(-np.pi / 6, axis=2)
         R_xyz = np.matmul(np.matmul(R_z, R_y), R_x)
-        perm = np.diag([300, 15, 1])
+        perm = np.diag([100, 1, 1])
         perm = np.matmul(np.matmul(R_xyz, perm), R_xyz.transpose()).reshape(
             [1, 9]
         )[0]

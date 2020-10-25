@@ -641,7 +641,9 @@ class MpfaD3D:
             t = time.time() - t0
             its = solver.GetAztecStatus()[0]
             solver_time = solver.GetAztecStatus()[6]
-            import pdb; pdb.set_trace()
+            import pdb
+
+            pdb.set_trace()
             print(
                 "Solver took {0} seconds to run over {1} volumes".format(
                     t, mesh_size

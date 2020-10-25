@@ -29,14 +29,14 @@ benchmark_fvca_cases = [3]
 #         BenchmarkFVCA(mesh, im).benchmark_case_2(log_name_2)
 #         # BenchmarkFVCA(mesh, im).benchmark_case_3(log_name_3)
 #         # BenchmarkFVCA(mesh, im).benchmark_case_5(log_name_5)
-        # TestCasesMGE(mesh, im).run_case(log_name_1, "mge_test_case_1")
+# TestCasesMGE(mesh, im).run_case(log_name_1, "mge_test_case_1")
 #         # TestCasesMGE(mesh, im).run_case(log_name_1, "mge_test_case_2")
 #         # TestCasesMGE(mesh, im).run_case(log_name_1, "mge_test_case_3")
-        # TestCasesMGE(mesh, im).run_case(log_name_1, "mge_test_case_5")
-    # os.remove(mesh)
+# TestCasesMGE(mesh, im).run_case(log_name_1, "mge_test_case_5")
+# os.remove(mesh)
 #
 # meshes = []
-cases_dmp = ["4x4x4"]
+cases_dmp = ["32x32x32"]
 for case in cases_dmp:
     for im in interpolation_methods:
         log_name = "linear_monotonicity_test_" + im.__name__ + "_" + case

@@ -74,27 +74,35 @@ class MpfaD3D:
             self.dx = Epetra.Vector(std_map)
         else:
             self.x = x
-        self.T_plus = lil_matrix((len(self.volumes), len(self.volumes)),
-                            dtype=np.float)
-        self._T = lil_matrix((len(self.volumes), len(self.volumes)),
-                            dtype=np.float)
-        self._T_plus = lil_matrix((len(self.volumes), len(self.volumes)),
-                            dtype=np.float)
-        self.T_minus = lil_matrix((len(self.volumes), len(self.volumes)),
-                            dtype=np.float)
+        # self.T_plus = lil_matrix((len(self.volumes), len(self.volumes)),
+        #                     dtype=np.float)
+        # self._T = lil_matrix((len(self.volumes), len(self.volumes)),
+        #                     dtype=np.float)
+        # self._T_plus = lil_matrix((len(self.volumes), len(self.volumes)),
+        #                     dtype=np.float)
+        # self.T_minus = lil_matrix((len(self.volumes), len(self.volumes)),
+        #                     dtype=np.float)
         expanded_matrix = len(self.volumes) + len(boundary_nodes)
         self.T_expanded = lil_matrix(
             (expanded_matrix, expanded_matrix), dtype=np.float
         )
+        self.T_plus = lil_matrix(
+            (expanded_matrix, expanded_matrix), dtype=np.float
+        )
+        self.T_plus_aux = lil_matrix(
+            (expanded_matrix, expanded_matrix), dtype=np.float
+        )
+        self.T_minus = lil_matrix(
+            (expanded_matrix, expanded_matrix), dtype=np.float
+        )
         self.expanded_matrix_node_ids = self.get_node_ids(boundary_nodes)
+        self.u = np.zeros(expanded_matrix)
 
     def get_node_ids(self, nodes):
         max_volumes_ids = max(
             self.mb.tag_get_data(self.global_id_tag, self.volumes)
         )
         return {node: max_volumes_ids + node for node in nodes}
-
-
 
     def record_data(self, file_name):
         """Record data to file."""
@@ -356,10 +364,13 @@ class MpfaD3D:
         RHS = 0.5 * K_eq * (D_JK + D_JI)
         if node in self.dirichlet_nodes:
             pressure = self.get_boundary_node_pressure(node)
+            node_id = self.expanded_matrix_node_ids[node]
             # self.Q[id_left] += RHS * pressure
             # self.Q[id_right] += -RHS * pressure
             self.Q[id_left[0], 0] += RHS * pressure
-            self.Q[id_right[0], 0] += - RHS * pressure
+            self.Q[id_right[0], 0] += -RHS * pressure
+            self.T_expanded[id_left[0][0], node_id[0]] -= RHS
+            self.T_expanded[id_right[0][0], node_id[0]] += RHS
 
         if node in self.intern_nodes:
             for volume, weight in self.nodes_ws[node].items():
@@ -372,7 +383,7 @@ class MpfaD3D:
             neu_term = self.nodes_nts[node]
             # self.Q[id_right] += -RHS * neu_term
             # self.Q[id_left] += RHS * neu_term
-            self.Q[id_right, 0] += - RHS * neu_term
+            self.Q[id_right, 0] += -RHS * neu_term
             self.Q[id_left, 0] += RHS * neu_term
 
             for volume, weight_N in self.nodes_ws[node].items():
@@ -381,83 +392,43 @@ class MpfaD3D:
                 self.v_ids.append([v_id, v_id])
                 self.ivalues.append([-RHS * weight_N, RHS * weight_N])
 
-
-    def slip(self, mi=1):
-        rows, columns, _ = find(self.T_plus)
-        alfa = lil_matrix((len(self.volumes), len(self.volumes)), dtype=np.float)
-        for i, j in zip(rows, columns):
-            if i != j:
-                _i, _j, _ = find(self.T_plus)
-                # u_max_i = maximo entre zero e o maximo da diferenca das pressoes no patch
-                # u_min_i =  maximo entre zero e o maximo da diferenca das pressoes no patch
-                u_max_i = max(0, self.x[i] + max(self.x[_j] - self.x[_i]))
-                u_min_i = min(0, self.x[i] + min(self.x[_j] - self.x[_i]))
-                u_max_j = max(0, self.x[j] + max(self.x[_i] - self.x[_j]))
-                u_min_j = min(0, self.x[j] + min(self.x[_i] - self.x[_j]))
-                if j not in self.boundary_ids:
-                    if self.x[i] > self.x[j]:
-                        s_ij = min(
-                            2 * mi * (u_max_i - self.x[i]),
-                            self.x[i] - self.x[j],
-                            2 * mi * (self.x[j] - u_min_j)
-                        )
-                    else:
-                        s_ij = max(
-                            2 * mi * (u_min_i - self.x[i]),
-                            self.x[i] - self.x[j],
-                            2 * mi * (self.x[j] - u_max_j)
-                        )
-                else:
-                    if self.x[i] > self.x[j]:
-                        s_ij = min(
-                            2 * mi * (u_max_i - self.x[i]),
-                            self.x[i] - self.x[j]
-                        )
-                    else:
-                        s_ij = max(
-                            2 * mi * (u_min_i - self.x[i]),
-                            self.x[i] - self.x[j]
-                        )
-
-                alfa[i, j] = s_ij / (self.x[i] - self.x[j])
-        return alfa
-
-    def flux_limiter(self, antidiffusive_fluxes, mi=1):
-        for volume, vertices in antidiffusive_fluxes.items():
-            adjacent_volumes = self.mtu.get_bridge_adjacencies(
-                self.volumes[int(volume)], 2, 3
-            )
-            adjacent_pressures = [
-                self.x[self.mb.tag_get_data(self.global_id_tag, volume)]
-                for volume in adjacent_volumes
-            ]
-            p = self.x[volume]
-            for vertice, vertice_data in vertices[0].items():
-                g, source = vertice_data
-                adjacent_pressures.append(g)
-            u_max_i = max(
-                np.array([0.]), p + max([u - p for u in adjacent_pressures])
-            )
-            u_min_i = min(
-                np.array([0.]), p + min([u - p for u in adjacent_pressures])
-            )
-            for vertice, vertice_data in vertices[0].items():
-                g, source = vertice_data
-                if source < 0:
-                    if self.x[volume] > g:
-                        s_ij = min(
-                            2 * mi * (u_max_i - self.x[volume]),
-                            self.x[volume] - g
-                        )
-                    else:
-                        s_ij = max(
-                            2 * mi * (u_min_i - self.x[volume]),
-                            self.x[volume] - g
-                        )
-                    source = s_ij / (self.x[volume] - g) * source
-                    print(s_ij / (self.x[volume] - g))
-                antidiffusive_fluxes[volume][0][vertice][1] = source
-        return antidiffusive_fluxes
+    def compute_alpha(
+        self, i, j, mi=0.000001
+    ):
+        print(j, len(self.volumes))
+        if j >= len(self.volumes):
+            u_i_max = self.u_maxs[i]
+            u_i_min = self.u_mins[i]
+            u_i = self.u[i]
+            u_j = self.u[j]
+            if u_i > u_j:
+                s_ij = min(2 * mi * (u_i_max - u_i), u_i - u_j)
+            else:
+                s_ij = max(2 * mi * (u_i_min - u_i), u_i - u_j)
+        else:
+            u_i_max = self.u_maxs[i]
+            u_i_min = self.u_mins[i]
+            u_j_min = self.u_mins[j]
+            u_i = self.u[i]
+            u_j = self.u[j]
+            if u_i > u_j:
+                s_ij = min(
+                    2 * mi * (u_i_max - u_i),
+                    u_i - u_j,
+                    2 * mi * (u_j - u_j_min),
+                )
+            else:
+                s_ij = max(
+                    2 * mi * (u_i_min - u_i),
+                    u_i - u_j,
+                    2 * mi * (u_j - u_i_max),
+                )
+        try:
+            alpha = s_ij / (u_i - u_j)
+        except ZeroDivisionError:
+            alpha = 1
+        alpha = max(0, alpha)
+        return alpha
 
     def run_solver(self, interpolation_method):
         """Run solver."""
@@ -500,7 +471,7 @@ class MpfaD3D:
             face_area = geo._area_vector(node_crds, norma=True)
             RHS = face_mobility * face_flow * face_area
             # self.Q[id_volume] += -RHS
-            self.Q[id_volume, 0] += - RHS
+            self.Q[id_volume, 0] += -RHS
 
         id_volumes = []
         all_LHS = []
@@ -535,6 +506,7 @@ class MpfaD3D:
                 JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
                 JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
                 N_IJK = np.cross(JI, JK) / 2.0
+            #  calc_grad(I, J, K, vol_left, vol_right=none)
             tan_JI = np.cross(N_IJK, JI)
             tan_JK = np.cross(N_IJK, JK)
             self.mb.tag_set_data(self.normal_tag, face, N_IJK)
@@ -570,28 +542,26 @@ class MpfaD3D:
                 {
                     I: [g_I, D_JK],
                     J: [g_J, -D_JK + D_JI - K_eq],
-                    K: [g_K, -D_JI]
+                    K: [g_K, -D_JI],
                 }
             )
-            antidiffusive_flux[id_volume].append(
-                fluxes
-            )
+            antidiffusive_flux[id_volume].append(fluxes)
             # self.Q[id_volume] += -RHS
-            self.Q[id_volume, 0] += - RHS
+            self.Q[id_volume, 0] += -RHS
             # self.mb.tag_set_data(self.flux_info_tag, face,
             #                      [D_JK, D_JI, K_eq, I, J, K, face_area])
             i_id = self.expanded_matrix_node_ids[I]
             j_id = self.expanded_matrix_node_ids[J]
             k_id = self.expanded_matrix_node_ids[K]
-            self.T_expanded[i_id, id_volume] = D_JK
+            # self.T_expanded[i_id, id_volume] = D_JK
             self.T_expanded[id_volume, i_id] = D_JK
-            self.T_expanded[j_id, id_volume] = -D_JK + D_JI - K_eq
+            # self.T_expanded[j_id, id_volume] = -D_JK + D_JI - K_eq
             self.T_expanded[id_volume, j_id] = -D_JK + D_JI - K_eq
-            self.T_expanded[k_id, id_volume] = -D_JI
+            # self.T_expanded[k_id, id_volume] = -D_JI
             self.T_expanded[id_volume, k_id] = -D_JI
-            self.T_expanded[i_id, i_id] = 1.
-            self.T_expanded[j_id, j_id] = 1.
-            self.T_expanded[k_id, k_id] = 1.
+            self.T_expanded[i_id, i_id] = 1.0
+            self.T_expanded[j_id, j_id] = 1.0
+            self.T_expanded[k_id, k_id] = 1.0
 
         all_cols = []
         all_rows = []
@@ -699,164 +669,130 @@ class MpfaD3D:
         self.T.InsertGlobalValues(id_volumes, id_volumes, all_LHS)
         self.T.InsertGlobalValues(all_cols, all_rows, all_values)
         self.T.FillComplete()
-        inner_ids = []
-        boundary_ids = []
-        [
-            inner_ids.append(self.mb.tag_get_data(self.global_id_tag, volume))
-            if len(self.mtu.get_bridge_adjacencies(volume, 2, 3)) == 4
-            else boundary_ids.append(
-                self.mb.tag_get_data(self.global_id_tag, volume)
-            ) for volume in self.volumes
-        ]
-        inner_adjacencies_ids = []
-        boundary_adjacencies_ids = []
-        [
-            inner_adjacencies_ids.append(
-                self.mb.tag_get_data(
-                    self.global_id_tag,
-                    self.mtu.get_bridge_adjacencies(volume, 2, 3)
-                )
-            )
-            if len(self.mtu.get_bridge_adjacencies(volume, 2, 3)) == 4
-            else boundary_adjacencies_ids.append(
-                self.mb.tag_get_data(
-                    self.global_id_tag,
-                    self.mtu.get_bridge_adjacencies(volume, 2, 3)
-                )
-            ) for volume in self.volumes
-        ]
-        for row, columns in zip(inner_ids, inner_adjacencies_ids):
-            i = row[0][0]
-            for column in columns:
-                j = column[0]
-                if i != j:
-                    self.T_plus[i, j] = max(0, self.T[i][j])
-                elif i == j:
-                    self.T_plus[i, j] = -np.sum(
-                        [t for t in self.T[i]]
-                    )
-            self.T_minus[i, :] = self.T[i] - self.T_plus[i]
-            self._T[i, :] = self.T[i]
-        for row, columns in zip(boundary_ids, boundary_adjacencies_ids):
-            i = row[0][0]
-            for column in columns:
-                j = column[0]
-                if i != j:
-                    self.T_plus[i, j] = max(0, self.T[i][j])
-                elif i == j:
-                    self.T_plus[i, j] = -np.sum(
-                        [t for t in self.T[i]]
-                    )
-            self.T_minus[i, :] = self.T[i] - self.T_plus[i]
-            self._T[i, :] = self.T[i]
-        # from openpyxl import Workbook
-        # from openpyxl.styles import Color, Fill
-        # wb = Workbook()
-        # ws = wb.active
-        # ws.title = "RESULTS"
-        # rows, columns, values = find(self.T_minus)
-        # for i, j, v in zip(rows, columns, values):
-        #     ws.cell(row=i + 1, column=j + 1, value=v)
-
-
-
-        # ids = []
-        # boundary_ids = []
-        # [
-        #     ids.append(self.mb.tag_get_data(self.global_id_tag, volume))
-        #     for volume in self.volumes
-        # ]
-        # adjacencies_ids = []
-        # [
-        #     adjacencies_ids.append(
-        #         self.mb.tag_get_data(
-        #             self.global_id_tag,
-        #             self.mtu.get_bridge_adjacencies(volume, 2, 3)
-        #         )
-        #     )
-        #     for volume in self.volumes
-        # ]
-        # for row, columns in zip(ids, adjacencies_ids):
-        #     i = row[0][0]
-        #     for column in columns:
-        #         j = column[0]
-        #         if i != j:
-        #             self.T_plus[i, j] = max(0, self.T[i][j])
-        #         elif i == j:
-        #             self.T_plus[i, j] = -np.sum(
-        #                 [t for t in self.T[i]]
-        #             )
-        #     self.T_minus[i, :] = self.T[i] - self.T_plus[i]
-        #     self._T[i, :] =  self.T[i]
-        # from openpyxl import Workbook
-        # wb = Workbook()
-        # ws = wb.active
-        # ws.title = "RESULTS"
-        # rows, columns, values = find(self.T_minus)
-        # for i, j, v in zip(rows, columns, values):
-        #     ws.cell(row=i + 1, column=j + 1, value=v)
-        # wb.save('8x8x8_T_miuns.xlsx')
-
-        self.boundary_ids = [bid[0][0] for bid in boundary_ids]
+        for i in range(len(self.volumes)):
+            for j in range(len(self.volumes)):
+                if self.T[i][j]:
+                    self.T_expanded[i, j] = self.T[i][j]
+        _is, js, values = find(self.T_expanded)
+        self.T_plus[
+            [i for i, j in zip(_is, js) if i != j],
+            [j for i, j in zip(_is, js) if i != j],
+        ] = np.asarray(
+            [max(0, value) for i, j, value in zip(_is, js, values) if i != j]
+        )
+        self.T_plus[_is, _is] = -self.T_plus[_is].sum(axis=1).transpose()
+        self.T_minus = self.T_expanded - self.T_plus
         self.q = self.Q.tocsc()
-        self.x = spsolve(self.T_minus, self.q)
-        f = (self.T_plus) * self.x
-        q = self.q.toarray()
-        residual = q[:, 0] + f - self.T_minus * self.x
-        antidiffusive_flux = self.flux_limiter(antidiffusive_flux)
-        for volume, vertices in antidiffusive_flux.items():
-            for vertice, vertice_data in vertices[0].items():
-                cumm = 0
-                g, source = vertice_data
-                cumm += g * source
-            q[volume] = - cumm
-        residual += 1
-        while max(abs(residual)) > 1E-3:
-            self.dx = spsolve(self.T_minus, residual)
-            self.x += self.dx
-            # alfa = self.slip()
-            # for row, columns in zip(ids, adjacencies_ids):
-            #         i = row[0][0]
-            #         for column in columns:
-            #             j = column[0]
-            #             if i != j:
-            #                 self.T_plus[i, j] = alfa[i, j] * self.T_plus[i, j]
-            # f = self.T_plus * self.x
-            # rows, columns, values = find(alfa)
-            antidiffusive_flux = self.flux_limiter(antidiffusive_flux)
-            for volume, vertices in antidiffusive_flux.items():
-                for vertice, vertice_data in vertices[0].items():
-                    cumm = 0
-                    g, source = vertice_data
-                    cumm += g * source
-                q[volume] = -cumm
-            residual = q[:, 0] + f - self.T_minus * self.x
-            print(f"max res: {max(abs(residual))}")
-        # while max(abs(residual)) > 1E-3:
-        #     print('max residual :', max(abs(residual)))
-        #     alfa = self.slip()
-        #     for row, columns in zip(inner_ids, inner_adjacencies_ids):
-        #         i = row[0][0]
-        #         for column in columns:
-        #             j = column[0]
-        #             if i != j:
-        #                 self.T_plus[i, j] = alfa[i, j] * self.T_plus[i, j]
-        #     f = (-self.T_minus + self._T_plus) * self.x
-        #     residual = q[:, 0] + f
-        #     self.dx = spsolve(self.T_minus, residual)
-        #     self.x += self.dx
-        #     rows, columns, values = find(alfa)
-        #     vals = [value for value in values if value != 1.0]
-        #     print(vals)
-        self.mb.tag_set_data(self.pressure_tag, self.volumes, self.x)
-        #
-        #
-        #
-        #
-        #
-        #
-        #
-        #
-        #
+        self.u[: len(self.volumes)] = spsolve(
+            self.T_minus[0: len(self.volumes), 0: len(self.volumes)], self.q
+        )
+
+        nodes_pressure = self.mb.tag_get_data(
+            self.dirichlet_tag, self.dirichlet_nodes | self.neumann_nodes
+        )
+        self.u[len(self.volumes):] = nodes_pressure[:, 0]
+        residual = -self.T_minus * self.u
+        self.T_plus_aux = self.T_plus
+        _is, js, _ = find(self.T_plus)
+        print("vai entrar no calculo do residuo")
+        n = 0
+        while max(abs(residual[:len(self.volumes)])) > 1e-3:
+            n += 1
+            # print("u_i max")
+            self.u_maxs = {}
+            [
+                self.u_maxs.update({
+                    i: max(
+                            0,
+                            self.u[i]
+                            + max(
+                                [
+                                    self.u[j] - self.u[i]
+                                    for j in self.mb.tag_get_data(
+                                        self.global_id_tag,
+                                        self.mtu.get_bridge_adjacencies(
+                                            self.volumes[i], 0, 3
+                                        )
+                                    )
+                                    if j != i
+                                ]
+                            ),
+                        )
+                    }) for i in range(len(self.volumes))
+            ]
+            # print("u_i min")
+            self.u_mins = {}
+            [
+                self.u_mins.update({
+                    i: min(
+                            0,
+                            self.u[i]
+                            + min(
+                                [
+                                    self.u[j] - self.u[i]
+                                    for j in self.mb.tag_get_data(
+                                        self.global_id_tag,
+                                        self.mtu.get_bridge_adjacencies(
+                                            self.volumes[i], 0, 3))
+                                    if j != i
+                                ]
+                            ),
+                        )
+                    }) for i in range(len(self.volumes))
+            ]
+            # print("u_j max")
+            # print(f"Solution: u_max: \
+            #       {max(self.u[:len(self.volumes)])} \
+            #       u_min: {min(self.u[:len(self.volumes)])}")
+            # print("calculo de slope limiter")
+            rows = []
+            cols = []
+            import pdb; pdb.set_trace()
+            alpha_ijs = []
+            [
+                (
+                    rows.append(i),
+                    cols.append(j),
+                    alpha_ijs.append(
+                        self.compute_alpha(i, j)
+                    ),
+                ) for i, j in zip(_is, js) if i != j
+            ]
+            # print(f"max alpha: {max(alpha_ijs)} min alpha: {min(alpha_ijs)}")
+            # print("vai recalcular T_plus")
+            t0 = time.time()
+            new_vals = [
+                self.T_plus[i, j] * alpha for i, j, alpha in zip(
+                    rows, cols, alpha_ijs
+                )
+            ]
+            self.T_plus[rows, cols] = new_vals
+            self.T_plus[
+                range(len(self.u)), range(len(self.u))
+            ] = self.T_plus.sum(axis=1).transpose() - self.T_plus.diagonal()
+            # print("Refaz o assembly da matry com novos fluxos")
+            self.T_expanded = self.T_minus + self.T_plus
+            # print("calculo do termo fonte")
+            _q = (
+                -self.T_expanded[: len(self.volumes), len(self.volumes):]
+                * nodes_pressure
+            )
+            # print("calculo de pressao u")
+            self.u[: len(self.volumes)] = spsolve(
+                self.T_expanded[: len(self.volumes), : len(self.volumes)], _q
+            )
+            f = self.T_plus * self.u
+            a_omega_u = - self.T_minus * self.u
+            residual = a_omega_u + f
+            print(f"res: {max(abs(residual[:len(self.volumes)]))}")
+
+        self.mb.tag_set_data(self.pressure_tag, self.volumes, self.u[:len(self.volumes)])
+        self.record_data(f'results_crr.vtk')
+        import pdb
+
+        pdb.set_trace()
+
+        # self.mb.tag_set_data(self.pressure_tag, self.volumes, self.x)
+
         # self.mb.tag_set_data(self.pressure_tag, self.volumes, self.x)
         # self.tag_velocity()
