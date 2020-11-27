@@ -338,6 +338,7 @@ class BenchmarkFVCA:
             + log_name
             + "_log"
         )
+        import pdb; pdb.set_trace()
         with open(path, "w") as f:
             f.write("TEST CASE 1\n\nUnknowns:\t %.0f\n" % (len(volumes)))
             # f.write('Interpolation Method: {}'.format(self.im.__name__))

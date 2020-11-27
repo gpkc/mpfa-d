@@ -65,7 +65,8 @@ class MpfaD3D:
         self.neumann_faces = mesh_data.neumann_faces
         self.intern_faces = mesh_data.intern_faces()
         self.volumes = self.mesh_data.all_volumes
-
+        self.vol_volumes = {}
+        [self.get_volume(a_volume) for a_volume in self.volumes]
         std_map = Epetra.Map(len(self.volumes), 0, self.comm)
         self.T = Epetra.CrsMatrix(Epetra.Copy, std_map, 0)
         self.Q = lil_matrix((len(self.volumes), 1), dtype=np.float)
@@ -102,7 +103,120 @@ class MpfaD3D:
         max_volumes_ids = max(
             self.mb.tag_get_data(self.global_id_tag, self.volumes)
         )
-        return {node: max_volumes_ids + node for node in nodes}
+        return {
+            node: max_volumes_ids + index + 1 for index, node in enumerate(nodes)
+        }
+
+    def get_volume(self, a_volume):
+        vol_nodes = self.mtu.get_bridge_adjacencies(a_volume, 0, 0)
+        vol_crds = self.mb.get_coords(vol_nodes)
+        vol_crds = np.reshape(vol_crds, ([4, 3]))
+        _id = self.mb.tag_get_data(self.global_id_tag, a_volume)
+        volume = self.mesh_data.get_tetra_volume(vol_crds)
+        self.vol_volumes.update({_id[0][0]: volume})
+
+    def compute_b_parameter(self, u_j, u_vol, u_max, u_min):
+        if u_j == u_vol:
+            val = 1
+        if u_j > u_vol:
+            val = (u_max - u_vol) / (u_j - u_vol)
+        else:
+            val = (u_min - u_vol) / (u_j - u_vol)
+        b = min(1, val)
+        return b
+
+    def get_grad(self, a_volume):
+        vol_faces = self.mtu.get_bridge_adjacencies(a_volume, 2, 2)
+        vol_nodes = self.mtu.get_bridge_adjacencies(a_volume, 0, 0)
+        vol_crds = self.mb.get_coords(vol_nodes)
+        vol_crds = np.reshape(vol_crds, ([4, 3]))
+        vol_volume = self.mesh_data.get_tetra_volume(vol_crds)
+        I, J, K = self.mtu.get_bridge_adjacencies(vol_faces[0], 2, 0)
+        L = list(
+            set(vol_nodes).difference(
+                set(
+                    self.mtu.get_bridge_adjacencies(
+                        vol_faces[0], 2, 0
+                    )
+                )
+            )
+        )
+        JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
+        JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
+        LJ = self.mb.get_coords([J]) - self.mb.get_coords(L)
+        N_IJK = np.cross(JI, JK) / 2.0
+
+        test = np.dot(LJ, N_IJK)
+        if test < 0.0:
+            I, K = K, I
+            JI = self.mb.get_coords([I]) - self.mb.get_coords(
+                [J]
+            )
+            JK = self.mb.get_coords([K]) - self.mb.get_coords(
+                [J]
+            )
+            N_IJK = np.cross(JI, JK) / 2.0
+
+        tan_JI = np.cross(N_IJK, JI)
+        tan_JK = np.cross(N_IJK, JK)
+        face_area = np.sqrt(np.dot(N_IJK, N_IJK))
+
+        h_L = geo.get_height(N_IJK, LJ)
+
+        p_I = self.mb.tag_get_data(self.node_pressure_tag, I)
+        p_J = self.mb.tag_get_data(self.node_pressure_tag, J)
+        p_K = self.mb.tag_get_data(self.node_pressure_tag, K)
+        p_L = self.mb.tag_get_data(self.node_pressure_tag, L)
+        grad_normal = -2 * (p_J - p_L) * N_IJK
+        grad_cross_I = (p_J - p_I) * (
+            (np.dot(tan_JK, LJ) / face_area ** 2) * N_IJK
+            - (h_L / (face_area)) * tan_JK
+        )
+        grad_cross_K = (p_K - p_J) * (
+            (np.dot(tan_JI, LJ) / face_area ** 2) * N_IJK
+            - (h_L / (face_area)) * tan_JI
+        )
+        grad_p = -(1 / (6 * vol_volume)) * (
+            grad_normal + grad_cross_I + grad_cross_K
+        )
+        return grad_p
+
+    def compute_vert_pressure(self, node):
+        all_vols = [
+            self.mb.tag_get_data(
+                self.global_id_tag, self.nodes_ws[node].keys()
+            ) for node in self.nodes_ws.keys()
+        ]
+        its = set()
+        [[its.add(i) for i in item] for item in all_vols]
+        volumes_pressure = self.u[
+            self.mb.tag_get_data(
+                self.global_id_tag, self.nodes_ws[node].keys()
+            )][:, 0]
+        volumes_ids = self.mb.tag_get_data(
+            self.global_id_tag, self.nodes_ws[node].keys()
+        )
+        max_pressure = max(volumes_pressure)
+        min_pressure = min(volumes_pressure)
+        pressure = np.dot(
+            self.u[
+                self.mb.tag_get_data(
+                    self.global_id_tag, self.nodes_ws[node].keys()
+                )
+            ][:, 0],
+            np.asarray([value for value in self.nodes_ws[node].values()])
+        )
+        _bs = [{key: self.compute_b_parameter(pressure, u_vol, max_pressure, min_pressure)} for key, u_vol in zip(volumes_ids[:, 0], volumes_pressure)]
+        # bs = {}
+        bs = {
+            key: self.compute_b_parameter(
+                pressure, u_vol, max_pressure, min_pressure
+            ) for key, u_vol in zip(volumes_ids[:, 0], volumes_pressure)
+        }
+        # import pdb; pdb.set_trace()
+        # data = {"pressure": pressure, "max": max_pressure, "min": min_pressure}
+        # import pdb; pdb.set_trace()
+        return bs
 
     def record_data(self, file_name):
         """Record data to file."""
@@ -114,6 +228,7 @@ class MpfaD3D:
         self.mb.write_file(file_name, [ms])
 
     def tag_verts_pressure(self):
+        print("Will tag vertices pressure")
         p_verts = []
         for node in self.mesh_data.all_nodes:
             try:
@@ -130,6 +245,7 @@ class MpfaD3D:
         self.mb.tag_set_data(
             self.node_pressure_tag, self.mesh_data.all_nodes, p_verts
         )
+        print("Done tagging vertices pressure!!")
 
     def tag_velocity(self):
         self.tag_verts_pressure()
@@ -151,9 +267,9 @@ class MpfaD3D:
         velocities = []
         dirichlet_faces = list(self.dirichlet_faces)
         for face in dirichlet_faces:
-            face_mobility = self.mb.tag_get_data(self.face_mobility_tag, face)[
-                0
-            ][0]
+            face_mobility = self.mb.tag_get_data(
+                self.face_mobility_tag, face
+            )[0][0]
             # '2' argument was initially '0' but it's incorrect
             I, J, K = self.mtu.get_bridge_adjacencies(face, 2, 0)
 
@@ -187,9 +303,9 @@ class MpfaD3D:
             g_J = self.mb.tag_get_data(self.node_pressure_tag, J)
             g_K = self.mb.tag_get_data(self.node_pressure_tag, K)
 
-            K_L = self.mb.tag_get_data(self.perm_tag, left_volume).reshape(
-                [3, 3]
-            )
+            K_L = self.mb.tag_get_data(
+                self.perm_tag, left_volume
+            ).reshape([3, 3])
             K_n_L = self.vmv_multiply(N_IJK, face_mobility * K_L, N_IJK)
             K_L_JI = self.vmv_multiply(N_IJK, face_mobility * K_L, tan_JI)
             K_L_JK = self.vmv_multiply(N_IJK, face_mobility * K_L, tan_JK)
@@ -393,41 +509,82 @@ class MpfaD3D:
                 self.ivalues.append([-RHS * weight_N, RHS * weight_N])
 
     def compute_alpha(
-        self, i, j, mi=0.000001
+        self, i, _j, mi=None
     ):
-        print(j, len(self.volumes))
-        if j >= len(self.volumes):
+        import pdb; pdb.set_trace()
+        if _j >= len(self.volumes):
+            # _j = j
+            idx = list(self.expanded_matrix_node_ids.values()).index(_j)
+            val = list(self.expanded_matrix_node_ids.keys())[idx]
+            adj_vols = self.mb.tag_get_data(
+                self.global_id_tag, self.mtu.get_bridge_adjacencies(val, 0, 3)
+            )
+            grad_i = self.grads.get(i).get("grad")
+            coords_i = self.mb.get_coords(self.grads.get(i).get('vol'))
+            # grads = np.asarray(
+            #     [self.grads.get(vol[0]).get('grad')[0] for vol in adj_vols]
+            # )
+            dists = np.asarray([
+                coords_i - self.mb.get_coords(
+                    self.grads.get(vol[0]).get('vol')
+                )
+                for vol in adj_vols
+            ])
+            volumes = np.asarray(
+                [self.vol_volumes.get(vol[0]) for vol in adj_vols]
+            )
+            avg_dist = np.asarray(
+                [sum(volumes * dists[:, i]) / sum(volumes) for i in range(3)]
+            )
+            mi = np.dot(coords_i - avg_dist, grad_i[0])
+            # mi = np.dot(
+            #     np.asarray(
+            #         [np.dot(grad, dist) for grad, dist in zip(grads, dists)]
+            #     ), volumes
+            # )
+            # get averaged grad from other volumes
             u_i_max = self.u_maxs[i]
             u_i_min = self.u_mins[i]
             u_i = self.u[i]
-            u_j = self.u[j]
-            if u_i > u_j:
+            u_j = self.u[_j]
+            if u_i < u_j:
                 s_ij = min(2 * mi * (u_i_max - u_i), u_i - u_j)
             else:
                 s_ij = max(2 * mi * (u_i_min - u_i), u_i - u_j)
         else:
+            grad_i = self.grads.get(i).get("grad")
+            coords_i = self.mb.get_coords(self.grads.get(i).get('vol'))
+            grad_j = self.grads.get(j).get("grad")
+            coords_j = self.mb.get_coords(self.grads.get(j).get('vol'))
             u_i_max = self.u_maxs[i]
             u_i_min = self.u_mins[i]
-            u_j_min = self.u_mins[j]
+            u_j_min = self.u_mins[_j]
             u_i = self.u[i]
-            u_j = self.u[j]
+            u_j = self.u[_j]
+            mi_ij = np.dot(
+                grad_i, (coords_i - coords_j)
+            )
+            mi_ji = np.dot(
+                grad_j, (coords_j - coords_i)
+            )
             if u_i > u_j:
                 s_ij = min(
-                    2 * mi * (u_i_max - u_i),
+                    2 * mi_ij * (u_i_max - u_i),
                     u_i - u_j,
-                    2 * mi * (u_j - u_j_min),
+                    2 * mi_ji * (u_j - u_j_min),
                 )
             else:
                 s_ij = max(
-                    2 * mi * (u_i_min - u_i),
+                    2 * mi_ij * (u_i_min - u_i),
                     u_i - u_j,
-                    2 * mi * (u_j - u_i_max),
+                    2 * mi_ji * (u_j - u_i_max),
                 )
         try:
             alpha = s_ij / (u_i - u_j)
         except ZeroDivisionError:
             alpha = 1
         alpha = max(0, alpha)
+        # alpha = 1
         return alpha
 
     def run_solver(self, interpolation_method):
@@ -477,18 +634,18 @@ class MpfaD3D:
         all_LHS = []
         antidiffusive_flux = {}
         for face in self.dirichlet_faces:
-            face_mobility = self.mb.tag_get_data(self.face_mobility_tag, face)[
-                0
-            ][0]
+            face_mobility = self.mb.tag_get_data(
+                self.face_mobility_tag, face
+            )[0][0]
             # '2' argument was initially '0' but it's incorrect
             I, J, K = self.mtu.get_bridge_adjacencies(face, 2, 0)
 
             left_volume = np.asarray(
                 self.mtu.get_bridge_adjacencies(face, 2, 3), dtype="uint64"
             )
-            id_volume = self.mb.tag_get_data(self.global_id_tag, left_volume)[
-                0
-            ][0]
+            id_volume = self.mb.tag_get_data(
+                self.global_id_tag, left_volume
+            )[0][0]
             id_volumes.append(id_volume)
 
             JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
@@ -548,6 +705,7 @@ class MpfaD3D:
             antidiffusive_flux[id_volume].append(fluxes)
             # self.Q[id_volume] += -RHS
             self.Q[id_volume, 0] += -RHS
+            # self.T_expanded[:len(self.volumes), len(self.volumes):len(self.u)] * self.u[len(self.volumes):]
             # self.mb.tag_set_data(self.flux_info_tag, face,
             #                      [D_JK, D_JI, K_eq, I, J, K, face_area])
             i_id = self.expanded_matrix_node_ids[I]
@@ -683,9 +841,7 @@ class MpfaD3D:
         self.T_plus[_is, _is] = -self.T_plus[_is].sum(axis=1).transpose()
         self.T_minus = self.T_expanded - self.T_plus
         self.q = self.Q.tocsc()
-        self.u[: len(self.volumes)] = spsolve(
-            self.T_minus[0: len(self.volumes), 0: len(self.volumes)], self.q
-        )
+        self.u[: len(self.volumes)] = spsolve(self.T_expanded[0: len(self.volumes), 0: len(self.volumes)], self.q)
 
         nodes_pressure = self.mb.tag_get_data(
             self.dirichlet_tag, self.dirichlet_nodes | self.neumann_nodes
@@ -696,7 +852,41 @@ class MpfaD3D:
         _is, js, _ = find(self.T_plus)
         print("vai entrar no calculo do residuo")
         n = 0
-        while max(abs(residual[:len(self.volumes)])) > 1e-3:
+        self.mb.tag_set_data(
+            self.pressure_tag, self.volumes, self.u[:len(self.volumes)]
+        )
+        vols = [
+            self.vol_volumes.get(vol[0]) for vol in self.mb.tag_get_data(
+                self.global_id_tag, self.volumes
+            )
+        ]
+        tol = np.dot(vols, abs(residual[:len(self.volumes)]))
+        # while np.average(abs(residual[:len(self.volumes)])) > 1e-3:
+
+        while tol > 1e-3:
+            self.tag_verts_pressure()
+            # its = list(
+            #     map(self.compute_vert_pressure, self.nodes_ws.keys())
+            # )
+            # import pdb; pdb.set_trace()
+            # bs = {}
+            # for item in its:
+            #     for key, value in item.items():
+            #         if bs.get(key):
+            #             bs[key] = min(bs.get(key), value)
+            #         else:
+            #             pass
+            # limiter = {key}
+            # limiters = {
+            #     key: value for key, value in list(
+            #         map(self.compute_vert_pressure, self.nodes_ws.keys())
+            #     )
+            # }
+            self.grads = {}
+            for volume in self.volumes:
+                vol_id = self.mb.tag_get_data(self.global_id_tag, volume)[0][0]
+                grad = self.get_grad(volume)
+                self.grads.update({vol_id: {"grad": grad, "vol": volume}})
             n += 1
             # print("u_i max")
             self.u_maxs = {}
@@ -747,7 +937,6 @@ class MpfaD3D:
             # print("calculo de slope limiter")
             rows = []
             cols = []
-            import pdb; pdb.set_trace()
             alpha_ijs = []
             [
                 (
@@ -784,13 +973,15 @@ class MpfaD3D:
             f = self.T_plus * self.u
             a_omega_u = - self.T_minus * self.u
             residual = a_omega_u + f
-            print(f"res: {max(abs(residual[:len(self.volumes)]))}")
-
-        self.mb.tag_set_data(self.pressure_tag, self.volumes, self.u[:len(self.volumes)])
-        self.record_data(f'results_crr.vtk')
-        import pdb
-
-        pdb.set_trace()
+            tol = np.dot(vols, abs(residual[:len(self.volumes)]))
+            # print(f"res: {np.average(abs(residual[:len(self.volumes)]))}")
+            print(f"res: {tol}")
+            self.mb.tag_set_data(
+                self.pressure_tag, self.volumes, self.u[:len(self.volumes)]
+            )
+            self.record_data(f'results_crr2.vtk')
+        print("DONE!!!")
+        import pdb; pdb.set_trace()
 
         # self.mb.tag_set_data(self.pressure_tag, self.volumes, self.x)
 

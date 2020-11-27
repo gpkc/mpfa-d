@@ -76,6 +76,63 @@ class MpfaD3D:
         #                     dtype=np.float)
         # self.Q = lil_matrix((len(self.volumes), 1), dtype=np.float)
 
+    def get_grad(self, a_volume):
+        vol_faces = self.mtu.get_bridge_adjacencies(a_volume, 2, 2)
+        vol_nodes = self.mtu.get_bridge_adjacencies(a_volume, 0, 0)
+        vol_crds = self.mb.get_coords(vol_nodes)
+        vol_crds = np.reshape(vol_crds, ([4, 3]))
+        vol_volume = self.mesh_data.get_tetra_volume(vol_crds)
+        I, J, K = self.mtu.get_bridge_adjacencies(vol_faces[0], 2, 0)
+        L = list(
+            set(vol_nodes).difference(
+                set(
+                    self.mtu.get_bridge_adjacencies(
+                        vol_faces[0], 2, 0
+                    )
+                )
+            )
+        )
+        JI = self.mb.get_coords([I]) - self.mb.get_coords([J])
+        JK = self.mb.get_coords([K]) - self.mb.get_coords([J])
+        LJ = self.mb.get_coords([J]) - self.mb.get_coords(L)
+        N_IJK = np.cross(JI, JK) / 2.0
+
+        test = np.dot(LJ, N_IJK)
+        if test < 0.0:
+            I, K = K, I
+            JI = self.mb.get_coords([I]) - self.mb.get_coords(
+                [J]
+            )
+            JK = self.mb.get_coords([K]) - self.mb.get_coords(
+                [J]
+            )
+            N_IJK = np.cross(JI, JK) / 2.0
+
+        tan_JI = np.cross(N_IJK, JI)
+        tan_JK = np.cross(N_IJK, JK)
+        face_area = np.sqrt(np.dot(N_IJK, N_IJK))
+
+        h_L = geo.get_height(N_IJK, LJ)
+
+        p_I = self.mb.tag_get_data(self.node_pressure_tag, I)
+        p_J = self.mb.tag_get_data(self.node_pressure_tag, J)
+        p_K = self.mb.tag_get_data(self.node_pressure_tag, K)
+        p_L = self.mb.tag_get_data(self.node_pressure_tag, L)
+        grad_normal = -2 * (p_J - p_L) * N_IJK
+        grad_cross_I = (p_J - p_I) * (
+            (np.dot(tan_JK, LJ) / face_area ** 2) * N_IJK
+            - (h_L / (face_area)) * tan_JK
+        )
+        grad_cross_K = (p_K - p_J) * (
+            (np.dot(tan_JI, LJ) / face_area ** 2) * N_IJK
+            - (h_L / (face_area)) * tan_JI
+        )
+
+        grad_p = -(1 / (6 * vol_volume)) * (
+            grad_normal + grad_cross_I + grad_cross_K
+        )
+        return grad_p
+
     def record_data(self, file_name):
         """Record data to file."""
         volumes = self.mb.get_entities_by_dimension(0, 3)
@@ -611,7 +668,7 @@ class MpfaD3D:
         print("matrix fill took {0} seconds...".format(mat_fill_time))
         mesh_size = len(self.volumes)
         print("running solver...")
-        USE_DIRECT_SOLVER = True
+        USE_DIRECT_SOLVER = False
         linearProblem = Epetra.LinearProblem(self.T, self.x, self.Q)
         if USE_DIRECT_SOLVER:
             solver = Amesos.Lapack(linearProblem)
@@ -634,7 +691,7 @@ class MpfaD3D:
             solver.SetAztecOption(AztecOO.AZ_pre_calc, AztecOO.AZ_recalc)
             solver.SetAztecOption(AztecOO.AZ_precond, AztecOO.AZ_dom_decomp)
             solver.SetAztecOption(AztecOO.AZ_subdomain_solve, AztecOO.AZ_ilu)
-            solver.SetAztecOption(AztecOO.AZ_kspace, 50)
+            # solver.SetAztecOption(AztecOO.AZ_kspace, )
             # solver.SetAztecOption(AztecOO.AZ_orthog, AztecOO.AZ_modified)
             # solver.SetAztecOption(AztecOO.AZ_conv, AztecOO.AZ_Anorm)
             solver.Iterate(10000, 1e-5)
