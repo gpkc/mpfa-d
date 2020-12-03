@@ -4,12 +4,6 @@ from solvers.nMpfaD import MpfaD3D
 # from mpfad.interpolation.LPEW3 import LPEW3
 from preprocessor.mesh_preprocessor import MeshManager
 
-array([-1.40672832e+00, -1.59987678e-01, -8.04291298e-02, -1.17397012e+00,
-        7.91400462e-02, -3.61799920e+02,  3.59936432e+02,  3.60650141e+02,
-       -3.61086220e+02, -1.70530257e-13, -8.68354274e-01, -1.67221135e-01,
-       -4.97151928e-01, -1.59009457e+00, -8.10739294e-02])
-
-
 
 class ObliqueDrain:
     def __init__(self, filename):

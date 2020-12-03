@@ -511,7 +511,6 @@ class MpfaD3D:
     def compute_alpha(
         self, i, _j, mi=None
     ):
-        import pdb; pdb.set_trace()
         if _j >= len(self.volumes):
             # _j = j
             idx = list(self.expanded_matrix_node_ids.values()).index(_j)
@@ -536,7 +535,7 @@ class MpfaD3D:
             avg_dist = np.asarray(
                 [sum(volumes * dists[:, i]) / sum(volumes) for i in range(3)]
             )
-            mi = np.dot(coords_i - avg_dist, grad_i[0])
+            mi = np.dot(avg_dist - coords_i, grad_i[0])
             # mi = np.dot(
             #     np.asarray(
             #         [np.dot(grad, dist) for grad, dist in zip(grads, dists)]
@@ -547,15 +546,15 @@ class MpfaD3D:
             u_i_min = self.u_mins[i]
             u_i = self.u[i]
             u_j = self.u[_j]
-            if u_i < u_j:
+            if u_i > u_j:
                 s_ij = min(2 * mi * (u_i_max - u_i), u_i - u_j)
             else:
                 s_ij = max(2 * mi * (u_i_min - u_i), u_i - u_j)
         else:
             grad_i = self.grads.get(i).get("grad")
             coords_i = self.mb.get_coords(self.grads.get(i).get('vol'))
-            grad_j = self.grads.get(j).get("grad")
-            coords_j = self.mb.get_coords(self.grads.get(j).get('vol'))
+            grad_j = self.grads.get(_j).get("grad")
+            coords_j = self.mb.get_coords(self.grads.get(_j).get('vol'))
             u_i_max = self.u_maxs[i]
             u_i_min = self.u_mins[i]
             u_j_min = self.u_mins[_j]
@@ -580,11 +579,12 @@ class MpfaD3D:
                     2 * mi_ji * (u_j - u_i_max),
                 )
         try:
-            alpha = s_ij / (u_i - u_j)
+            alpha = (s_ij + 1e-20) / (u_i - u_j + 1e-20)
         except ZeroDivisionError:
             alpha = 1
-        alpha = max(0, alpha)
+        # alpha = max(0, alpha)
         # alpha = 1
+
         return alpha
 
     def run_solver(self, interpolation_method):
@@ -841,15 +841,16 @@ class MpfaD3D:
         self.T_plus[_is, _is] = -self.T_plus[_is].sum(axis=1).transpose()
         self.T_minus = self.T_expanded - self.T_plus
         self.q = self.Q.tocsc()
-        self.u[: len(self.volumes)] = spsolve(self.T_expanded[0: len(self.volumes), 0: len(self.volumes)], self.q)
-
+        # self.u[: len(self.volumes)] = spsolve(
+        #     self.T_minus[0: len(self.volumes), 0: len(self.volumes)], self.q
+        # )
         nodes_pressure = self.mb.tag_get_data(
             self.dirichlet_tag, self.dirichlet_nodes | self.neumann_nodes
         )
         self.u[len(self.volumes):] = nodes_pressure[:, 0]
-        residual = -self.T_minus * self.u
-        self.T_plus_aux = self.T_plus
-        _is, js, _ = find(self.T_plus)
+        residual = self.q.transpose() - \
+            ((self.T_minus - self.T_plus) * self.u)[:len(self.volumes)]
+        residual = np.asarray(residual).flatten()
         print("vai entrar no calculo do residuo")
         n = 0
         self.mb.tag_set_data(
@@ -862,8 +863,8 @@ class MpfaD3D:
         ]
         tol = np.dot(vols, abs(residual[:len(self.volumes)]))
         # while np.average(abs(residual[:len(self.volumes)])) > 1e-3:
-
         while tol > 1e-3:
+            _is, js, _ = find(self.T_plus)
             self.tag_verts_pressure()
             # its = list(
             #     map(self.compute_vert_pressure, self.nodes_ws.keys())
@@ -889,52 +890,88 @@ class MpfaD3D:
                 self.grads.update({vol_id: {"grad": grad, "vol": volume}})
             n += 1
             # print("u_i max")
+
+
+            # apply method for looping through the volumes.
+            # Get all neighbour volumes
+            # Get current pressure value and assign maxima/minima associated
+            # to the volume in question
+            # check if there are boundary nodes in the neighborhood
+            # If true, check for their values as well and compare to
+            # current assigned maxima/minima values
+            self.max_min = {}
             self.u_maxs = {}
-            [
-                self.u_maxs.update({
-                    i: max(
-                            0,
-                            self.u[i]
-                            + max(
-                                [
-                                    self.u[j] - self.u[i]
-                                    for j in self.mb.tag_get_data(
-                                        self.global_id_tag,
-                                        self.mtu.get_bridge_adjacencies(
-                                            self.volumes[i], 0, 3
-                                        )
-                                    )
-                                    if j != i
-                                ]
-                            ),
-                        )
-                    }) for i in range(len(self.volumes))
-            ]
-            # print("u_i min")
             self.u_mins = {}
-            [
-                self.u_mins.update({
-                    i: min(
-                            0,
-                            self.u[i]
-                            + min(
-                                [
-                                    self.u[j] - self.u[i]
-                                    for j in self.mb.tag_get_data(
-                                        self.global_id_tag,
-                                        self.mtu.get_bridge_adjacencies(
-                                            self.volumes[i], 0, 3))
-                                    if j != i
-                                ]
-                            ),
-                        )
-                    }) for i in range(len(self.volumes))
-            ]
-            # print("u_j max")
-            # print(f"Solution: u_max: \
-            #       {max(self.u[:len(self.volumes)])} \
-            #       u_min: {min(self.u[:len(self.volumes)])}")
-            # print("calculo de slope limiter")
+            for volume in self.volumes:
+                adj_volumes = self.mtu.get_bridge_adjacencies(
+                    volume, 2, 3
+                )
+                # volumes_in_patch = [*adj_volumes]
+                # volumes_in_patch.append(volume)
+                volumes_in_patch_ids = self.mb.tag_get_data(
+                    self.global_id_tag, adj_volumes
+                )
+                volume_id = self.mb.tag_get_data(
+                    self.global_id_tag, volume
+                )
+                neigh_pressure = self.u[volumes_in_patch_ids].flatten()
+                max_in_vols = max(neigh_pressure)
+                min_in_vols = min(neigh_pressure)
+                if len(adj_volumes) < 4:
+                    vol_verts = self.mtu.get_bridge_adjacencies(
+                        volume, 3, 0
+                    )
+                    adj_vols_verts = [
+                        self.mtu.get_bridge_adjacencies(
+                            adj_volume, 3, 0
+                            ) for adj_volume in adj_volumes
+                    ]
+                    adj_vols_verts.append(vol_verts)
+                    adj_vols_verts = np.asarray(
+                        adj_vols_verts, dtype='uint64'
+                    ).flatten()
+                    adj_vols_verts_as_set = set(adj_vols_verts)
+                    boundary_verts = adj_vols_verts_as_set.intersection(
+                        self.dirichlet_nodes
+                    )
+                    if boundary_verts:
+                        boundary_verts_as_list = list(boundary_verts)
+                        verts_pressure = np.asarray([
+                            self.get_boundary_node_pressure(node)
+                            for node in boundary_verts_as_list
+                        ]).flatten()
+                        try:
+                            max_in_verts = max(verts_pressure)
+                            min_in_verts = min(verts_pressure)
+                        except:
+                            import pdb; pdb.set_trace()
+                try:
+                    self.max_min.update(
+                        {
+                            volume: (
+                                max(max_in_vols, max_in_verts),
+                                min(min_in_vols, min_in_verts)
+                            )
+                        }
+                    )
+                except UnboundLocalError:
+                    self.max_min.update(
+                        {
+                            volume: (
+                                max_in_vols,
+                                min_in_vols
+                            )
+                        }
+                    )
+                try:
+                    self.u_maxs.update(
+                        {volume_id[0][0]: self.max_min.get(volume)[0]}
+                    )
+                    self.u_mins.update(
+                        {volume_id[0][0]: self.max_min.get(volume)[1]}
+                    )
+                except:
+                    import pdb; pdb.set_trace()
             rows = []
             cols = []
             alpha_ijs = []
@@ -947,20 +984,22 @@ class MpfaD3D:
                     ),
                 ) for i, j in zip(_is, js) if i != j
             ]
+            import pdb; pdb.set_trace()
             # print(f"max alpha: {max(alpha_ijs)} min alpha: {min(alpha_ijs)}")
             # print("vai recalcular T_plus")
             t0 = time.time()
-            new_vals = [
-                self.T_plus[i, j] * alpha for i, j, alpha in zip(
-                    rows, cols, alpha_ijs
-                )
-            ]
-            self.T_plus[rows, cols] = new_vals
-            self.T_plus[
-                range(len(self.u)), range(len(self.u))
-            ] = self.T_plus.sum(axis=1).transpose() - self.T_plus.diagonal()
+            # new_vals = [
+            #     self.T_plus[i, j] * alpha for i, j, alpha in zip(
+            #         rows, cols, alpha_ijs
+            #     )
+            # ]
+            self.T_plus_aux = self.T_plus.copy()
+            aux = self.T_plus[rows, cols].copy()
+            aux = np.multiply(alpha_ijs, self.T_plus[rows, cols].copy().toarray()).flatten()
+            self.T_plus_aux[rows, cols] = aux
+            self.T_plus_aux[range(len(self.u)), range(len(self.u))] = self.T_plus_aux.sum(axis=1).transpose() - self.T_plus_aux.diagonal()
             # print("Refaz o assembly da matry com novos fluxos")
-            self.T_expanded = self.T_minus + self.T_plus
+            self.T_expanded = self.T_minus + self.T_plus_aux
             # print("calculo do termo fonte")
             _q = (
                 -self.T_expanded[: len(self.volumes), len(self.volumes):]
@@ -970,9 +1009,9 @@ class MpfaD3D:
             self.u[: len(self.volumes)] = spsolve(
                 self.T_expanded[: len(self.volumes), : len(self.volumes)], _q
             )
-            f = self.T_plus * self.u
-            a_omega_u = - self.T_minus * self.u
-            residual = a_omega_u + f
+            residual = np.asarray(_q).flatten() - (
+                self.T_expanded * self.u
+            )[:len(self.volumes)]
             tol = np.dot(vols, abs(residual[:len(self.volumes)]))
             # print(f"res: {np.average(abs(residual[:len(self.volumes)]))}")
             print(f"res: {tol}")

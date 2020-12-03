@@ -1,16 +1,16 @@
-import os
-
-from preprocessor.benchmark_mesh_generator import BenchMeshGenerator
-
-from solvers.interpolation.IDW import IDW
+# import os
+#
+# from preprocessor.benchmark_mesh_generator import BenchMeshGenerator
+#
+# from solvers.interpolation.IDW import IDW
 from solvers.interpolation.LPEW3 import LPEW3
-from solvers.interpolation.LSW import LSW
+# from solvers.interpolation.LSW import LSW
 
-from single_phase_cases.benchmark_fvca import BenchmarkFVCA
+# from single_phase_cases.benchmark_fvca import BenchmarkFVCA
 
 from single_phase_cases.oblique_drain import ObliqueDrain
-from single_phase_cases.discrete_maximum_principle import DiscreteMaxPrinciple
-from single_phase_cases.mpfad_mge_tests import TestCasesMGE
+# from single_phase_cases.discrete_maximum_principle import DiscreteMaxPrinciple
+# from single_phase_cases.mpfad_mge_tests import TestCasesMGE
 
 interpolation_methods = [LPEW3]
 # benchmark_fvca_cases = [2]
@@ -45,8 +45,8 @@ interpolation_methods = [LPEW3]
 #         DiscreteMaxPrinciple(mesh_dmp, im).run_lai_sheng_dmp_test()
 # #
 meshes = {
-    # "meshes/oblique-drain.msh": "distort",
-    "meshes/mesh_slanted_mesh.h5m": "coarse_mesh",
+    "meshes/oblique-drain.msh": "distort",
+    # "meshes/mesh_slanted_mesh.h5m": "coarse_mesh",
 }
 for setCase, logName in meshes.items():
     for im in interpolation_methods:
