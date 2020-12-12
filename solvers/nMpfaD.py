@@ -28,9 +28,11 @@ class MpfaD3D:
         self.dirichlet_tag = mesh_data.dirichlet_tag
         self.neumann_tag = mesh_data.neumann_tag
         self.perm_tag = mesh_data.perm_tag
+
         self.source_tag = mesh_data.source_tag
         self.global_id_tag = mesh_data.global_id_tag
         self.volume_centre_tag = mesh_data.volume_centre_tag
+
         self.pressure_tag = mesh_data.pressure_tag
         self.velocity_tag = mesh_data.velocity_tag
         self.node_pressure_tag = mesh_data.node_pressure_tag
@@ -56,8 +58,8 @@ class MpfaD3D:
                 0, types.MBVERTEX, self.neumann_tag, np.array((None,))
             )
         )
+        # Removes vertices that have both Neumann and Dirichlet tag, but prior Dirichlet tags
         self.neumann_nodes = self.neumann_nodes - self.dirichlet_nodes
-
         boundary_nodes = self.dirichlet_nodes | self.neumann_nodes
         self.intern_nodes = set(self.mesh_data.all_nodes) - boundary_nodes
 
@@ -70,19 +72,12 @@ class MpfaD3D:
         std_map = Epetra.Map(len(self.volumes), 0, self.comm)
         self.T = Epetra.CrsMatrix(Epetra.Copy, std_map, 0)
         self.Q = lil_matrix((len(self.volumes), 1), dtype=np.float)
+        self._Q = Epetra.Vector(std_map)
         if x is None:
             self.x = Epetra.Vector(std_map)
             self.dx = Epetra.Vector(std_map)
         else:
             self.x = x
-        # self.T_plus = lil_matrix((len(self.volumes), len(self.volumes)),
-        #                     dtype=np.float)
-        # self._T = lil_matrix((len(self.volumes), len(self.volumes)),
-        #                     dtype=np.float)
-        # self._T_plus = lil_matrix((len(self.volumes), len(self.volumes)),
-        #                     dtype=np.float)
-        # self.T_minus = lil_matrix((len(self.volumes), len(self.volumes)),
-        #                     dtype=np.float)
         expanded_matrix = len(self.volumes) + len(boundary_nodes)
         self.T_expanded = lil_matrix(
             (expanded_matrix, expanded_matrix), dtype=np.float
@@ -481,8 +476,8 @@ class MpfaD3D:
         if node in self.dirichlet_nodes:
             pressure = self.get_boundary_node_pressure(node)
             node_id = self.expanded_matrix_node_ids[node]
-            # self.Q[id_left] += RHS * pressure
-            # self.Q[id_right] += -RHS * pressure
+            self._Q[id_left] += RHS * pressure
+            self._Q[id_right] += -RHS * pressure
             self.Q[id_left[0], 0] += RHS * pressure
             self.Q[id_right[0], 0] += -RHS * pressure
             self.T_expanded[id_left[0][0], node_id[0]] -= RHS
@@ -497,8 +492,8 @@ class MpfaD3D:
 
         if node in self.neumann_nodes:
             neu_term = self.nodes_nts[node]
-            # self.Q[id_right] += -RHS * neu_term
-            # self.Q[id_left] += RHS * neu_term
+            self._Q[id_right] += -RHS * neu_term
+            self._Q[id_left] += RHS * neu_term
             self.Q[id_right, 0] += -RHS * neu_term
             self.Q[id_left, 0] += RHS * neu_term
 
@@ -578,11 +573,12 @@ class MpfaD3D:
                     u_i - u_j,
                     2 * mi_ji * (u_j - u_i_max),
                 )
-        try:
-            alpha = (s_ij + 1e-20) / (u_i - u_j + 1e-20)
-        except ZeroDivisionError:
-            alpha = 1
-        # alpha = max(0, alpha)
+        # try:
+        #     alpha = (s_ij) / (u_i - u_j)
+        # except ZeroDivisionError:
+        alpha = (s_ij + 1e-20) / (u_i - u_j + 1e-20)
+        # TODO: testar abrir a malha com apenas alpha na iteração
+
         # alpha = 1
 
         return alpha
@@ -610,7 +606,7 @@ class MpfaD3D:
                     0
                 ][0]
                 RHS = self.mb.tag_get_data(self.source_tag, volume)[0][0]
-                # self.Q[volume_id] += RHS
+                self._Q[volume_id] += RHS
                 self.Q[volume_id, 0] += RHS
         except Exception:
             pass
@@ -627,7 +623,7 @@ class MpfaD3D:
             node_crds = self.mb.get_coords(face_nodes).reshape([3, 3])
             face_area = geo._area_vector(node_crds, norma=True)
             RHS = face_mobility * face_flow * face_area
-            # self.Q[id_volume] += -RHS
+            self._Q[id_volume] += -RHS
             self.Q[id_volume, 0] += -RHS
 
         id_volumes = []
@@ -703,7 +699,7 @@ class MpfaD3D:
                 }
             )
             antidiffusive_flux[id_volume].append(fluxes)
-            # self.Q[id_volume] += -RHS
+            self._Q[id_volume] += -RHS
             self.Q[id_volume, 0] += -RHS
             # self.T_expanded[:len(self.volumes), len(self.volumes):len(self.u)] * self.u[len(self.volumes):]
             # self.mb.tag_set_data(self.flux_info_tag, face,
@@ -827,11 +823,76 @@ class MpfaD3D:
         self.T.InsertGlobalValues(id_volumes, id_volumes, all_LHS)
         self.T.InsertGlobalValues(all_cols, all_rows, all_values)
         self.T.FillComplete()
+        # mesh_size = len(self.volumes)
+        # print("running solver...")
+        # USE_DIRECT_SOLVER = False
+        # linearProblem = Epetra.LinearProblem(self.T, self.x, self._Q)
+        # if USE_DIRECT_SOLVER:
+        #     solver = Amesos.Lapack(linearProblem)
+        #     print("1) Performing symbolic factorizations...")
+        #     solver.SymbolicFactorization()
+        #     print("2) Performing numeric factorizations...")
+        #     solver.NumericFactorization()
+        #     print("3) Solving the linear system...")
+        #     solver.Solve()
+        #     t = time.time() - t0
+        #     print(
+        #         "Solver took {0} seconds to run over {1} volumes".format(
+        #             t, mesh_size
+        #         )
+        #     )
+        # else:
+        #     solver = AztecOO.AztecOO(linearProblem)
+        #     solver.SetAztecOption(AztecOO.AZ_solver, AztecOO.AZ_gmres)
+        #     solver.SetAztecOption(AztecOO.AZ_output, AztecOO.AZ_none)
+        #     solver.SetAztecOption(AztecOO.AZ_precond, AztecOO.AZ_Jacobi)
+        #     solver.SetAztecOption(AztecOO.AZ_kspace, 1251)
+        #     solver.SetAztecOption(AztecOO.AZ_orthog, AztecOO.AZ_modified)
+        #     solver.SetAztecOption(AztecOO.AZ_conv, AztecOO.AZ_Anorm)
+        #     solver.Iterate(8000, 1e-10)
+        #     t = time.time() - t0
+        #     its = solver.GetAztecStatus()[0]
+        #     solver_time = solver.GetAztecStatus()[6]
+        #     print(
+        #         "Solver took {0} seconds to run over {1} volumes".format(
+        #             t, mesh_size
+        #         )
+        #     )
+        #     print(
+        #         "Solver converged at %.dth iteration in %3f seconds."
+        #         % (int(its), solver_time)
+        #     )
+        # self.mb.tag_set_data(self.pressure_tag, self.volumes, self.x)
+        # coords_x = [
+        #     coords[0] for coords in self.mb.get_coords(
+        #         self.volumes
+        #     ).reshape([len(self.volumes), 3])
+        # ]
+        # with open('nresults.csv', 'w') as results:
+        #     for coord, x in zip(coords_x, self.x):
+        #         results.write(f"{str(coord)};{str(x)}\n")
+        # print("asdfasdlkforgnadmfbnsorjgalçskdfnsdçfgm\nasdkjfhaskldfhaklsdjh")
+        # import pdb
+        # pdb.set_trace()
         for i in range(len(self.volumes)):
             for j in range(len(self.volumes)):
                 if self.T[i][j]:
                     self.T_expanded[i, j] = self.T[i][j]
         _is, js, values = find(self.T_expanded)
+        self.q = np.asarray(self._Q)
+        self.T_expanded.tocsc()
+        # self.u[: len(self.volumes)] = spsolve(
+        #     self.T_expanded[0: len(self.volumes), 0: len(self.volumes)],
+        #     self.q[0: len(self.volumes)]
+        # )
+        # coords_x = [
+        #     coords[0] for coords in self.mb.get_coords(
+        #         self.volumes
+        #     ).reshape([len(self.volumes), 3])
+        # ]
+        # with open('n_t_expanded_results.csv', 'w') as results:
+        #     for coord, x in zip(coords_x, self.u[: len(self.volumes)]):
+        #         results.write(f"{str(coord)};{str(x)}\n")
         self.T_plus[
             [i for i, j in zip(_is, js) if i != j],
             [j for i, j in zip(_is, js) if i != j],
@@ -840,16 +901,13 @@ class MpfaD3D:
         )
         self.T_plus[_is, _is] = -self.T_plus[_is].sum(axis=1).transpose()
         self.T_minus = self.T_expanded - self.T_plus
-        self.q = self.Q.tocsc()
-        # self.u[: len(self.volumes)] = spsolve(
-        #     self.T_minus[0: len(self.volumes), 0: len(self.volumes)], self.q
-        # )
         nodes_pressure = self.mb.tag_get_data(
-            self.dirichlet_tag, self.dirichlet_nodes | self.neumann_nodes
+            self.dirichlet_tag, self.dirichlet_nodes
         )
         self.u[len(self.volumes):] = nodes_pressure[:, 0]
-        residual = self.q.transpose() - \
-            ((self.T_minus - self.T_plus) * self.u)[:len(self.volumes)]
+        residual = self._Q - (
+                (self.T_minus + self.T_plus)[:len(self.volumes), :len(self.volumes)] * self.u[:len(self.volumes)]
+        )
         residual = np.asarray(residual).flatten()
         print("vai entrar no calculo do residuo")
         n = 0
@@ -863,6 +921,7 @@ class MpfaD3D:
         ]
         tol = np.dot(vols, abs(residual[:len(self.volumes)]))
         # while np.average(abs(residual[:len(self.volumes)])) > 1e-3:
+        myCounter = 0
         while tol > 1e-3:
             _is, js, _ = find(self.T_plus)
             self.tag_verts_pressure()
@@ -889,16 +948,6 @@ class MpfaD3D:
                 grad = self.get_grad(volume)
                 self.grads.update({vol_id: {"grad": grad, "vol": volume}})
             n += 1
-            # print("u_i max")
-
-
-            # apply method for looping through the volumes.
-            # Get all neighbour volumes
-            # Get current pressure value and assign maxima/minima associated
-            # to the volume in question
-            # check if there are boundary nodes in the neighborhood
-            # If true, check for their values as well and compare to
-            # current assigned maxima/minima values
             self.max_min = {}
             self.u_maxs = {}
             self.u_mins = {}
@@ -906,8 +955,6 @@ class MpfaD3D:
                 adj_volumes = self.mtu.get_bridge_adjacencies(
                     volume, 2, 3
                 )
-                # volumes_in_patch = [*adj_volumes]
-                # volumes_in_patch.append(volume)
                 volumes_in_patch_ids = self.mb.tag_get_data(
                     self.global_id_tag, adj_volumes
                 )
@@ -940,38 +987,22 @@ class MpfaD3D:
                             self.get_boundary_node_pressure(node)
                             for node in boundary_verts_as_list
                         ]).flatten()
-                        try:
-                            max_in_verts = max(verts_pressure)
-                            min_in_verts = min(verts_pressure)
-                        except:
-                            import pdb; pdb.set_trace()
-                try:
-                    self.max_min.update(
-                        {
-                            volume: (
-                                max(max_in_vols, max_in_verts),
-                                min(min_in_vols, min_in_verts)
-                            )
-                        }
-                    )
-                except UnboundLocalError:
-                    self.max_min.update(
-                        {
-                            volume: (
-                                max_in_vols,
-                                min_in_vols
-                            )
-                        }
-                    )
+                        max_in_verts = max(verts_pressure)
+                        min_in_verts = min(verts_pressure)
                 try:
                     self.u_maxs.update(
-                        {volume_id[0][0]: self.max_min.get(volume)[0]}
+                        {volume_id[0][0]: max(max_in_vols, max_in_verts)}
                     )
                     self.u_mins.update(
-                        {volume_id[0][0]: self.max_min.get(volume)[1]}
+                        {volume_id[0][0]: min(min_in_vols, min_in_verts)}
                     )
-                except:
-                    import pdb; pdb.set_trace()
+                except UnboundLocalError:
+                    self.u_maxs.update(
+                        {volume_id[0][0]: max_in_vols}
+                    )
+                    self.u_mins.update(
+                        {volume_id[0][0]: min_in_vols}
+                    )
             rows = []
             cols = []
             alpha_ijs = []
@@ -984,7 +1015,6 @@ class MpfaD3D:
                     ),
                 ) for i, j in zip(_is, js) if i != j
             ]
-            import pdb; pdb.set_trace()
             # print(f"max alpha: {max(alpha_ijs)} min alpha: {min(alpha_ijs)}")
             # print("vai recalcular T_plus")
             t0 = time.time()
@@ -993,32 +1023,37 @@ class MpfaD3D:
             #         rows, cols, alpha_ijs
             #     )
             # ]
+            # max(self.u[:len(self.volumes)])
+            # min(self.u[:len(self.volumes)])
+            # self.T_expanded[1579,1579]
+            import pdb;
             self.T_plus_aux = self.T_plus.copy()
             aux = self.T_plus[rows, cols].copy()
             aux = np.multiply(alpha_ijs, self.T_plus[rows, cols].copy().toarray()).flatten()
             self.T_plus_aux[rows, cols] = aux
-            self.T_plus_aux[range(len(self.u)), range(len(self.u))] = self.T_plus_aux.sum(axis=1).transpose() - self.T_plus_aux.diagonal()
+            self.T_plus_aux[range(len(self.u)), range(len(self.u))] = -self.T_plus_aux.sum(axis=1).transpose() + self.T_plus_aux.diagonal()
             # print("Refaz o assembly da matry com novos fluxos")
+            pdb.set_trace()
             self.T_expanded = self.T_minus + self.T_plus_aux
             # print("calculo do termo fonte")
             _q = (
                 -self.T_expanded[: len(self.volumes), len(self.volumes):]
                 * nodes_pressure
             )
-            # print("calculo de pressao u")
+            print("calculo de pressao u")
             self.u[: len(self.volumes)] = spsolve(
                 self.T_expanded[: len(self.volumes), : len(self.volumes)], _q
             )
-            residual = np.asarray(_q).flatten() - (
-                self.T_expanded * self.u
-            )[:len(self.volumes)]
+            residual = np.asarray(_q).flatten() - (self.T_expanded * self.u)[:len(self.volumes)]
             tol = np.dot(vols, abs(residual[:len(self.volumes)]))
             # print(f"res: {np.average(abs(residual[:len(self.volumes)]))}")
             print(f"res: {tol}")
-            self.mb.tag_set_data(
-                self.pressure_tag, self.volumes, self.u[:len(self.volumes)]
-            )
-            self.record_data(f'results_crr2.vtk')
+            self.mb.tag_set_data(self.pressure_tag, self.volumes, self.u[:len(self.volumes)])
+            self.record_data(f'results_crr_{myCounter}.vtk')
+            myCounter += 1
+            if myCounter > 20:
+                import pdb; pdb.set_trace()
+                exit()
         print("DONE!!!")
         import pdb; pdb.set_trace()
 

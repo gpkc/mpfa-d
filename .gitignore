@@ -128,3 +128,4 @@ paper_mpfad_tests/
 run_enchmark.cprof
 galileo/
 .vscode/
+nresults.csv n_t_expanded_results.csv press.csv results.csv rs.csv

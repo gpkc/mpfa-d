@@ -1,7 +1,7 @@
 """Tests for linearity preserving solutions."""
 import unittest
 import numpy as np
-from solvers.MpfaD import MpfaD3D
+from solvers.nMpfaD import MpfaD3D
 from solvers.interpolation.LPEW3 import LPEW3
 from preprocessor.mesh_preprocessor import MeshManager
 
@@ -123,6 +123,7 @@ class LinearityPreservingTests(unittest.TestCase):
         self.mpfad_homogeneous.run_solver(
             LPEW3(self.mesh_homogeneous).interpolate
         )
+        import pdb; pdb.set_trace()
         for volume in allVolumes:
             coords = mb.get_coords([volume])
             u = self.psol1(coords)
