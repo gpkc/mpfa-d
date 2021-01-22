@@ -2,4 +2,6 @@ flake8>=3.6.0,<3.7.0
 matplotlib
 scipy
 pandas==0.24.2
+pysqlite3
 openpyxl
+ipython

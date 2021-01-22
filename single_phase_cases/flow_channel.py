@@ -1,3 +1,5 @@
+import pdb
+
 import numpy as np
 # from solvers.MpfaD import MpfaD3D
 from solvers.nMpfaD import MpfaD3D
@@ -14,6 +16,7 @@ class FlowChannel:
              0.0, 1.0, 0.0,
              0.0, 0.0, 1.0]
         )
+        # mesh_test_conservative
         self.mesh = MeshManager("meshes/mesh_test_conservative.msh", dim=3)
         self.mesh.set_media_property("Permeability", {1: K_1}, dim_target=3)
         self.mesh.set_boundary_condition(

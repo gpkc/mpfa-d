@@ -47,7 +47,7 @@ from single_phase_cases.flow_channel import FlowChannel
 #         DiscreteMaxPrinciple(mesh_dmp, im).run_lai_sheng_dmp_test()
 # #
 # meshes = {
-#     "meshes/oblique-drain.msh": "distort",
+    #     "meshes/oblique-drain.msh": "distort",
 #     # "meshes/mesh_slanted_mesh.h5m": "coarse_mesh",
 # }
 # for setCase, logName in meshes.items():
@@ -56,6 +56,12 @@ from single_phase_cases.flow_channel import FlowChannel
 #         ObliqueDrain(setCase).runCase(im, logName)
 
 
-FlowChannel()
-
-
+fl = FlowChannel()
+rows, cols = fl.mpfad.get_global_rows()
+volumes = fl.mpfad.volumes
+A = fl.mpfad.copy_mat(rows, cols, shape=len(volumes))
+q = fl.mpfad.Q.toarray()
+x = fl.mpfad.solve_original_problem(A, q)
+fl.mpfad.mb.tag_set_data(fl.mpfad.pressure_tag, volumes, x)
+fl.mpfad.tag_verts_pressure()
+fl.mpfad.compute_slip_fact()

@@ -52,10 +52,10 @@ Physical Point(202) = {2, 3, 7, 6};
 
 Physical Surface(201) = {18, 14, 22, 16};
 Physical Surface(102) = {24};
-Physical Surface(202) = {20};
+Physical Surface(101) = {20};
 
 Physical Volume(1) = {26};
-Transfinite Line {7, 5, 1, 2, 6, 10, 11, 3, 12, 8, 9, 4} = 4 Using Progression 1;
+Transfinite Line {7, 5, 1, 2, 6, 10, 11, 3, 12, 8, 9, 4} = 4 Using Progression 10;
 Transfinite Surface {16};
 Transfinite Surface {22};
 Transfinite Surface {24};
@@ -63,6 +63,3 @@ Transfinite Surface {20};
 Transfinite Surface {14};
 Transfinite Surface {18};
 Transfinite Volume {26};
-Physical Surface(101) = {24};
-Physical Surface(1cd ..) += {20};
-Physical Surface(201) += {22, 14, 16, 18};
